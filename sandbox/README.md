@@ -22,6 +22,45 @@ npm.cmd run screenshots
 
 Use `npm.cmd` on this Windows machine because PowerShell blocks `npm.ps1`.
 
+## Docker
+
+Build the image from `D:\Hrproject\sandbox`:
+
+```bash
+docker build -t hr-ememo-sandbox .
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 3000:3000 hr-ememo-sandbox
+```
+
+Open `http://localhost:3000`.
+
+For a server that should keep the app running continuously, use Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+This project ships with `compose.yaml` using:
+
+- `restart: unless-stopped`
+- fixed container name: `hr-ememo-sandbox`
+- host port `3000` mapped to container port `3000`
+
+Useful server commands:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose restart
+docker compose down
+```
+
+If the server reboots, the container will start again automatically as long as the Docker service itself starts on boot.
+
 ## Current Scope
 
 - Dashboard for memo volume, pending approvals, approval cycle time, and approval queue.
