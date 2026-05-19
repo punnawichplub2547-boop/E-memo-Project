@@ -14,6 +14,8 @@ import Link from "next/link";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#047857", "#B45309", "#BE123C", "#0891B2", "#6D28D9"];
 const avatarColor = (s: string) => AVATAR_COLORS[s.charCodeAt(0) % AVATAR_COLORS.length];
+const routeSummary = (memo: MemoRecord) =>
+  memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
 
 type TabStatus = "all" | "pending" | "approved" | "rejected" | "draft" | "returned";
 
@@ -125,7 +127,8 @@ export default function QueuePage() {
                           {isMd && <IconCrown size={14} style={{ color: "var(--gold)" }} />}
                           <span>{r.title}</span>
                         </div>
-                        {isMd && <div style={{ fontSize: 11, color: "#7C5E0F", marginTop: 3, fontWeight: 600 }}>Executive tier · &gt;50,000 THB</div>}
+                        {isMd && <div style={{ fontSize: 11, color: "#7C5E0F", marginTop: 3, fontWeight: 600 }}>Executive route · {r.routeMode ?? "Book1"}</div>}
+                        {r.routeMode === "exception" && <div style={{ fontSize: 11, color: "var(--amber)", marginTop: 3, fontWeight: 600 }}>Route exception · reason captured</div>}
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -197,12 +200,21 @@ function DrawerPanel({ memo, onClose, onAction }: { memo: MemoRecord; onClose: (
             <dt>Category</dt><dd>{approvalLabels[memo.category]}</dd>
             <dt>Amount</dt><dd className="em-amt" style={{ fontSize: 15 }}>฿{memo.amount.toLocaleString()} <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>THB</span></dd>
             <dt>Approver</dt><dd>{memo.currentStep}</dd>
+            <dt>Selected route</dt><dd>{routeSummary(memo)}</dd>
+            <dt>Workflow state</dt><dd>{memo.workflowState ?? (memo.status === "approved" ? "Approved" : memo.status === "rejected" ? "Rejected" : "Issued")}</dd>
+            {memo.readRecipients && memo.readRecipients.length > 0 && (<><dt>Read by</dt><dd>{memo.readRecipients.join(", ")}</dd></>)}
+            {memo.routeOverrideReason && (<><dt>Exception reason</dt><dd>{memo.routeOverrideReason}</dd></>)}
             <dt>Updated</dt><dd>{memo.updatedAt}</dd>
           </dl>
         </section>
         <hr className="em-divider" />
         <section>
           <div className="em-eyebrow" style={{ marginBottom: 8 }}>Workflow</div>
+          <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12.5, color: "var(--ink-2)", marginBottom: 10 }}>
+            <strong>Selected route:</strong> {routeSummary(memo)}
+            {memo.routeMode === "exception" && <div style={{ color: "var(--amber)", fontWeight: 600, marginTop: 3 }}>Exception: {memo.routeOverrideReason}</div>}
+            {memo.readRecipients && memo.readRecipients.length > 0 && <div style={{ color: "var(--muted)", marginTop: 3 }}>Read: {memo.readRecipients.join(", ")}</div>}
+          </div>
           <div className="em-flow">
             <div className={`em-flow-step done`}>
               <div className="em-flow-dot"><IconCheck size={14} /></div>

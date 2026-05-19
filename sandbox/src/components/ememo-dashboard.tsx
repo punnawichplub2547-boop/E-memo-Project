@@ -40,7 +40,8 @@ const statusLabel = {
   draft: "Draft",
   pending: "Pending",
   approved: "Approved",
-  rejected: "Rejected"
+  rejected: "Rejected",
+  returned: "Returned"
 };
 
 export function EMemoDashboard() {

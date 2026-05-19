@@ -7,18 +7,60 @@ export type ApprovalCategory =
 
 export type BudgetStatus = "in-budget" | "over-budget" | "no-budget";
 
-export type ApprovalInput = {
-  category: ApprovalCategory;
-  amount: number;
-  budgetStatus: BudgetStatus;
-};
-
 export type ApprovalLevel =
   | "Manager / Top Section"
   | "General Manager"
   | "Managing Director";
 
-export type MemoStatus = "draft" | "pending" | "approved" | "rejected";
+export type WorkflowState =
+  | "Issued"
+  | "Checked"
+  | "Read"
+  | "Approved"
+  | "Rejected";
+
+export type ApprovalRouteMode = "recommended" | "escalated" | "exception";
+
+export type ApprovalRouteReview = {
+  recommendedRoute: ApprovalLevel[];
+  selectedRoute: ApprovalLevel[];
+  mode: ApprovalRouteMode;
+  requiresReason: boolean;
+  reasonLabel: string;
+};
+
+export type ApprovalInput = {
+  category: ApprovalCategory;
+  amount: number;
+  budgetStatus: BudgetStatus;
+  /** Supplier price adjustment - categories 1 and 2 only; triggers MD notification */
+  isPriceAdjustment?: boolean;
+  /** Raw material per production plan - recommend GM regardless of amount */
+  followsProductionPlan?: boolean;
+  /** Raw material flagged as dead stock or slow movement - UI tag only */
+  isDeadStockOrSlowMovement?: boolean;
+  /** Sum of over-budget approvals already granted this month for the requesting department */
+  departmentMonthlyOverBudgetTotal?: number;
+};
+
+export type ApprovalRecommendation = {
+  recommendedFinalApprover: ApprovalLevel;
+  reason: string;
+  notifyMD: boolean;
+  notifyMDReason?: string;
+};
+
+export type MemoStatus = "draft" | "pending" | "approved" | "rejected" | "returned";
+
+export type PriceComparison = {
+  id: string;
+  vendorName: string;
+  offeredPrice: number;
+  discount: number;
+  netPrice: number;
+  remark?: string;
+  isSelected: boolean;
+};
 
 export type MemoRecord = {
   id: string;
@@ -29,12 +71,25 @@ export type MemoRecord = {
   amount: number;
   status: MemoStatus;
   currentStep: ApprovalLevel;
+  workflowState?: WorkflowState;
+  recommendedFinalApprover?: ApprovalLevel;
+  recommendedRoute?: ApprovalLevel[];
+  selectedRoute?: ApprovalLevel[];
+  routeMode?: ApprovalRouteMode;
+  routeOverrideReason?: string;
+  readRecipients?: string[];
+  returnReason?: string;
+  priceComparisons?: PriceComparison[];
+  selectedVendorId?: string;
+  selectedVendorReason?: string;
   cycleHours: number;
   updatedAt: string;
 };
 
 const managerLimit = 10000;
 const gmLimit = 50000;
+const fixedAssetGmLimit = 100000;
+const overBudgetMonthlyDeptQuota = 10000;
 
 export const approvalLabels: Record<ApprovalCategory, string> = {
   "raw-material": "วัตถุดิบ / ชิ้นงานเพื่อการผลิต",
@@ -44,32 +99,205 @@ export const approvalLabels: Record<ApprovalCategory, string> = {
   mold: "แม่พิมพ์"
 };
 
-export function getApprovalLevel(input: ApprovalInput): ApprovalLevel {
+export const approvalLevels: ApprovalLevel[] = [
+  "Manager / Top Section",
+  "General Manager",
+  "Managing Director"
+];
+
+export function getApprovalRecommendation(
+  input: ApprovalInput
+): ApprovalRecommendation {
+  const supportsPriceAdjustment =
+    input.category === "raw-material" || input.category === "fixed-asset";
+  const priceAdjustmentActive =
+    Boolean(input.isPriceAdjustment) && supportsPriceAdjustment;
+
+  const notifyMDFields: Pick<
+    ApprovalRecommendation,
+    "notifyMD" | "notifyMDReason"
+  > = priceAdjustmentActive
+    ? {
+        notifyMD: true,
+        notifyMDReason:
+          "Supplier ปรับราคา ต้องแจ้ง MD เพื่อรับทราบ (Book1 หมวด 1/2)"
+      }
+    : { notifyMD: false };
+
   if (input.category === "mold") {
-    return "Managing Director";
+    return {
+      recommendedFinalApprover: "Managing Director",
+      reason: "แม่พิมพ์ ต้องเสนอ MD ทุกครั้ง (Book1 ข้อ 5)",
+      ...notifyMDFields
+    };
   }
 
-  if (input.category === "fixed-asset") {
-    if (input.budgetStatus === "in-budget" && input.amount <= 100000) {
-      return "General Manager";
-    }
-
-    return "Managing Director";
+  if (input.category === "raw-material" && input.followsProductionPlan) {
+    return {
+      recommendedFinalApprover: "General Manager",
+      reason: "วัตถุดิบ ตามแผนการผลิต -> GM (Book1 ข้อ 1.1)",
+      ...notifyMDFields
+    };
   }
 
   if (input.budgetStatus !== "in-budget") {
-    return input.amount <= managerLimit ? "General Manager" : "Managing Director";
+    const deptCumulative = input.departmentMonthlyOverBudgetTotal ?? 0;
+    const wouldExceedDeptQuota =
+      deptCumulative + input.amount > overBudgetMonthlyDeptQuota;
+
+    if (input.amount <= managerLimit && !wouldExceedDeptQuota) {
+      return {
+        recommendedFinalApprover: "General Manager",
+        reason: "เกิน/ไม่มีใน Budget ภายในวงเงิน 10,000 บาท ยอดสะสมแผนกเดือนนี้ " + deptCumulative.toLocaleString() + " บาท ยังไม่เกินโควต้า 10,000 -> GM",
+        ...notifyMDFields
+      };
+    }
+
+    if (wouldExceedDeptQuota && input.amount <= managerLimit) {
+      return {
+        recommendedFinalApprover: "Managing Director",
+        reason: "ยอด over-budget สะสมของแผนกเดือนนี้ (" + deptCumulative.toLocaleString() + ") + รายการนี้ (" + input.amount.toLocaleString() + ") เกินโควต้า 10,000 บาท/แผนก/เดือน -> เสนอ MD",
+        ...notifyMDFields
+      };
+    }
+
+    return {
+      recommendedFinalApprover: "Managing Director",
+      reason: "เกิน/ไม่มีใน Budget วงเงิน 10,001 บาทขึ้นไป -> เสนอ MD",
+      ...notifyMDFields
+    };
+  }
+
+  if (input.category === "fixed-asset") {
+    if (input.amount <= fixedAssetGmLimit) {
+      return {
+        recommendedFinalApprover: "General Manager",
+        reason: "สินทรัพย์ถาวร ภายใน Budget <= 100,000 บาท -> GM (Book1 ข้อ 2.1)",
+        ...notifyMDFields
+      };
+    }
+    return {
+      recommendedFinalApprover: "Managing Director",
+      reason: "สินทรัพย์ถาวร ภายใน Budget เกิน 100,000 บาท -> MD (Book1 ข้อ 2.2)",
+      ...notifyMDFields
+    };
+  }
+
+  if (input.category === "raw-material") {
+    if (input.amount <= managerLimit) {
+      return {
+        recommendedFinalApprover: "General Manager",
+        reason: "วัตถุดิบ ภายใน Budget <= 10,000 บาท -> GM (Book1 ข้อ 1.2 - หมวดนี้ไม่ให้ Manager อนุมัติ)",
+        ...notifyMDFields
+      };
+    }
+    if (input.amount <= gmLimit) {
+      return {
+        recommendedFinalApprover: "General Manager",
+        reason: "วัตถุดิบ ภายใน Budget 10,001-50,000 บาท -> GM (Book1 ข้อ 1.3)",
+        ...notifyMDFields
+      };
+    }
+    return {
+      recommendedFinalApprover: "Managing Director",
+      reason: "วัตถุดิบ ภายใน Budget เกิน 50,000 บาท -> MD (Book1 ข้อ 1.4)",
+      ...notifyMDFields
+    };
   }
 
   if (input.amount <= managerLimit) {
-    return "Manager / Top Section";
+    return {
+      recommendedFinalApprover: "Manager / Top Section",
+      reason: approvalLabels[input.category] + " ภายใน Budget <= 10,000 บาท -> Manager / Top Section",
+      ...notifyMDFields
+    };
   }
 
   if (input.amount <= gmLimit) {
-    return "General Manager";
+    return {
+      recommendedFinalApprover: "General Manager",
+      reason: approvalLabels[input.category] + " ภายใน Budget 10,001-50,000 บาท -> GM",
+      ...notifyMDFields
+    };
   }
 
-  return "Managing Director";
+  return {
+    recommendedFinalApprover: "Managing Director",
+    reason: approvalLabels[input.category] + " ภายใน Budget เกิน 50,000 บาท -> MD",
+    ...notifyMDFields
+  };
+}
+
+export function getApprovalLevel(input: ApprovalInput): ApprovalLevel {
+  return getApprovalRecommendation(input).recommendedFinalApprover;
+}
+
+export function buildApprovalFlow(
+  chosenFinalApprover: ApprovalLevel,
+  options: { respectChosenOnly?: boolean } = {}
+): ApprovalLevel[] {
+  if (options.respectChosenOnly) {
+    return chosenFinalApprover === "Manager / Top Section"
+      ? ["Manager / Top Section"]
+      : ["Manager / Top Section", chosenFinalApprover];
+  }
+  const targetIndex = approvalLevels.indexOf(chosenFinalApprover);
+  return approvalLevels.slice(0, targetIndex + 1);
+}
+
+export function getApprovalLevelRank(level: ApprovalLevel): number {
+  return approvalLevels.indexOf(level);
+}
+
+export function getRouteFinalApprover(route: ApprovalLevel[]): ApprovalLevel {
+  return route[route.length - 1] ?? "Manager / Top Section";
+}
+
+export function analyzeApprovalRoute(
+  recommendedFinalApprover: ApprovalLevel,
+  selectedRoute: ApprovalLevel[]
+): ApprovalRouteReview {
+  const recommendedRoute = buildApprovalFlow(recommendedFinalApprover);
+  const selectedFinalApprover = getRouteFinalApprover(selectedRoute);
+  const recommendedFinalRank = getApprovalLevelRank(recommendedFinalApprover);
+  const selectedFinalRank = getApprovalLevelRank(selectedFinalApprover);
+  const isSameRoute =
+    recommendedRoute.length === selectedRoute.length &&
+    recommendedRoute.every((step, index) => step === selectedRoute[index]);
+  const skipsRecommendedStep = recommendedRoute.some(
+    (step) => !selectedRoute.includes(step)
+  );
+
+  if (isSameRoute) {
+    return {
+      recommendedRoute,
+      selectedRoute,
+      mode: "recommended",
+      requiresReason: false,
+      reasonLabel: "Uses Book1 recommended stair route"
+    };
+  }
+
+  if (selectedFinalRank > recommendedFinalRank && !skipsRecommendedStep) {
+    return {
+      recommendedRoute,
+      selectedRoute,
+      mode: "escalated",
+      requiresReason: false,
+      reasonLabel: "Escalated above Book1 recommendation"
+    };
+  }
+
+  return {
+    recommendedRoute,
+    selectedRoute,
+    mode: "exception",
+    requiresReason: true,
+    reasonLabel:
+      selectedFinalRank < recommendedFinalRank
+        ? "Selected final approver is below Book1 recommendation"
+        : "Selected route skips one or more recommended steps"
+  };
 }
 
 export const seedMemos: MemoRecord[] = [
@@ -177,7 +405,6 @@ export function getDashboardMetrics(memos: MemoRecord[]) {
   const averageCycleHours = Math.round(
     memos.reduce((sum, memo) => sum + memo.cycleHours, 0) / memos.length
   );
-
   return {
     total: memos.length,
     pending: statusCount("pending"),

@@ -10,8 +10,11 @@ import {
   IconArrowRight, IconArrowUp, IconArrowDown, IconCalendar,
   IconUsers, IconChevDown,
 } from "@/components/icons";
-import { approvalLabels } from "@/lib/approval";
+import { MemoRecord, approvalLabels } from "@/lib/approval";
 import Link from "next/link";
+
+const routeSummary = (memo: MemoRecord) =>
+  memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
 
 type HistoryAction = "approved" | "rejected" | "returned" | "submitted" | "draft";
 const ACTION_CONFIG: Record<HistoryAction, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
@@ -142,8 +145,16 @@ export default function HistoryPage() {
                               <span className={`em-tier ${isMd ? "md" : m.currentStep === "General Manager" ? "gm" : "mgr"}`} style={{ height: 18, padding: "0 6px", fontSize: 10 }}>
                                 {isMd ? "MD" : m.currentStep === "General Manager" ? "GM" : "Manager"}
                               </span>
+                              {m.routeMode && (
+                                <span className={`em-tier ${m.routeMode === "exception" ? "" : m.routeMode === "escalated" ? "md" : "mgr"}`} style={{ height: 18, padding: "0 6px", fontSize: 10 }}>
+                                  {m.routeMode}
+                                </span>
+                              )}
                             </div>
-                            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>{approvalLabels[m.category]}</div>
+                            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>{approvalLabels[m.category]} · {routeSummary(m)}</div>
+                            {m.routeOverrideReason && (
+                              <div style={{ fontSize: 11.5, color: "#7C5E0F", marginTop: 3, fontWeight: 600 }}>Exception reason: {m.routeOverrideReason}</div>
+                            )}
                           </div>
                           <div style={{ fontSize: 11.5, color: "var(--muted-2)", textAlign: "right", whiteSpace: "nowrap" }}>
                             {m.updatedAt}
