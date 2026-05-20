@@ -62,6 +62,14 @@ export type PriceComparison = {
   isSelected: boolean;
 };
 
+export type RequestItem = {
+  id: string;
+  name: string;
+  unit: string;
+  qty: number;
+  unitPrice: number;
+};
+
 export type MemoRecord = {
   id: string;
   title: string;
@@ -79,10 +87,19 @@ export type MemoRecord = {
   routeOverrideReason?: string;
   readRecipients?: string[];
   returnReason?: string;
+  description?: string;
+  budgetStatus?: BudgetStatus;
+  accountCode?: string;
+  budgetPlan?: number;
+  budgetUsed?: number;
+  notifyMD?: boolean;
   priceComparisons?: PriceComparison[];
   selectedVendorId?: string;
   selectedVendorReason?: string;
+  requestItems?: RequestItem[];
+  priceAdjustmentReason?: string;
   cycleHours: number;
+  createdAt?: string;
   updatedAt: string;
 };
 
@@ -402,9 +419,9 @@ export const seedMemos: MemoRecord[] = [
 export function getDashboardMetrics(memos: MemoRecord[]) {
   const statusCount = (status: MemoStatus) =>
     memos.filter((memo) => memo.status === status).length;
-  const averageCycleHours = Math.round(
-    memos.reduce((sum, memo) => sum + memo.cycleHours, 0) / memos.length
-  );
+  const averageCycleHours = memos.length
+    ? Math.round(memos.reduce((sum, memo) => sum + memo.cycleHours, 0) / memos.length)
+    : 0;
   return {
     total: memos.length,
     pending: statusCount("pending"),

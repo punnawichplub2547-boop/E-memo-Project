@@ -148,6 +148,19 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   mix-blend-mode: screen;
   animation: emShimmer 6s ease-in-out infinite;
 }
+@keyframes emPulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  display: inline-block;
+  flex-shrink: 0;
+  animation: emPulseDot 1.4s ease-in-out infinite;
+}
 @keyframes emShimmer {
   0%,100% { transform: translateX(-60%); }
   50% { transform: translateX(60%); }
@@ -504,7 +517,7 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
   .em-queue-detail-shell {
     min-width: 0;
-    overflow: hidden;
+    overflow-x: hidden;
     opacity: 0;
     transform: translateX(18px);
     transition: opacity 180ms ease, transform 220ms ease;

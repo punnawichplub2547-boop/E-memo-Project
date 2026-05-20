@@ -5,8 +5,8 @@ import { seedMemos, MemoRecord, MemoStatus, ApprovalLevel } from "./approval";
 
 type Action =
   | { type: "ADD_MEMO"; memo: MemoRecord }
-  | { type: "UPDATE_STATUS"; id: string; status: MemoStatus }
-  | { type: "UPDATE_STEP"; id: string; step: ApprovalLevel };
+  | { type: "UPDATE_STATUS"; id: string; status: MemoStatus; updatedAt?: string }
+  | { type: "UPDATE_STEP"; id: string; step: ApprovalLevel; updatedAt?: string };
 
 function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
   switch (action.type) {
@@ -14,11 +14,11 @@ function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
       return [action.memo, ...state];
     case "UPDATE_STATUS":
       return state.map((m) =>
-        m.id === action.id ? { ...m, status: action.status } : m
+        m.id === action.id ? { ...m, status: action.status, updatedAt: action.updatedAt ?? m.updatedAt } : m
       );
     case "UPDATE_STEP":
       return state.map((m) =>
-        m.id === action.id ? { ...m, currentStep: action.step } : m
+        m.id === action.id ? { ...m, currentStep: action.step, updatedAt: action.updatedAt ?? m.updatedAt } : m
       );
     default:
       return state;

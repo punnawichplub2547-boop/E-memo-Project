@@ -8,7 +8,7 @@ import { MemoRecord, approvalLabels } from "@/lib/approval";
 import {
   IconDownload, IconPlus, IconFilter, IconSearch, IconSort,
   IconCrown, IconUsers, IconChevDown, IconCalendar,
-  IconDots, IconCheck, IconX, IconPrinter, IconReturn,
+  IconDots, IconCheck, IconX, IconPrinter, IconReturn, IconBell,
 } from "@/components/icons";
 import Link from "next/link";
 
@@ -70,10 +70,15 @@ export default function QueuePage() {
   };
 
   const handleAction = (id: string, action: "approve" | "reject") => {
+    const updatedAt = new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(new Date());
     dispatch({
       type: "UPDATE_STATUS",
       id,
       status: action === "approve" ? "approved" : "rejected",
+      updatedAt,
     });
     setSelected(null);
   };
@@ -556,10 +561,29 @@ function DrawerPanel({
       </div>
 
       <div className="em-drawer-body">
-        <section>
-          <div className="em-eyebrow" style={{ marginBottom: 10 }}>
-            Memo details
+
+        {/* Description / reason */}
+        {memo.description && (
+          <section style={{ marginBottom: 0 }}>
+            <div className="em-eyebrow" style={{ marginBottom: 6 }}>เหตุผล / Description</div>
+            <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--ink-2)", margin: 0, padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+              {memo.description}
+            </p>
+          </section>
+        )}
+
+        {/* notifyMD banner */}
+        {memo.notifyMD && (
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 8, background: "var(--gold-soft)", border: "1px solid rgba(201,168,76,0.40)" }}>
+            <div style={{ width: 20, height: 20, borderRadius: 6, background: "rgba(201,168,76,0.25)", color: "#7C5E0F", display: "grid", placeItems: "center", flexShrink: 0 }}><IconBell size={11} /></div>
+            <div style={{ fontSize: 12.5, color: "#5C4708", lineHeight: 1.5 }}>
+              <strong style={{ color: "#7C5E0F" }}>แจ้ง MD เพื่อทราบ</strong> — Supplier ปรับราคา (สำเนาถึง MD โดยอัตโนมัติ)
+            </div>
           </div>
+        )}
+
+        <section>
+          <div className="em-eyebrow" style={{ marginBottom: 10 }}>Memo details</div>
           <dl className="em-kv">
             <dt>Requester</dt>
             <dd>{memo.requester}</dd>
@@ -570,10 +594,40 @@ function DrawerPanel({
             <dt>Amount</dt>
             <dd className="em-amt" style={{ fontSize: 15 }}>
               ฿{memo.amount.toLocaleString()}{" "}
-              <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>
-                THB
-              </span>
+              <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>THB</span>
             </dd>
+            {memo.budgetStatus && (
+              <>
+                <dt>Budget status</dt>
+                <dd>
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                    background: memo.budgetStatus === "in-budget" ? "var(--emerald-soft)" : memo.budgetStatus === "over-budget" ? "var(--amber-soft)" : "var(--rose-soft)",
+                    color: memo.budgetStatus === "in-budget" ? "var(--emerald)" : memo.budgetStatus === "over-budget" ? "var(--amber)" : "var(--rose)",
+                  }}>
+                    {memo.budgetStatus === "in-budget" ? "ในงบประมาณ" : memo.budgetStatus === "over-budget" ? "เกินงบ" : "ไม่มีงบ"}
+                  </span>
+                </dd>
+              </>
+            )}
+            {memo.accountCode && (
+              <>
+                <dt>Account code</dt>
+                <dd style={{ fontFamily: "monospace", fontSize: 12.5 }}>{memo.accountCode}</dd>
+              </>
+            )}
+            {memo.budgetPlan !== undefined && (
+              <>
+                <dt>งบประมาณแผน</dt>
+                <dd className="em-amt">฿{memo.budgetPlan.toLocaleString()}</dd>
+                <dt>ใช้แล้ว / รายการนี้</dt>
+                <dd className="em-amt">฿{(memo.budgetUsed ?? 0).toLocaleString()} / ฿{memo.amount.toLocaleString()}</dd>
+                <dt>คงเหลือ</dt>
+                <dd className="em-amt" style={{ color: (memo.budgetPlan - (memo.budgetUsed ?? 0) - memo.amount) < 0 ? "var(--rose)" : "var(--emerald)", fontWeight: 700 }}>
+                  ฿{(memo.budgetPlan - (memo.budgetUsed ?? 0) - memo.amount).toLocaleString()}
+                </dd>
+              </>
+            )}
             <dt>Approver</dt>
             <dd>{memo.currentStep}</dd>
             <dt>Selected route</dt>
@@ -581,11 +635,7 @@ function DrawerPanel({
             <dt>Workflow state</dt>
             <dd>
               {memo.workflowState ??
-                (memo.status === "approved"
-                  ? "Approved"
-                  : memo.status === "rejected"
-                    ? "Rejected"
-                    : "Issued")}
+                (memo.status === "approved" ? "Approved" : memo.status === "rejected" ? "Rejected" : "Issued")}
             </dd>
             {memo.readRecipients && memo.readRecipients.length > 0 && (
               <>
@@ -605,22 +655,49 @@ function DrawerPanel({
             <dd>{memo.updatedAt}</dd>
           </dl>
         </section>
+
+        {/* Price comparison summary */}
+        {memo.priceComparisons && memo.priceComparisons.some(r => r.offeredPrice > 0) && (() => {
+          const rows = memo.priceComparisons!;
+          const selected = rows.find(r => r.id === memo.selectedVendorId) ?? rows[0];
+          const validNetPrices = rows.filter(r => r.offeredPrice > 0).map(r => r.netPrice);
+          const lowest = Math.min(...validNetPrices);
+          const diff = (selected?.netPrice ?? 0) - lowest;
+          return (
+            <section>
+              <div className="em-eyebrow" style={{ marginBottom: 8 }}>Price Comparison</div>
+              <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--line)", display: "grid", gap: 6, fontSize: 12.5 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Selected vendor</span>
+                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>
+                    {selected?.vendorName?.trim() || "—"} · ฿{(selected?.netPrice ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Lowest offer</span>
+                  <span style={{ fontWeight: 600, color: "var(--emerald)" }}>฿{lowest.toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--muted)" }}>Difference</span>
+                  <span style={{ fontWeight: 700, color: diff > 0 ? "var(--amber)" : "var(--ink)" }}>
+                    {diff > 0 ? `+฿${diff.toLocaleString()}` : "฿0"}
+                  </span>
+                </div>
+                {memo.selectedVendorReason && (
+                  <div style={{ marginTop: 4, padding: "6px 8px", borderRadius: 6, background: "var(--amber-soft)", color: "#7C5E0F", fontSize: 12 }}>
+                    <strong>เหตุผล:</strong> {memo.selectedVendorReason}
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })()}
+
         <hr className="em-divider" />
+
         <section>
-          <div className="em-eyebrow" style={{ marginBottom: 8 }}>
-            Workflow
-          </div>
-          <div
-            style={{
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--line)",
-              background: "var(--surface-2)",
-              fontSize: 12.5,
-              color: "var(--ink-2)",
-              marginBottom: 10,
-            }}
-          >
+          <div className="em-eyebrow" style={{ marginBottom: 8 }}>Workflow</div>
+          <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12.5, color: "var(--ink-2)", marginBottom: 10 }}>
             <strong>Selected route:</strong> {routeSummary(memo)}
             {memo.routeMode === "exception" && (
               <div style={{ color: "var(--amber)", fontWeight: 600, marginTop: 3 }}>
@@ -635,79 +712,37 @@ function DrawerPanel({
           </div>
           <div className="em-flow">
             <div className="em-flow-step done">
-              <div className="em-flow-dot">
-                <IconCheck size={14} />
-              </div>
+              <div className="em-flow-dot"><IconCheck size={14} /></div>
               <div>
                 <div className="em-flow-title">Requester submitted</div>
-                <div className="em-flow-meta">
-                  {memo.requester} · {memo.department}
-                </div>
+                <div className="em-flow-meta">{memo.requester} · {memo.department}</div>
               </div>
             </div>
-            <div
-              className={`em-flow-step${
-                memo.currentStep === "General Manager" ||
-                memo.currentStep === "Managing Director"
-                  ? " done"
-                  : " current"
-              }`}
-            >
-              <div className="em-flow-dot">
-                {memo.currentStep !== "Manager / Top Section" ? (
-                  <IconCheck size={14} />
-                ) : (
-                  "2"
-                )}
-              </div>
-              <div>
-                <div className="em-flow-title">Manager / Top Section</div>
-                <div className="em-flow-meta">Budget and document review</div>
-              </div>
-            </div>
-            <div
-              className={`em-flow-step${
-                memo.currentStep === "Managing Director"
-                  ? " done"
-                  : memo.currentStep === "General Manager"
-                    ? " current"
-                    : ""
-              }`}
-            >
-              <div className="em-flow-dot">
-                {memo.currentStep === "Managing Director" ? (
-                  <IconCheck size={14} />
-                ) : (
-                  "3"
-                )}
-              </div>
-              <div>
-                <div className="em-flow-title">General Manager</div>
-                <div className="em-flow-meta">Amount threshold approval</div>
-              </div>
-            </div>
-            <div
-              className={`em-flow-step${
-                memo.currentStep === "Managing Director" ? " current md" : ""
-              }`}
-            >
-              <div className="em-flow-dot">
-                {memo.currentStep === "Managing Director" ? (
-                  <IconCrown size={14} />
-                ) : (
-                  "4"
-                )}
-              </div>
-              <div>
+            {(memo.selectedRoute ?? [memo.currentStep]).map((step, i, arr) => {
+              const currentIdx = arr.indexOf(memo.currentStep);
+              const isDone = i < currentIdx;
+              const isCurrent = i === currentIdx;
+              const isMdStep = step === "Managing Director";
+              return (
                 <div
-                  className="em-flow-title"
-                  style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                  key={step}
+                  className={`em-flow-step${isDone ? " done" : isCurrent ? " current" : ""}${isMdStep && isCurrent ? " md" : ""}`}
                 >
-                  Managing Director <span className="em-tier md">MD tier</span>
+                  <div className="em-flow-dot">
+                    {isDone ? <IconCheck size={14} /> : isMdStep && isCurrent ? <IconCrown size={14} /> : i + 2}
+                  </div>
+                  <div>
+                    <div className="em-flow-title" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {step}
+                      {isMdStep && <span className="em-tier md">MD tier</span>}
+                    </div>
+                    <div className="em-flow-meta">
+                      {isDone ? "อนุมัติแล้ว" : isCurrent ? "รอการอนุมัติ" : "รอคิว"}
+                    </div>
+                  </div>
                 </div>
-                <div className="em-flow-meta">Required for MD-level rules</div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </section>
       </div>

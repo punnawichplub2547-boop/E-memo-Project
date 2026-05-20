@@ -129,6 +129,30 @@ describe("approval rules from HR&GA workbook (Book1.xlsx)", () => {
     expect(rec.recommendedFinalApprover).toBe("Managing Director");
   });
 
+  it("routes service-contract/general-purchase at exact 10,000 boundary to Manager", () => {
+    expect(
+      getApprovalLevel({ category: "service-contract", amount: 10000, budgetStatus: "in-budget" })
+    ).toBe("Manager / Top Section");
+    expect(
+      getApprovalLevel({ category: "general-purchase", amount: 10000, budgetStatus: "in-budget" })
+    ).toBe("Manager / Top Section");
+  });
+
+  it("routes service-contract/general-purchase at 10,001 to GM", () => {
+    expect(
+      getApprovalLevel({ category: "service-contract", amount: 10001, budgetStatus: "in-budget" })
+    ).toBe("General Manager");
+  });
+
+  it("routes service-contract/general-purchase at exactly 50,000 to GM and at 50,001 to MD", () => {
+    expect(
+      getApprovalLevel({ category: "service-contract", amount: 50000, budgetStatus: "in-budget" })
+    ).toBe("General Manager");
+    expect(
+      getApprovalLevel({ category: "service-contract", amount: 50001, budgetStatus: "in-budget" })
+    ).toBe("Managing Director");
+  });
+
   it("routes fixed-asset in-budget at exactly 100,000 to GM and above to MD", () => {
     expect(
       getApprovalLevel({
@@ -216,6 +240,19 @@ describe("analyzeApprovalRoute", () => {
       requiresReason: false
     });
   });
+
+  it("marks Manager-recommended route escalated to GM or MD without requiring a reason", () => {
+    expect(
+      analyzeApprovalRoute("Manager / Top Section", ["Manager / Top Section", "General Manager"])
+    ).toMatchObject({ mode: "escalated", requiresReason: false });
+    expect(
+      analyzeApprovalRoute("Manager / Top Section", [
+        "Manager / Top Section",
+        "General Manager",
+        "Managing Director"
+      ])
+    ).toMatchObject({ mode: "escalated", requiresReason: false });
+  });
 });
 
 describe("dashboard metrics", () => {
@@ -226,6 +263,16 @@ describe("dashboard metrics", () => {
       approved: 3,
       rejected: 1,
       averageCycleHours: 18
+    });
+  });
+
+  it("returns zero averageCycleHours on empty memo list without NaN", () => {
+    expect(getDashboardMetrics([])).toEqual({
+      total: 0,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      averageCycleHours: 0
     });
   });
 });

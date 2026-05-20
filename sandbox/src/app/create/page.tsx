@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
@@ -14,6 +14,7 @@ import {
   BudgetStatus,
   getApprovalRecommendation,
   PriceComparison,
+  RequestItem,
 } from "@/lib/approval";
 import {
   IconFileText, IconMail, IconSparkles, IconTag, IconBuilding,
@@ -33,17 +34,24 @@ function parseReadRecipientsInput(value: string) {
     .filter(Boolean);
 }
 
+const mockLoggedInUser = {
+  name: "อำภา หิงคำ",
+  department: "HR&GA",
+  role: "Manager"
+};
+
 export default function CreatePage() {
   const { dispatch } = useMemos();
   const router = useRouter();
 
   const [subject, setSubject] = useState("ขออนุมัติซื้ออุปกรณ์สำนักงาน Q2/2026");
   const [category, setCategory] = useState<ApprovalCategory>("general-purchase");
-  const [department, setDepartment] = useState("HR&GA");
+  const [department, setDepartment] = useState(mockLoggedInUser.department);
   const [amount, setAmount] = useState(32000);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus>("in-budget");
   const [description, setDescription] = useState("ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&GA");
 
+  const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
   const [isPriceAdjustment, setIsPriceAdjustment] = useState(false);
   const [followsProductionPlan, setFollowsProductionPlan] = useState(false);
   const [isDeadStockOrSlowMovement, setIsDeadStockOrSlowMovement] = useState(false);
@@ -59,6 +67,22 @@ export default function CreatePage() {
     { id: "1", vendorName: "", offeredPrice: 0, discount: 0, netPrice: 0, remark: "", isSelected: true },
   ]);
   const [selectedVendorReason, setSelectedVendorReason] = useState("");
+  const [requestItems, setRequestItems] = useState<RequestItem[]>([
+    { id: "1", name: "", unit: "ชิ้น", qty: 1, unitPrice: 0 },
+  ]);
+  const [priceAdjustmentReason, setPriceAdjustmentReason] = useState("");
+
+  const addRequestItem = () => {
+    setRequestItems(prev => [...prev, {
+      id: String(Date.now()), name: "", unit: "ชิ้น", qty: 1, unitPrice: 0,
+    }]);
+  };
+  const removeRequestItem = (id: string) => {
+    setRequestItems(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
+  };
+  const updateRequestItem = (id: string, updates: Partial<Omit<RequestItem, "id">>) => {
+    setRequestItems(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
 
   const addVendorRow = () => {
     setPriceComparisons(prev => [...prev, {
@@ -95,6 +119,13 @@ export default function CreatePage() {
     setPriceComparisons(prev => prev.map(row => ({ ...row, isSelected: row.id === id })));
     setSelectedVendorReason("");
   };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const supportsPriceAdjustment = category === "raw-material" || category === "fixed-asset";
   const supportsProductionPlan = category === "raw-material";
@@ -164,6 +195,28 @@ export default function CreatePage() {
   const selectedNotLowest = priceComparisons.length > 1 && lowestNetPrice > 0 && (selectedVendor?.netPrice ?? 0) > lowestNetPrice;
   const cleanVendorReason = selectedVendorReason.trim();
   const canSubmitPending = (!routeReview.requiresReason || cleanOverrideReason.length > 0) && (!selectedNotLowest || cleanVendorReason.length > 0);
+  const currentDateLabel = useMemo(
+    () => currentDateTime
+      ? new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeStyle: "short" }).format(currentDateTime)
+      : "",
+    [currentDateTime]
+  );
+  const clockDateLabel = useMemo(
+    () => currentDateTime
+      ? new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(currentDateTime)
+      : "",
+    [currentDateTime]
+  );
+  const clockTimeLabel = useMemo(
+    () => currentDateTime
+      ? new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(currentDateTime)
+      : "--:--:--",
+    [currentDateTime]
+  );
+  const requestItemsGrandTotal = useMemo(
+    () => requestItems.reduce((sum, r) => sum + Math.round(r.qty * r.unitPrice), 0),
+    [requestItems]
+  );
 
   const handleSubmit = (status: "draft" | "pending") => {
     if (status === "pending" && !canSubmitPending) {
@@ -171,10 +224,18 @@ export default function CreatePage() {
     }
     const now = new Date();
     const id = `EM-${now.getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
+    const createdTimestamp = new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(now);
     dispatch({
       type: "ADD_MEMO",
       memo: {
-        id, title: subject, requester: "อำภา หิงคำ", department, category, amount, status,
+        id, title: subject, requester: mockLoggedInUser.name, department, category, amount, status,
         currentStep: firstCheckingStep,
         workflowState: "Issued",
         recommendedFinalApprover: recommendation.recommendedFinalApprover,
@@ -183,10 +244,18 @@ export default function CreatePage() {
         routeMode: routeReview.mode,
         routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
         readRecipients: orderedReadRecipients,
+        description: description.trim() || undefined,
+        budgetStatus,
+        accountCode: accountCode.trim() || undefined,
+        budgetPlan,
+        budgetUsed,
+        notifyMD: recommendation.notifyMD,
         priceComparisons,
         selectedVendorId: selectedVendor?.id,
         selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
-        cycleHours: 0, updatedAt: now.toLocaleDateString("th-TH"),
+        requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
+        priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
+        cycleHours: 0, createdAt: createdTimestamp, updatedAt: createdTimestamp,
       },
     });
     router.push(status === "pending" ? "/queue" : "/");
@@ -229,6 +298,35 @@ export default function CreatePage() {
                 <div className="em-field">
                   <label className="em-label">เรื่อง <span className="req">*</span></label>
                   <input className="em-input" value={subject} onChange={e => setSubject(e.target.value)} />
+                </div>
+
+                {/* Document Info — Memo identity + Live clock */}
+                <div style={{ display: "flex", gap: 12, alignItems: "stretch", padding: "12px 14px", borderRadius: 10, background: "linear-gradient(to right, var(--surface-soft), var(--surface-2))", border: "1px solid var(--primary-soft)" }}>
+                  <div style={{ flex: 1, display: "flex", gap: 18 }}>
+                    <div>
+                      <div className="em-eyebrow" style={{ marginBottom: 3 }}>เลขที่เอกสาร</div>
+                      <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 500 }}>Draft / Auto-assigned</div>
+                    </div>
+                    <div style={{ width: 1, background: "var(--line-2)", flexShrink: 0 }} />
+                    <div>
+                      <div className="em-eyebrow" style={{ marginBottom: 3 }}>ผู้จัดทำ / Issued by</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{mockLoggedInUser.name}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{mockLoggedInUser.department} · {mockLoggedInUser.role}</div>
+                    </div>
+                  </div>
+                  {/* Live clock pill */}
+                  <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(37,99,235,0.06)", border: "1px solid var(--primary-soft)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 700, color: "var(--primary)", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+                      <span className="pulse-dot" style={{ background: "var(--primary)" }} /> Live
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1 }}>
+                      {clockTimeLabel}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--muted)", textAlign: "center", lineHeight: 1.5, marginTop: 2 }}>
+                      {clockDateLabel}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 500, letterSpacing: "0.04em" }}>Thailand · GMT+7</div>
+                  </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -294,6 +392,18 @@ export default function CreatePage() {
                         <FlagCheckbox checked={isPriceAdjustment} onChange={(v) => { setIsPriceAdjustment(v); setChosenApprover(null); }}
                           title="Supplier ปรับราคา (Book1 หมวด 1/2)" sub="ระบบจะแจ้ง MD ให้รับทราบ - flow อนุมัติยังตามวงเงิน" />
                       )}
+                      {effectiveIsPriceAdjustment && (
+                        <div className="em-field" style={{ gap: 4, paddingLeft: 8 }}>
+                          <label className="em-label" style={{ fontSize: 11.5 }}>เหตุผลการปรับราคา (ถ้ามี)</label>
+                          <textarea
+                            className="em-textarea"
+                            style={{ minHeight: 52 }}
+                            placeholder="ระบุสาเหตุที่ Supplier ปรับราคา เช่น ต้นทุนวัตถุดิบสูงขึ้น, อัตราแลกเปลี่ยน"
+                            value={priceAdjustmentReason}
+                            onChange={e => setPriceAdjustmentReason(e.target.value)}
+                          />
+                        </div>
+                      )}
                       {showDeptMonthly && (
                         <div className="em-field" style={{ gap: 4 }}>
                           <label className="em-label" style={{ fontSize: 11.5 }}>ยอด over-budget สะสมของแผนกในเดือนนี้ (บาท)</label>
@@ -313,6 +423,88 @@ export default function CreatePage() {
                 <div className="em-field">
                   <label className="em-label">Description / เหตุผลการขอ <span className="req">*</span></label>
                   <textarea className="em-textarea" value={description} onChange={e => setDescription(e.target.value)} />
+                </div>
+
+                {/* Request Items */}
+                <div className="em-card" style={{ borderRadius: 10, boxShadow: "none" }}>
+                  <div className="em-card-head" style={{ padding: "12px 14px" }}>
+                    <div>
+                      <h3 style={{ fontSize: 13 }}>รายการที่ขออนุมัติ / Request Items</h3>
+                      <div className="em-sub" style={{ fontSize: 11.5 }}>รายละเอียดสินค้า / บริการที่ต้องการ</div>
+                    </div>
+                    <button type="button" className="em-btn sm ghost" onClick={addRequestItem} style={{ whiteSpace: "nowrap" }}>
+                      + เพิ่มรายการ
+                    </button>
+                  </div>
+                  <div className="em-card-body" style={{ padding: 14 }}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="em-table" style={{ minWidth: 500 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ minWidth: 150 }}>รายการ / Item</th>
+                            <th style={{ width: 72 }}>หน่วย</th>
+                            <th style={{ width: 78, textAlign: "right" }}>จำนวน</th>
+                            <th style={{ width: 110, textAlign: "right" }}>ราคา/หน่วย (฿)</th>
+                            <th style={{ width: 110, textAlign: "right" }}>รวม (฿)</th>
+                            <th style={{ width: 32 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {requestItems.map((row) => {
+                            const lineTotal = Math.round(row.qty * row.unitPrice);
+                            return (
+                              <tr key={row.id}>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <input className="em-table-input" value={row.name}
+                                    placeholder="ชื่อรายการ / บริการ"
+                                    onChange={e => updateRequestItem(row.id, { name: e.target.value })} />
+                                </td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <input className="em-table-input" value={row.unit}
+                                    placeholder="ชิ้น"
+                                    onChange={e => updateRequestItem(row.id, { unit: e.target.value })} />
+                                </td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <input className="em-table-input num" type="number" min={0}
+                                    value={row.qty || ""} placeholder="1"
+                                    onChange={e => updateRequestItem(row.id, { qty: Number(e.target.value) || 0 })} />
+                                </td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <input className="em-table-input num" type="number" min={0}
+                                    value={row.unitPrice || ""} placeholder="0"
+                                    onChange={e => updateRequestItem(row.id, { unitPrice: Number(e.target.value) || 0 })} />
+                                </td>
+                                <td style={{ padding: "8px 16px", textAlign: "right", fontWeight: 600, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                                  ฿{lineTotal.toLocaleString()}
+                                </td>
+                                <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                                  <button type="button" onClick={() => removeRequestItem(row.id)}
+                                    disabled={requestItems.length === 1}
+                                    style={{ background: "none", border: "none", cursor: requestItems.length === 1 ? "default" : "pointer", color: "var(--rose)", opacity: requestItems.length === 1 ? 0.25 : 1, display: "grid", placeItems: "center", padding: 4 }}>
+                                    <IconX size={13} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ borderTop: "2px solid var(--line)" }}>
+                            <td colSpan={4} style={{ padding: "8px 16px", textAlign: "right", fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>ยอดรวมทั้งสิ้น</td>
+                            <td style={{ padding: "8px 16px", textAlign: "right", fontSize: 14, fontWeight: 700, color: "var(--primary)", fontVariantNumeric: "tabular-nums" }}>
+                              ฿{requestItemsGrandTotal.toLocaleString()}
+                            </td>
+                            <td />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    {requestItemsGrandTotal > 0 && requestItemsGrandTotal !== amount && (
+                      <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--amber)", fontWeight: 500 }}>
+                        ยอดรายการ ฿{requestItemsGrandTotal.toLocaleString()} ≠ จำนวนเงิน ฿{amount.toLocaleString()} — กรุณาตรวจสอบให้ตรงกัน
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="em-card" style={{ borderRadius: 10, boxShadow: "none" }}>
@@ -663,8 +855,9 @@ export default function CreatePage() {
                     <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 14px", marginBottom: 12, fontSize: 12.5 }}>
                       <span style={{ color: "var(--muted)" }}>เรื่อง</span><span style={{ fontWeight: 600 }}>{subject}</span>
                       <span style={{ color: "var(--muted)" }}>เรียน</span><span style={{ fontWeight: 600 }}>{effectiveApprover}</span>
+                      <span style={{ color: "var(--muted)" }}>วันที่</span><span>{currentDateLabel}</span>
                       <span style={{ color: "var(--muted)" }}>Route</span><span>{selectedRoute.join(" -> ")}</span>
-                      <span style={{ color: "var(--muted)" }}>จาก</span><span>{department} · อำภา หิงคำ</span>
+                      <span style={{ color: "var(--muted)" }}>จาก</span><span>{department} · {mockLoggedInUser.name}</span>
                       <span style={{ color: "var(--muted)" }}>Read / Review</span><span>{orderedReadRecipients.join(" -> ") || "—"}</span>
                       {routeReview.requiresReason && (<>
                         <span style={{ color: "var(--muted)" }}>Exception</span>
@@ -678,6 +871,31 @@ export default function CreatePage() {
                     <hr className="em-divider" style={{ margin: "10px 0 14px" }} />
                     <p style={{ marginBottom: 10 }}>ขออนุมัติรายการ {approvalLabels[category]} วงเงิน <strong>฿{amount.toLocaleString()}</strong> เพื่อสนับสนุนการดำเนินงานของแผนก {department}</p>
                     <p style={{ marginBottom: 10 }}>{description}</p>
+                    {requestItems.some(r => r.name.trim()) && (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: "var(--ink)" }}>รายการที่ขออนุมัติ:</div>
+                        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginBottom: 10 }}>
+                          <tbody>
+                            {requestItems.filter(r => r.name.trim()).map((r, i) => {
+                              const lt = Math.round(r.qty * r.unitPrice);
+                              return (
+                                <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                                  <td style={{ padding: "3px 0", color: "var(--ink-2)" }}>{i + 1}. {r.name}</td>
+                                  <td style={{ textAlign: "center", color: "var(--muted)", width: 80 }}>{r.qty} {r.unit}</td>
+                                  <td style={{ textAlign: "right", fontWeight: 600, width: 90 }}>฿{lt.toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <td colSpan={2} style={{ padding: "5px 0 2px", fontWeight: 700, fontSize: 12.5 }}>รวมทั้งสิ้น</td>
+                              <td style={{ textAlign: "right", fontWeight: 700, color: "var(--primary)", fontSize: 12.5 }}>฿{requestItemsGrandTotal.toLocaleString()}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
