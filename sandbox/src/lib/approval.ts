@@ -98,6 +98,10 @@ export type MemoRecord = {
   selectedVendorReason?: string;
   requestItems?: RequestItem[];
   priceAdjustmentReason?: string;
+  isPriceAdjustment?: boolean;
+  followsProductionPlan?: boolean;
+  isDeadStockOrSlowMovement?: boolean;
+  departmentMonthlyOverBudgetTotal?: number;
   cycleHours: number;
   createdAt?: string;
   updatedAt: string;

@@ -6,22 +6,26 @@ import {
   IconGauge, IconPen, IconRoute, IconSearch,
   IconHistory, IconCrown, IconShield,
 } from "./icons";
+import { useMemos } from "@/lib/memo-store";
 
 const mainItems = [
   { id: "dashboard", href: "/",        label: "Dashboard",       Icon: IconGauge },
   { id: "create",    href: "/create",   label: "Create Memo",     Icon: IconPen },
-  { id: "queue",     href: "/queue",    label: "Approval Queue",  Icon: IconRoute,   badge: "4" },
+  { id: "queue",     href: "/queue",    label: "Approval Queue",  Icon: IconRoute },
   { id: "search",    href: "/search",   label: "AI Search",       Icon: IconSearch },
   { id: "history",   href: "/history",  label: "History",         Icon: IconHistory },
 ];
 
 const execItems = [
-  { id: "exec", href: "/queue?tier=md", label: "Executive Review", Icon: IconCrown, badge: "1", gold: true },
+  { id: "exec", href: "/queue?tier=md", label: "Executive Review", Icon: IconCrown, gold: true },
   { id: "audit", href: "/history",      label: "Audit Trail",      Icon: IconShield },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { memos } = useMemos();
+  const pendingCount = memos.filter(m => m.status === "pending").length;
+  const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -40,7 +44,7 @@ export function Sidebar() {
 
       <nav className="em-nav">
         <div className="em-nav-group-label">Workflow</div>
-        {mainItems.map(({ id, href, label, Icon, badge }) => (
+        {mainItems.map(({ id, href, label, Icon }) => (
           <Link
             key={id}
             href={href}
@@ -48,12 +52,12 @@ export function Sidebar() {
           >
             <Icon size={17} />
             <span>{label}</span>
-            {badge && <span className="em-nav-badge">{badge}</span>}
+            {id === "queue" && pendingCount > 0 && <span className="em-nav-badge">{pendingCount}</span>}
           </Link>
         ))}
 
         <div className="em-nav-group-label" style={{ marginTop: 14 }}>Executive</div>
-        {execItems.map(({ id, href, label, Icon, badge, gold }) => (
+        {execItems.map(({ id, href, label, Icon, gold }) => (
           <Link
             key={id}
             href={href}
@@ -61,7 +65,7 @@ export function Sidebar() {
           >
             <Icon size={17} />
             <span>{label}</span>
-            {badge && <span className="em-nav-badge">{badge}</span>}
+            {id === "exec" && mdPendingCount > 0 && <span className="em-nav-badge">{mdPendingCount}</span>}
           </Link>
         ))}
       </nav>

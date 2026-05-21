@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
@@ -15,6 +16,15 @@ import Link from "next/link";
 export default function DashboardPage() {
   const { memos } = useMemos();
   const metrics = getDashboardMetrics(memos);
+  const [today, setToday] = useState<Date | null>(null);
+  useEffect(() => {
+    const id = window.setTimeout(() => setToday(new Date()), 0);
+    return () => window.clearTimeout(id);
+  }, []);
+  const todayLabel = today
+    ? new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(today)
+    : " ";
+  const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
 
   return (
     <div className="em-art">
@@ -36,12 +46,12 @@ export default function DashboardPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, alignItems: "stretch" }}>
             <div className="em-card" style={{ padding: 0, position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#0A0F1E 0%,#1A2547 65%,#1E3A8A 110%)", color: "#fff", border: "1px solid #060A17" }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(60% 100% at 100% 0%,rgba(59,130,246,0.25),transparent 60%),radial-gradient(50% 100% at 0% 100%,rgba(201,168,76,0.10),transparent 60%)", pointerEvents: "none" }} />
-              <div style={{ position: "relative", padding: "22px 24px", display: "flex", gap: 24, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div>
-                  <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#93C5FD", fontWeight: 600, marginBottom: 6 }}>Monday · 18 May 2026</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 4 }}>สวัสดีตอนเช้า, อำภา</div>
-                  <div style={{ fontSize: 13, color: "rgba(219,234,254,0.75)" }}>
-                    มีเอกสาร <strong style={{ color: "#fff" }}>{metrics.pending} ฉบับ</strong> รอการอนุมัติ และ <strong style={{ color: "#E6C76B" }}>1 ฉบับ</strong> ระดับ MD
+              <div style={{ position: "relative", padding: "28px 28px 26px", display: "flex", flexDirection: "column", gap: 20, minHeight: 200, justifyContent: "space-between" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#93C5FD", fontWeight: 600 }}>{todayLabel}</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 }}>สวัสดีตอนเช้า, อำภา</div>
+                  <div style={{ fontSize: 13.5, color: "rgba(219,234,254,0.78)", lineHeight: 1.55 }}>
+                    มีเอกสาร <strong style={{ color: "#fff" }}>{metrics.pending} ฉบับ</strong> รอการอนุมัติ{mdPendingCount > 0 && <> และ <strong style={{ color: "#E6C76B" }}>{mdPendingCount} ฉบับ</strong> ระดับ MD</>}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

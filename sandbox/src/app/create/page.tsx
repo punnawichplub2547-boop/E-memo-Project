@@ -255,6 +255,10 @@ export default function CreatePage() {
         selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
         requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
         priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
+        isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
+        followsProductionPlan: effectiveFollowsProductionPlan || undefined,
+        isDeadStockOrSlowMovement: effectiveIsDeadStock || undefined,
+        departmentMonthlyOverBudgetTotal: showDeptMonthly && deptMonthlyOverBudgetTotal > 0 ? deptMonthlyOverBudgetTotal : undefined,
         cycleHours: 0, createdAt: createdTimestamp, updatedAt: createdTimestamp,
       },
     });
@@ -278,9 +282,10 @@ export default function CreatePage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 4px" }}>
             <StepDot n="1" label="รายละเอียด Memo" active />
             <div style={{ flex: 1, height: 1, background: "var(--line-2)", maxWidth: 60 }} />
-            <StepDot n="2" label="เส้นทางอนุมัติ" />
+            <StepDot n="2" label="เส้นทางอนุมัติ" active />
             <div style={{ flex: 1, height: 1, background: "var(--line-2)", maxWidth: 60 }} />
-            <StepDot n="3" label="ตรวจทานและส่ง" />
+            <StepDot n="3" label="ตรวจทานและส่ง" active />
+            <span style={{ fontSize: 10.5, color: "var(--muted)", marginLeft: 8, whiteSpace: "nowrap" }}>แบบฟอร์มเดียว</span>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 16, alignItems: "start" }}>
@@ -710,7 +715,7 @@ export default function CreatePage() {
                 </div>
 
                 <div className="em-field">
-                  <label className="em-label">เอกสารแนบ</label>
+                  <label className="em-label">เอกสารแนบ <span style={{ fontSize: 10, color: "var(--amber)", fontWeight: 600 }}>[Prototype — ไม่บันทึกจริง]</span></label>
                   <div className="em-upload">
                     <div className="em-upload-ico"><IconUpload size={18} /></div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>

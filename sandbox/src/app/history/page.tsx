@@ -71,10 +71,10 @@ export default function HistoryPage() {
 
           {/* Summary bar */}
           <div className="em-card" style={{ padding: 0, display: "grid", gridTemplateColumns: "repeat(5,1fr)", overflow: "hidden" }}>
-            <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" />
-            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" />
+            <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" active={tabFilter === "all"} />
+            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" active={tabFilter === "approved"} />
+            <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconSlash size={16} />} accent="rose" active={tabFilter === "rejected"} />
             <SummaryBlock label="Avg. cycle" value={`${avgCycle}h`} sub="target < 24h" icon={<IconClock size={16} />} accent="gold" trendDir="down" />
-            <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconReturn size={16} />} accent="amber" />
             <SummaryBlock label="MD-tier" value={String(mdCount)} sub="executive reviews" icon={<IconCrown size={16} />} accent="md" last />
           </div>
 
@@ -219,17 +219,18 @@ export default function HistoryPage() {
   );
 }
 
-function SummaryBlock({ label, value, sub, icon, accent, trendDir, last }: { label: string; value: string; sub: string; icon: React.ReactNode; accent: string; trendDir?: "up" | "down"; last?: boolean }) {
+function SummaryBlock({ label, value, sub, icon, accent, trendDir, last, active }: { label: string; value: string; sub: string; icon: React.ReactNode; accent: string; trendDir?: "up" | "down"; last?: boolean; active?: boolean }) {
   const accents: Record<string, { bar: string; bg: string; fg: string }> = {
     primary: { bar: "var(--primary-grad)", bg: "var(--primary-soft)", fg: "var(--primary)" },
     emerald: { bar: "linear-gradient(90deg,#047857,#10B981)", bg: "var(--emerald-soft)", fg: "var(--emerald)" },
+    rose:    { bar: "linear-gradient(90deg,#BE123C,#F43F5E)", bg: "var(--rose-soft)", fg: "var(--rose)" },
     gold:    { bar: "var(--gold-grad)", bg: "var(--gold-soft)", fg: "#7C5E0F" },
     amber:   { bar: "linear-gradient(90deg,#D97706,#F59E0B)", bg: "var(--amber-soft)", fg: "var(--amber)" },
     md:      { bar: "var(--gold-grad)", bg: "var(--gold-soft)", fg: "#7C5E0F" },
   };
   const c = accents[accent];
   return (
-    <div className={`em-summary-block ${accent}`} style={{ borderRight: last ? 0 : "1px solid var(--line)" }}>
+    <div className={`em-summary-block ${accent}${active ? " is-active" : ""}`} style={{ borderRight: last ? 0 : "1px solid var(--line)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, background: c.bg, color: c.fg, display: "grid", placeItems: "center" }}>{icon}</div>
         <div className="em-eyebrow" style={{ color: "var(--muted)", letterSpacing: "0.10em" }}>{label}</div>
