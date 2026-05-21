@@ -1,0 +1,10 @@
+services:
+  ememo:
+    build: .
+    image: ememo:latest
+    container_name: ememo
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
