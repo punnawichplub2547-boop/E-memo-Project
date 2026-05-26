@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
@@ -71,6 +71,11 @@ export default function CreatePage() {
     { id: "1", name: "", unit: "ชิ้น", qty: 1, unitPrice: 0 },
   ]);
   const [priceAdjustmentReason, setPriceAdjustmentReason] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const addRequestItem = () => {
     setRequestItems(prev => [...prev, {
@@ -218,6 +223,111 @@ export default function CreatePage() {
     [requestItems]
   );
 
+  const handleAiSuggest = async () => {
+    setIsAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/ai-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, amount, department, budgetStatus }),
+      });
+      const data = await res.json();
+      if (data.error === "not_configured") {
+        setAiError("ยังไม่ได้ตั้งค่า GEMINI_API_KEY ใน .env.local");
+      } else if (data.error === "quota_exceeded") {
+        setAiError("Rate limit — รอ 1 นาทีแล้วลองใหม่");
+      } else if (data.error === "parse_error") {
+        setAiError("AI ตอบผิดรูปแบบ — ลองใหม่อีกครั้ง");
+      } else if (data.error) {
+        setAiError(`AI ไม่พร้อมใช้งานขณะนี้${data.detail ? ` (${data.detail})` : ""}`);
+      } else {
+        if (data.subject) setSubject(data.subject);
+        if (data.description) setDescription(data.description);
+      }
+    } catch {
+      setAiError("เชื่อมต่อ AI ไม่ได้");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handlePdfUpload = async (file: File) => {
+    setPdfError(null);
+    setIsPdfLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/pdf-extract", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.error === "not_configured") {
+        setPdfError("ยังไม่ได้ตั้งค่า AI API key");
+      } else if (data.error === "quota_exceeded") {
+        setPdfError("Rate limit — รอ 1 นาทีแล้วลองใหม่");
+      } else if (data.error === "pdf_only") {
+        setPdfError("รองรับเฉพาะไฟล์ PDF เท่านั้น");
+      } else if (data.error === "file_too_large") {
+        setPdfError("ไฟล์ใหญ่เกิน 10 MB");
+      } else if (data.error === "no_text_in_pdf") {
+        setPdfError("PDF นี้ไม่มีข้อความ (อาจเป็น scan) — กรอกด้วยตนเอง");
+      } else if (data.error) {
+        setPdfError("ดึงข้อมูลจาก PDF ไม่สำเร็จ — ลองใหม่");
+      } else {
+        // Pre-fill vendor row
+        if (data.vendor || data.items?.length > 0) {
+          const totalFromItems = (data.items ?? []).reduce(
+            (s: number, it: { qty: number; unitPrice: number }) => s + Math.round(it.qty * it.unitPrice),
+            0
+          );
+          const vendorPrice = data.totalAmount || totalFromItems;
+          const isFirstBlank =
+            priceComparisons.length === 1 &&
+            !priceComparisons[0].vendorName &&
+            priceComparisons[0].offeredPrice === 0;
+          const newVendorRow = {
+            id: String(Date.now()),
+            vendorName: data.vendor ?? "",
+            offeredPrice: vendorPrice,
+            discount: 0,
+            netPrice: vendorPrice,
+            remark: file.name,
+            isSelected: true,
+          };
+          if (isFirstBlank) {
+            setPriceComparisons([newVendorRow]);
+          } else {
+            setPriceComparisons(prev => [
+              ...prev.map(r => ({ ...r, isSelected: false })),
+              newVendorRow,
+            ]);
+          }
+        }
+        // Pre-fill request items
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          const isFirstItemBlank =
+            requestItems.length === 1 && !requestItems[0].name && requestItems[0].unitPrice === 0;
+          const newItems = data.items.map((it: { name: string; qty: number; unit: string; unitPrice: number }, idx: number) => ({
+            id: String(Date.now() + idx + 1),
+            name: it.name,
+            unit: it.unit || "ชิ้น",
+            qty: it.qty || 1,
+            unitPrice: it.unitPrice || 0,
+          }));
+          if (isFirstItemBlank) {
+            setRequestItems(newItems);
+          } else {
+            setRequestItems(prev => [...prev, ...newItems]);
+          }
+        }
+      }
+    } catch {
+      setPdfError("เชื่อมต่อ server ไม่ได้");
+    } finally {
+      setIsPdfLoading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = (status: "draft" | "pending") => {
     if (status === "pending" && !canSubmitPending) {
       return;
@@ -296,7 +406,16 @@ export default function CreatePage() {
                   <h3>รายละเอียด Memo</h3>
                   <div className="em-sub">กรอกข้อมูล - ระบบจะแนะนำผู้อนุมัติตาม Approval Matrix (Book1)</div>
                 </div>
-                <span className="em-tier mgr"><IconSparkles size={11} /> AI Assist</span>
+                <button
+                  type="button"
+                  className="em-btn sm"
+                  onClick={handleAiSuggest}
+                  disabled={isAiLoading}
+                  style={{ display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  <IconSparkles size={11} />
+                  {isAiLoading ? "กำลังสร้าง..." : "AI Suggest"}
+                </button>
               </div>
               <div className="em-card-body em-form-grid">
 
@@ -427,7 +546,12 @@ export default function CreatePage() {
 
                 <div className="em-field">
                   <label className="em-label">Description / เหตุผลการขอ <span className="req">*</span></label>
-                  <textarea className="em-textarea" value={description} onChange={e => setDescription(e.target.value)} />
+                  <textarea className="em-textarea" value={description} onChange={e => { setDescription(e.target.value); setAiError(null); }} />
+                  {aiError && (
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--rose, #BE123C)", fontWeight: 500 }}>
+                      {aiError}
+                    </div>
+                  )}
                 </div>
 
                 {/* Request Items */}
@@ -573,10 +697,42 @@ export default function CreatePage() {
                       <h3 style={{ fontSize: 13 }}>เปรียบเทียบราคา / Price Comparison</h3>
                       <div className="em-sub" style={{ fontSize: 11.5 }}>กรอกข้อมูลผู้เสนอราคา — ระบบคำนวณราคาสุทธิอัตโนมัติ</div>
                     </div>
-                    <button type="button" className="em-btn sm ghost" onClick={addVendorRow} style={{ whiteSpace: "nowrap" }}>
-                      + เพิ่มผู้ให้บริการ
-                    </button>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        ref={pdfInputRef}
+                        type="file"
+                        accept="application/pdf"
+                        style={{ display: "none" }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePdfUpload(file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="em-btn sm ghost"
+                        onClick={() => pdfInputRef.current?.click()}
+                        disabled={isPdfLoading}
+                        title="อัปโหลดใบเสนอราคา PDF เพื่อดึงข้อมูลอัตโนมัติ"
+                        style={{ whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5 }}
+                      >
+                        <IconUpload size={12} />
+                        {isPdfLoading ? "กำลังอ่าน..." : "อ่าน PDF"}
+                      </button>
+                      <button type="button" className="em-btn sm ghost" onClick={addVendorRow} style={{ whiteSpace: "nowrap" }}>
+                        + เพิ่มผู้ให้บริการ
+                      </button>
+                    </div>
                   </div>
+                  {pdfError && (
+                    <div style={{ margin: "0 14px 10px", padding: "8px 12px", borderRadius: 7, background: "var(--amber-soft)", border: "1px solid rgba(180,83,9,0.22)", fontSize: 12, color: "var(--amber)", display: "flex", alignItems: "center", gap: 8 }}>
+                      <IconX size={12} />
+                      {pdfError}
+                      <button type="button" onClick={() => setPdfError(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--amber)", padding: 0 }}>
+                        <IconX size={11} />
+                      </button>
+                    </div>
+                  )}
                   <div className="em-card-body" style={{ padding: 14 }}>
                     <div style={{ overflowX: "auto" }}>
                       <table className="em-table" style={{ minWidth: 560 }}>

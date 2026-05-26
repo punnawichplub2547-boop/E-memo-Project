@@ -30,22 +30,93 @@ const EXAMPLE_QUERIES = [
 
 export default function SearchPage() {
   const { memos } = useMemos();
-  const [query, setQuery] = useState("memo ซื้ออุปกรณ์สำนักงาน");
+  const [query, setQuery] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [approvedOnly, setApprovedOnly] = useState(false);
+  const [aiIds, setAiIds] = useState<string[] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function handleAiSearch() {
+    if (!query.trim()) return;
+    setIsAiSearching(true);
+    setAiError(null);
+    setAiIds(null);
+    setAiSummary("");
+    try {
+      const res = await fetch("/api/ai-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          memos: memos.map(m => ({
+            id: m.id,
+            title: m.title,
+            department: m.department,
+            category: m.category,
+            amount: m.amount,
+            status: m.status,
+            requester: m.requester,
+            description: m.description,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAiError("AI search ไม่พร้อมใช้งาน — แสดงผล keyword แทน");
+      } else {
+        setAiIds(data.ids ?? []);
+        setAiSummary(data.summary ?? "");
+      }
+    } catch {
+      setAiError("เชื่อมต่อ AI ไม่ได้ — แสดงผล keyword แทน");
+    } finally {
+      setIsAiSearching(false);
+    }
+  }
+
+  function handleExampleClick(q: string) {
+    setQuery(q);
+    setAiIds(null);
+    setAiSummary("");
+    setAiError(null);
+  }
+
+  function handleQueryChange(val: string) {
+    setQuery(val);
+    // Clear AI results when query changes so user knows they need to re-search
+    if (aiIds !== null) {
+      setAiIds(null);
+      setAiSummary("");
+    }
+  }
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return memos.filter(m => {
+    const filtered = memos.filter(m => {
       const matchCat = catFilter === "all" || m.category === catFilter;
       const matchApproved = !approvedOnly || m.status === "approved";
-      const matchQ = !q || [m.title, m.id, m.requester, m.department, approvalLabels[m.category]].join(" ").toLowerCase().includes(q);
-      return matchCat && matchApproved && matchQ;
+      return matchCat && matchApproved;
     });
-  }, [memos, query, catFilter, approvedOnly]);
+
+    if (aiIds !== null) {
+      // AI mode: order by AI ranking, then append non-matched filtered memos dimmed
+      const ranked = aiIds
+        .map(id => filtered.find(m => m.id === id))
+        .filter(Boolean) as typeof memos;
+      return ranked;
+    }
+
+    // Keyword mode
+    const q = query.trim().toLowerCase();
+    return filtered.filter(m =>
+      !q || [m.title, m.id, m.requester, m.department, approvalLabels[m.category]].join(" ").toLowerCase().includes(q)
+    );
+  }, [memos, query, catFilter, approvedOnly, aiIds]);
 
   const avgAmount = results.length ? Math.round(results.reduce((s, m) => s + m.amount, 0) / results.length) : 0;
   const approvalRate = results.length ? Math.round(results.filter(m => m.status === "approved").length / results.length * 100) : 0;
+  const isAiMode = aiIds !== null;
 
   return (
     <div className="em-art">
@@ -67,17 +138,38 @@ export default function SearchPage() {
           {/* Hero */}
           <div className="em-hero">
             <div className="em-hero-inner">
-              <div className="em-hero-eyebrow"><IconSparkles size={12} /> Powered by AI · Semantic + Keyword</div>
+              <div className="em-hero-eyebrow"><IconSparkles size={12} /> Powered by Groq · Llama 3.3 70B</div>
               <h2>ค้นหา memo ย้อนหลังด้วยภาษาธรรมชาติ</h2>
               <p>พิมพ์เลขเอกสาร คำสำคัญ ผู้อนุมัติ หรือคำถามแบบประโยค</p>
               <div className="em-hero-search">
                 <IconSearch size={18} style={{ color: "var(--muted)", flexShrink: 0 }} />
-                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="ค้นหา memo, ผู้อนุมัติ, แผนก, เลขเอกสาร…" />
-                <button className="em-btn primary" style={{ height: 40, padding: "0 18px" }}>Search <IconArrowRight size={14} /></button>
+                <input
+                  value={query}
+                  onChange={e => handleQueryChange(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleAiSearch()}
+                  placeholder="ค้นหา memo, ผู้อนุมัติ, แผนก, เลขเอกสาร…"
+                />
+                <button
+                  className="em-btn primary"
+                  style={{ height: 40, padding: "0 18px", minWidth: 100 }}
+                  onClick={handleAiSearch}
+                  disabled={isAiSearching || !query.trim()}
+                >
+                  {isAiSearching ? "กำลังค้นหา…" : <><IconSparkles size={14} /> AI Search</>}
+                </button>
               </div>
+              {aiError && (
+                <div style={{ fontSize: 12, color: "rgba(251,191,36,0.9)", marginTop: 6 }}>{aiError}</div>
+              )}
               <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
                 {EXAMPLE_QUERIES.map(q => (
-                  <span key={q} style={{ padding: "6px 12px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "rgba(219,234,254,0.9)", border: "1px solid rgba(147,197,253,0.20)", fontSize: 12, fontWeight: 500, cursor: "pointer" }} onClick={() => setQuery(q)}>{q}</span>
+                  <span
+                    key={q}
+                    style={{ padding: "6px 12px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "rgba(219,234,254,0.9)", border: "1px solid rgba(147,197,253,0.20)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                    onClick={() => handleExampleClick(q)}
+                  >
+                    {q}
+                  </span>
                 ))}
               </div>
             </div>
@@ -102,7 +194,10 @@ export default function SearchPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                  Found <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · sorted by <strong style={{ color: "var(--ink)" }}>relevance</strong>
+                  {isAiMode
+                    ? <>AI พบ <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · เรียงตาม <strong style={{ color: "var(--ink)" }}>ความเกี่ยวข้อง</strong></>
+                    : <>Found <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · sorted by <strong style={{ color: "var(--ink)" }}>keyword</strong></>
+                  }
                 </div>
                 <div className="em-tabs" style={{ padding: 3 }}>
                   <div className="em-tab active" style={{ padding: "5px 10px", fontSize: 11.5 }}>Relevance</div>
@@ -118,7 +213,7 @@ export default function SearchPage() {
                   <div style={{ fontSize: 13 }}>ลองเปลี่ยน keyword หรือล้าง filter</div>
                 </div>
               ) : (
-                results.map(m => {
+                results.map((m, idx) => {
                   const isMd = m.currentStep === "Managing Director";
                   const initials = m.requester.split(" ").map((p: string) => p[0]).slice(0, 2).join("");
                   return (
@@ -131,6 +226,11 @@ export default function SearchPage() {
                           {isMd ? "MD" : m.currentStep === "General Manager" ? "GM" : "Manager"}
                         </span>
                         <span className="em-dept">{approvalLabels[m.category]}</span>
+                        {isAiMode && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(37,99,235,0.12)", color: "var(--primary)", border: "1px solid rgba(37,99,235,0.2)" }}>
+                            #{idx + 1}
+                          </span>
+                        )}
                         <div style={{ flex: 1 }} />
                         <div style={{ fontSize: 11.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}>
                           <IconCalendar size={12} /> {m.updatedAt}
@@ -168,13 +268,21 @@ export default function SearchPage() {
                       <IconSparkles size={14} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>AI Summary</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                        {isAiMode ? "AI Summary" : "Search Summary"}
+                      </div>
                       <div style={{ fontSize: 11, color: "var(--muted)" }}>{results.length} memos found</div>
                     </div>
                   </div>
-                  <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--ink-2)" }}>
-                    ผลการค้นหาเฉลี่ยอยู่ที่ <strong>฿{avgAmount.toLocaleString()}</strong> อัตราการอนุมัติ <strong>{approvalRate}%</strong>
-                  </p>
+                  {isAiSearching ? (
+                    <p style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.65 }}>กำลังวิเคราะห์ด้วย AI…</p>
+                  ) : aiSummary ? (
+                    <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--ink-2)" }}>{aiSummary}</p>
+                  ) : (
+                    <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--ink-2)" }}>
+                      ผลการค้นหาเฉลี่ยอยู่ที่ <strong>฿{avgAmount.toLocaleString()}</strong> อัตราการอนุมัติ <strong>{approvalRate}%</strong>
+                    </p>
+                  )}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
                     <SummaryStat label="Avg amount" value={`฿${avgAmount.toLocaleString()}`} />
                     <SummaryStat label="Approval rate" value={`${approvalRate}%`} />
@@ -187,13 +295,17 @@ export default function SearchPage() {
               <div className="em-card">
                 <div className="em-card-head">
                   <div>
-                    <h3 style={{ fontSize: 13 }}>Try semantic search</h3>
+                    <h3 style={{ fontSize: 13 }}>Try AI search</h3>
                     <div className="em-sub" style={{ fontSize: 11.5 }}>Example queries</div>
                   </div>
                 </div>
                 <div className="em-card-body" style={{ paddingTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
                   {EXAMPLE_QUERIES.map(q => (
-                    <div key={q} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", cursor: "pointer", fontSize: 12.5, color: "var(--ink-2)" }} onClick={() => setQuery(q)}>
+                    <div
+                      key={q}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-2)", cursor: "pointer", fontSize: 12.5, color: "var(--ink-2)" }}
+                      onClick={() => handleExampleClick(q)}
+                    >
                       <IconSearch size={12} style={{ color: "var(--muted)" }} />
                       <span style={{ flex: 1 }}>{q}</span>
                       <IconArrowRight size={12} style={{ color: "var(--muted-2)" }} />
