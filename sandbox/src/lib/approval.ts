@@ -52,15 +52,34 @@ export type ApprovalRecommendation = {
 
 export type MemoStatus = "draft" | "pending" | "approved" | "rejected" | "returned";
 
+export type ReadActionStatus = "pending" | "read" | "skipped";
+
+export type ReadAction = {
+  recipient: string;
+  status: ReadActionStatus;
+  actedAt?: string;
+  skipReason?: string;
+};
+
 export type PriceComparison = {
   id: string;
   vendorName: string;
   offeredPrice: number;
   discount: number;
+  vatEnabled?: boolean;
   netPrice: number;
   remark?: string;
   isSelected: boolean;
 };
+
+export const VAT_RATE = 0.07;
+
+export function computePriceRowTotals(row: { offeredPrice: number; discount: number; vatEnabled?: boolean }) {
+  const basePrice = Math.max(0, (row.offeredPrice ?? 0) - (row.discount ?? 0));
+  const vatAmount = row.vatEnabled ? Math.round(basePrice * VAT_RATE * 100) / 100 : 0;
+  const netPrice = basePrice + vatAmount;
+  return { basePrice, vatAmount, netPrice };
+}
 
 export type RequestItem = {
   id: string;
@@ -86,7 +105,9 @@ export type MemoRecord = {
   routeMode?: ApprovalRouteMode;
   routeOverrideReason?: string;
   readRecipients?: string[];
+  readActions?: ReadAction[];
   returnReason?: string;
+  revisionNote?: string;
   description?: string;
   budgetStatus?: BudgetStatus;
   accountCode?: string;

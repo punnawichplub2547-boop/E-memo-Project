@@ -152,6 +152,12 @@ JSON:`;
       return NextResponse.json({ error: "parse_error" });
     }
 
+    // VAT is intentionally NOT inferred from extracted PDF text.
+    // Quotation totals are ambiguous about VAT inclusion (sometimes the listed
+    // total already includes VAT, sometimes VAT is a separate line). Inferring
+    // incorrectly would double-count or undercount the user's bill. The UI
+    // defaults to VAT disabled and lets the user toggle the per-row VAT 7%
+    // pill when the quote explicitly requires it.
     return NextResponse.json({
       vendor: typeof parsed.vendor === "string" ? parsed.vendor.trim() : "",
       items: Array.isArray(parsed.items)
@@ -163,6 +169,7 @@ JSON:`;
           }))
         : [],
       totalAmount: Number(parsed.totalAmount) || 0,
+      vatEnabled: false,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="white"/>
+  <!-- Outer thick blue C -->
+  <path d="M27,7 L8,7 Q3,7 3,12 L3,20 Q3,25 8,25 L27,25"
+        fill="none" stroke="#1870C8" stroke-width="5.5" stroke-linecap="butt" stroke-linejoin="round"/>
+  <!-- White channel — creates the hollow double-outline effect -->
+  <path d="M27,7 L8,7 Q3,7 3,12 L3,20 Q3,25 8,25 L27,25"
+        fill="none" stroke="white" stroke-width="2.5" stroke-linecap="butt" stroke-linejoin="round"/>
+  <!-- Inner thin blue line -->
+  <path d="M27,7 L8,7 Q3,7 3,12 L3,20 Q3,25 8,25 L27,25"
+        fill="none" stroke="#1870C8" stroke-width="0.9" stroke-linecap="butt" stroke-linejoin="round"/>
+</svg>

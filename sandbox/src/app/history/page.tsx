@@ -39,6 +39,7 @@ export default function HistoryPage() {
   const approvalRate = totalProcessed ? Math.round(approvedCount / totalProcessed * 100) : 0;
   const avgCycle = totalProcessed ? Math.round(memos.reduce((s, m) => s + m.cycleHours, 0) / totalProcessed) : 0;
   const rejectedCount = memos.filter(m => m.status === "rejected").length;
+  const returnedCount = memos.filter(m => m.status === "returned").length;
   const mdCount = memos.filter(m => m.currentStep === "Managing Director").length;
 
   // Group by date label (simplified — group by updatedAt date)
@@ -84,7 +85,7 @@ export default function HistoryPage() {
               {(["all", "approved", "rejected", "returned"] as const).map(t => (
                 <div key={t} className={`em-tab${tabFilter === t ? " active" : ""}`} onClick={() => setTabFilter(t)} style={{ cursor: "pointer" }}>
                   {t === "all" ? "All actions" : t.charAt(0).toUpperCase() + t.slice(1)}
-                  <span className="count">{t === "all" ? totalProcessed : t === "approved" ? approvedCount : t === "rejected" ? rejectedCount : 0}</span>
+                  <span className="count">{t === "all" ? totalProcessed : t === "approved" ? approvedCount : t === "rejected" ? rejectedCount : returnedCount}</span>
                 </div>
               ))}
             </div>
@@ -124,7 +125,7 @@ export default function HistoryPage() {
                   <div className="em-card" style={{ padding: "4px 0 0", marginTop: 10, position: "relative" }}>
                     {g.items.map((m, i) => {
                       const isMd = m.currentStep === "Managing Director";
-                      const action: HistoryAction = m.status === "approved" ? "approved" : m.status === "rejected" ? "rejected" : m.status === "draft" ? "draft" : "submitted";
+                      const action: HistoryAction = m.status === "approved" ? "approved" : m.status === "rejected" ? "rejected" : m.status === "returned" ? "returned" : m.status === "draft" ? "draft" : "submitted";
                       const cfg = ACTION_CONFIG[action];
                       const isLast = i === g.items.length - 1;
                       return (
@@ -154,6 +155,9 @@ export default function HistoryPage() {
                             <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>{approvalLabels[m.category]} · {routeSummary(m)}</div>
                             {m.routeOverrideReason && (
                               <div style={{ fontSize: 11.5, color: "#7C5E0F", marginTop: 3, fontWeight: 600 }}>Exception reason: {m.routeOverrideReason}</div>
+                            )}
+                            {m.returnReason && (
+                              <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 3, fontWeight: 600 }}>ส่งกลับ: {m.returnReason}</div>
                             )}
                           </div>
                           <div style={{ fontSize: 11.5, color: "var(--muted-2)", textAlign: "right", whiteSpace: "nowrap" }}>

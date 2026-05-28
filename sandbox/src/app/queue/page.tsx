@@ -68,18 +68,37 @@ export default function QueuePage() {
     returned: memos.filter((m) => m.status === "returned").length,
   };
 
-  const handleAction = (id: string, action: "approve" | "reject") => {
-    const updatedAt = new Intl.DateTimeFormat("en-GB", {
+  const stampNow = () =>
+    new Intl.DateTimeFormat("en-GB", {
       day: "2-digit", month: "short", year: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: false,
     }).format(new Date());
-    dispatch({
-      type: "UPDATE_STATUS",
-      id,
-      status: action === "approve" ? "approved" : "rejected",
-      updatedAt,
-    });
+
+  const handleAction = (id: string, action: "approve" | "reject") => {
+    if (action === "approve") {
+      dispatch({ type: "ADVANCE_STEP", id, updatedAt: stampNow() });
+    } else {
+      dispatch({ type: "UPDATE_STATUS", id, status: "rejected", updatedAt: stampNow() });
+    }
     setSelected(null);
+  };
+
+  const handleReturn = (id: string, reason: string) => {
+    dispatch({ type: "RETURN_MEMO", id, returnReason: reason, updatedAt: stampNow() });
+    setSelected(null);
+  };
+
+  const handleResubmit = (id: string, revisionNote?: string) => {
+    dispatch({ type: "RESUBMIT_MEMO", id, revisionNote, updatedAt: stampNow() });
+    setSelected(null);
+  };
+
+  const handleMarkRead = (id: string, recipient: string) => {
+    dispatch({ type: "MARK_READ", id, recipient, actedAt: stampNow() });
+  };
+
+  const handleSkipAllReads = (id: string, reason: string) => {
+    dispatch({ type: "SKIP_ALL_READS", id, skipReason: reason, actedAt: stampNow() });
   };
 
   return (
@@ -111,7 +130,7 @@ export default function QueuePage() {
               }}
             >
               <div className="em-tabs">
-                {(["all", "pending", "approved", "rejected", "draft"] as TabStatus[]).map((t) => (
+                {(["all", "pending", "approved", "rejected", "returned", "draft"] as TabStatus[]).map((t) => (
                   <div
                     key={t}
                     className={`em-tab${activeTab === t ? " active" : ""}`}
@@ -454,9 +473,14 @@ export default function QueuePage() {
               >
                 {selectedMemo && (
                   <DrawerPanel
+                    key={selectedMemo.id}
                     memo={selectedMemo}
                     onClose={() => setSelected(null)}
                     onAction={handleAction}
+                    onReturn={handleReturn}
+                    onResubmit={handleResubmit}
+                    onMarkRead={handleMarkRead}
+                    onSkipAllReads={handleSkipAllReads}
                     inline
                   />
                 )}
@@ -467,9 +491,14 @@ export default function QueuePage() {
 
         {showOverlayDetail && selectedMemo && (
           <DrawerPanel
+            key={selectedMemo.id}
             memo={selectedMemo}
             onClose={() => setSelected(null)}
             onAction={handleAction}
+            onReturn={handleReturn}
+            onResubmit={handleResubmit}
+            onMarkRead={handleMarkRead}
+            onSkipAllReads={handleSkipAllReads}
           />
         )}
       </div>
