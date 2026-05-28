@@ -1,4 +1,9 @@
 import { type PriceComparison, computePriceRowTotals } from "@/lib/approval";
+import {
+  clampNonNegativeInputElement,
+  coerceNonNegativeNumber,
+  shouldBlockNonNegativeNumberKey,
+} from "@/lib/number-input";
 import { IconWallet, IconUpload, IconX } from "@/components/icons";
 import { VatPill } from "./VatPill";
 import { DecisionCell } from "./DecisionCell";
@@ -140,7 +145,12 @@ export function PriceComparisonCard({
                         min={0}
                         value={row.offeredPrice || ""}
                         placeholder="0"
-                        onChange={e => updateVendorRow(row.id, { offeredPrice: Number(e.target.value) || 0 })}
+                        onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onKeyDown={(e) => {
+                          if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                        }}
+                        onChange={e => updateVendorRow(row.id, { offeredPrice: coerceNonNegativeNumber(e.target.value) })}
                       />
                     </td>
                     <td style={{ padding: "10px 12px" }}>
@@ -150,7 +160,12 @@ export function PriceComparisonCard({
                         min={0}
                         value={row.discount || ""}
                         placeholder="0"
-                        onChange={e => updateVendorRow(row.id, { discount: Number(e.target.value) || 0 })}
+                        onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onKeyDown={(e) => {
+                          if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                        }}
+                        onChange={e => updateVendorRow(row.id, { discount: coerceNonNegativeNumber(e.target.value) })}
                       />
                     </td>
                     <td style={{ padding: "10px 12px", textAlign: "center" }}>

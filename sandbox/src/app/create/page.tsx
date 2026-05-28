@@ -16,6 +16,7 @@ import {
   ReadAction,
   RequestItem,
 } from "@/lib/approval";
+import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import {
   IconFileText, IconMail,
 } from "@/components/icons";
@@ -96,7 +97,12 @@ export default function CreatePage() {
     setRequestItems(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
   };
   const updateRequestItem = (id: string, updates: Partial<Omit<RequestItem, "id">>) => {
-    setRequestItems(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.qty !== undefined ? { qty: coercePositiveInteger(updates.qty) } : {}),
+      ...(updates.unitPrice !== undefined ? { unitPrice: coerceNonNegativeNumber(updates.unitPrice) } : {}),
+    };
+    setRequestItems(prev => prev.map(r => r.id === id ? { ...r, ...normalizedUpdates } : r));
   };
 
   const addVendorRow = () => {
@@ -116,9 +122,14 @@ export default function CreatePage() {
   const updateVendorRow = (id: string, updates: Partial<PriceComparison>) => {
     setPriceComparisons(prev => prev.map(row => {
       if (row.id !== id) return row;
+      const normalizedUpdates = {
+        ...updates,
+        ...(updates.offeredPrice !== undefined ? { offeredPrice: coerceNonNegativeNumber(updates.offeredPrice) } : {}),
+        ...(updates.discount !== undefined ? { discount: coerceNonNegativeNumber(updates.discount) } : {}),
+      };
       const merged: PriceComparison = {
         ...row,
-        ...updates,
+        ...normalizedUpdates,
         // isSelected is owned by handleSelectVendor, not the per-field updater
         isSelected: row.isSelected,
       };
@@ -286,10 +297,11 @@ export default function CreatePage() {
         // Pre-fill vendor row
         if (data.vendor || data.items?.length > 0) {
           const totalFromItems = (data.items ?? []).reduce(
-            (s: number, it: { qty: number; unitPrice: number }) => s + Math.round(it.qty * it.unitPrice),
+            (s: number, it: { qty: number; unitPrice: number }) =>
+              s + Math.round(coercePositiveInteger(it.qty) * coerceNonNegativeNumber(it.unitPrice)),
             0
           );
-          const vendorPrice = data.totalAmount || totalFromItems;
+          const vendorPrice = coerceNonNegativeNumber(data.totalAmount || totalFromItems);
           const isFirstBlank =
             priceComparisons.length === 1 &&
             !priceComparisons[0].vendorName &&
@@ -323,8 +335,8 @@ export default function CreatePage() {
             id: String(Date.now() + idx + 1),
             name: it.name,
             unit: it.unit || "ชิ้น",
-            qty: it.qty || 1,
-            unitPrice: it.unitPrice || 0,
+            qty: coercePositiveInteger(it.qty),
+            unitPrice: coerceNonNegativeNumber(it.unitPrice),
           }));
           if (isFirstItemBlank) {
             setRequestItems(newItems);

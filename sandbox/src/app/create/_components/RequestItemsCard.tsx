@@ -1,4 +1,12 @@
 import { type RequestItem } from "@/lib/approval";
+import {
+  clampNonNegativeInputElement,
+  clampPositiveIntegerInputElement,
+  coerceNonNegativeNumber,
+  coercePositiveInteger,
+  shouldBlockNonNegativeNumberKey,
+  shouldBlockPositiveIntegerKey,
+} from "@/lib/number-input";
 import { IconFileText, IconX } from "@/components/icons";
 
 const effectiveQty = (qty: number) => (qty > 0 ? qty : 1);
@@ -67,12 +75,22 @@ export function RequestItemsCard({
                     <td style={{ padding: "10px 12px" }}>
                       <input className="em-table-input num" type="number" min={1}
                         value={effectiveQty(row.qty)} placeholder="1"
-                        onChange={e => updateRequestItem(row.id, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                        onInput={(e) => clampPositiveIntegerInputElement(e.currentTarget)}
+                        onBlur={(e) => clampPositiveIntegerInputElement(e.currentTarget)}
+                        onKeyDown={(e) => {
+                          if (shouldBlockPositiveIntegerKey(e.key)) e.preventDefault();
+                        }}
+                        onChange={e => updateRequestItem(row.id, { qty: coercePositiveInteger(e.target.value) })} />
                     </td>
                     <td style={{ padding: "10px 12px" }}>
                       <input className="em-table-input num" type="number" min={0}
                         value={row.unitPrice || ""} placeholder="0"
-                        onChange={e => updateRequestItem(row.id, { unitPrice: Number(e.target.value) || 0 })} />
+                        onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                        onKeyDown={(e) => {
+                          if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                        }}
+                        onChange={e => updateRequestItem(row.id, { unitPrice: coerceNonNegativeNumber(e.target.value) })} />
                     </td>
                     <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 600, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
                       ฿{lineTotal.toLocaleString()}

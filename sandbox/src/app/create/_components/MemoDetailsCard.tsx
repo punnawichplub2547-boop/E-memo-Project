@@ -1,4 +1,9 @@
 import { type ApprovalCategory, type BudgetStatus, approvalLabels } from "@/lib/approval";
+import {
+  clampNonNegativeInputElement,
+  coerceNonNegativeNumber,
+  shouldBlockNonNegativeNumberKey,
+} from "@/lib/number-input";
 import { IconSparkles, IconTag, IconBuilding } from "@/components/icons";
 import { FlagCheckbox } from "./FlagCheckbox";
 
@@ -153,7 +158,17 @@ export function MemoDetailsCard({
             <label className="em-label">จำนวนเงิน (THB) <span className="req">*</span></label>
             <div className="em-input-prefix">
               <span className="pre">฿</span>
-              <input type="number" value={amount} onChange={e => onAmountChange(Number(e.target.value))} />
+              <input
+                type="number"
+                min={0}
+                value={amount}
+                onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                }}
+                onChange={e => onAmountChange(coerceNonNegativeNumber(e.target.value))}
+              />
               <span style={{ color: "var(--muted)", fontSize: 11.5, fontWeight: 600 }}>THB</span>
             </div>
             <div className="em-help">เกณฑ์ขึ้นกับหมวด - ดูแผงด้านขวาว่าเข้ากฎข้อใด</div>
@@ -205,7 +220,12 @@ export function MemoDetailsCard({
                   <div className="em-input-prefix">
                     <span className="pre">฿</span>
                     <input type="number" min={0} value={deptMonthlyOverBudgetTotal}
-                      onChange={e => onDeptMonthlyChange(Number(e.target.value))} />
+                      onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                      onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                      onKeyDown={(e) => {
+                        if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                      }}
+                      onChange={e => onDeptMonthlyChange(coerceNonNegativeNumber(e.target.value))} />
                     <span style={{ color: "var(--muted)", fontSize: 11.5, fontWeight: 600 }}>THB</span>
                   </div>
                   <div className="em-help">โควต้า 10,000/แผนก/เดือน - เกินแล้วจะแนะนำ MD</div>
