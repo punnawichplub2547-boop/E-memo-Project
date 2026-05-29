@@ -1,27 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import { formatTimestamp } from "@/lib/format-timestamp";
-import { approvalLabels } from "@/lib/approval";
+import { ApprovalLevel, approvalLabels } from "@/lib/approval";
 import {
   IconDownload, IconPlus, IconFilter, IconSearch, IconSort,
   IconCrown, IconUsers, IconChevDown, IconCalendar,
   IconDots,
 } from "@/components/icons";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { DrawerPanel } from "./_components/drawer-panel";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#047857", "#B45309", "#BE123C", "#0891B2", "#6D28D9"];
 const avatarColor = (s: string) => AVATAR_COLORS[s.charCodeAt(0) % AVATAR_COLORS.length];
 
+const TIER_STEP_MAP: Record<string, ApprovalLevel> = {
+  md:      "Managing Director",
+  gm:      "General Manager",
+  manager: "Manager / Top Section",
+};
+const TIER_LABEL: Record<string, string> = {
+  md:      "MD Queue",
+  gm:      "GM Queue",
+  manager: "Manager Queue",
+};
+
 type TabStatus = "all" | "pending" | "approved" | "rejected" | "draft" | "returned";
 
-export default function QueuePage() {
+function QueuePageContent() {
   const { memos, dispatch } = useMemos();
-  const [activeTab, setActiveTab] = useState<TabStatus>("all");
+  const searchParams = useSearchParams();
+  const tierParam = searchParams.get("tier") ?? "";
+  const tierFilter: ApprovalLevel | null = TIER_STEP_MAP[tierParam] ?? null;
+  const tierLabel: string | null = TIER_LABEL[tierParam] ?? null;
+
+  const [activeTab, setActiveTab] = useState<TabStatus>(() => (tierFilter ? "pending" : "all"));
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [isDesktopSplit, setIsDesktopSplit] = useState(false);
@@ -43,7 +60,15 @@ export default function QueuePage() {
     };
   }, []);
 
-  const filtered = memos.filter((m) => {
+  // Reset the status tab to "pending" when entering a tier view, "all" when leaving.
+  useEffect(() => {
+    const applyTierDefault = () => setActiveTab(tierFilter ? "pending" : "all");
+    applyTierDefault();
+  }, [tierFilter]);
+
+  const tierMemos = tierFilter ? memos.filter((m) => m.currentStep === tierFilter) : memos;
+
+  const filtered = tierMemos.filter((m) => {
     const matchTab = activeTab === "all" || m.status === activeTab;
     const q = search.toLowerCase();
     const matchSearch =
@@ -61,12 +86,12 @@ export default function QueuePage() {
   const useCompactColumns = showInlineDetail || isCompactTable;
 
   const counts: Record<TabStatus, number> = {
-    all: memos.length,
-    pending: memos.filter((m) => m.status === "pending").length,
-    approved: memos.filter((m) => m.status === "approved").length,
-    rejected: memos.filter((m) => m.status === "rejected").length,
-    draft: memos.filter((m) => m.status === "draft").length,
-    returned: memos.filter((m) => m.status === "returned").length,
+    all:      tierMemos.length,
+    pending:  tierMemos.filter((m) => m.status === "pending").length,
+    approved: tierMemos.filter((m) => m.status === "approved").length,
+    rejected: tierMemos.filter((m) => m.status === "rejected").length,
+    draft:    tierMemos.filter((m) => m.status === "draft").length,
+    returned: tierMemos.filter((m) => m.status === "returned").length,
   };
 
   const stampNow = () => formatTimestamp(new Date());
@@ -106,10 +131,15 @@ export default function QueuePage() {
       <Sidebar />
       <div className="em-work" style={{ position: "relative" }}>
         <Topbar
-          crumbs={["Approval Queue"]}
-          title="Approval Queue"
+          crumbs={tierFilter ? ["Approval Queue", tierLabel!] : ["Approval Queue"]}
+          title={tierFilter ? `Executive Review — ${tierLabel}` : "Approval Queue"}
           actions={
             <>
+              {tierFilter && (
+                <Link href="/queue" className="em-btn sm ghost">
+                  ← All queues
+                </Link>
+              )}
               <button className="em-btn">
                 <IconDownload size={15} /> Export
               </button>
@@ -145,23 +175,46 @@ export default function QueuePage() {
 
               <div style={{ width: 1, height: 26, background: "var(--line)" }} />
 
-              <div
-                style={{
+              {tierFilter ? (
+                <div style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
                   padding: "6px 10px",
-                  border: "1px solid var(--line-2)",
+                  border: "1px solid rgba(201,168,76,0.45)",
                   borderRadius: 8,
                   fontSize: 12.5,
-                  background: "var(--surface)",
-                }}
-              >
-                <IconUsers size={13} style={{ color: "var(--muted)" }} />
-                <span style={{ color: "var(--muted)" }}>Tier:</span>
-                <strong style={{ color: "var(--ink)" }}>All levels</strong>
-                <IconChevDown size={13} style={{ color: "var(--muted)" }} />
-              </div>
+                  background: "var(--gold-soft)",
+                }}>
+                  <IconCrown size={13} style={{ color: "var(--gold)" }} />
+                  <span style={{ color: "#7C5E0F", fontWeight: 600 }}>{tierFilter}</span>
+                  <Link
+                    href="/queue"
+                    style={{ color: "#7C5E0F", marginLeft: 2, lineHeight: 1, textDecoration: "none", fontSize: 15, fontWeight: 400 }}
+                    title="Clear tier filter"
+                  >
+                    ×
+                  </Link>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 10px",
+                    border: "1px solid var(--line-2)",
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    background: "var(--surface)",
+                  }}
+                >
+                  <IconUsers size={13} style={{ color: "var(--muted)" }} />
+                  <span style={{ color: "var(--muted)" }}>Tier:</span>
+                  <strong style={{ color: "var(--ink)" }}>All levels</strong>
+                  <IconChevDown size={13} style={{ color: "var(--muted)" }} />
+                </div>
+              )}
 
               <div
                 style={{
@@ -275,6 +328,18 @@ export default function QueuePage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={useCompactColumns ? 4 : 7}
+                            style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}
+                          >
+                            {tierFilter
+                              ? `No ${tierLabel} memos match the current filters.`
+                              : "No memos match the current filters."}
+                          </td>
+                        </tr>
+                      )}
                       {filtered.map((memo) => {
                         const isMd = memo.currentStep === "Managing Director";
                         const initials = memo.requester
@@ -457,7 +522,12 @@ export default function QueuePage() {
                     color: "var(--muted)",
                   }}
                 >
-                  <div>Showing {filtered.length} of {memos.length} memos</div>
+                  <div>
+                    Showing {filtered.length} of{" "}
+                    {tierFilter
+                      ? `${tierMemos.length} ${tierLabel} memos`
+                      : `${memos.length} memos`}
+                  </div>
                 </div>
               </div>
             </div>
@@ -505,5 +575,13 @@ export default function QueuePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function QueuePage() {
+  return (
+    <Suspense>
+      <QueuePageContent />
+    </Suspense>
   );
 }
