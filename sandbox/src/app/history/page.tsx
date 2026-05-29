@@ -159,6 +159,11 @@ export default function HistoryPage() {
                             {m.returnReason && (
                               <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 3, fontWeight: 600 }}>ส่งกลับ: {m.returnReason}</div>
                             )}
+                            {m.rejectReason && (
+                              <div style={{ fontSize: 11.5, color: "var(--rose)", marginTop: 3, fontWeight: 600 }}>
+                                ปฏิเสธ{m.rejectDisposition === "revision-allowed" ? " (อนุญาตให้แก้ไข)" : " (ปิด)"}: {m.rejectReason}
+                              </div>
+                            )}
                           </div>
                           <div style={{ fontSize: 11.5, color: "var(--muted-2)", textAlign: "right", whiteSpace: "nowrap" }}>
                             {m.updatedAt}

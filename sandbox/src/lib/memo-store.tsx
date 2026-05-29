@@ -11,7 +11,8 @@ type Action =
   | { type: "MARK_READ"; id: string; recipient: string; actedAt?: string }
   | { type: "SKIP_ALL_READS"; id: string; skipReason: string; actedAt?: string }
   | { type: "RETURN_MEMO"; id: string; returnReason: string; updatedAt?: string }
-  | { type: "RESUBMIT_MEMO"; id: string; revisionNote?: string; updatedAt?: string };
+  | { type: "RESUBMIT_MEMO"; id: string; revisionNote?: string; updatedAt?: string }
+  | { type: "REJECT_MEMO"; id: string; disposition: "close" | "revision-allowed"; reason: string; updatedAt?: string };
 
 export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
   switch (action.type) {
@@ -79,6 +80,12 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
               updatedAt: action.updatedAt ?? m.updatedAt,
               readActions: m.readActions?.map((ra): ReadAction => ({ recipient: ra.recipient, status: "pending" })),
             }
+          : m
+      );
+    case "REJECT_MEMO":
+      return state.map((m) =>
+        m.id === action.id
+          ? { ...m, status: "rejected", rejectDisposition: action.disposition, rejectReason: action.reason, updatedAt: action.updatedAt ?? m.updatedAt }
           : m
       );
     default:

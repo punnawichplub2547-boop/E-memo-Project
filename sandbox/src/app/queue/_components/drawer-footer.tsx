@@ -7,18 +7,23 @@ import { IconCheck, IconReturn, IconX } from "@/components/icons";
 export function DrawerFooter({
   memo,
   onAction,
+  onReject,
   onReturn,
   onResubmit,
   onSkipAllReads,
 }: {
   memo: MemoRecord;
-  onAction: (id: string, action: "approve" | "reject") => void;
+  onAction: (id: string, action: "approve") => void;
+  onReject: (id: string, disposition: "close" | "revision-allowed", reason: string) => void;
   onReturn: (id: string, reason: string) => void;
   onResubmit: (id: string, revisionNote?: string) => void;
   onSkipAllReads: (id: string, reason: string) => void;
 }) {
   // key={selectedMemo.id} on the parent DrawerPanel guarantees full remount on memo
   // selection change, so simple boolean states are safe here.
+  const [rejectMode, setRejectMode] = useState(false);
+  const [localRejectReason, setLocalRejectReason] = useState("");
+  const [localRejectDisposition, setLocalRejectDisposition] = useState<"close" | "revision-allowed">("close");
   const [returnMode, setReturnMode] = useState(false);
   const [localReturnReason, setLocalReturnReason] = useState("");
   const [resubmitMode, setResubmitMode] = useState(false);
@@ -28,10 +33,124 @@ export function DrawerFooter({
 
   const hasPendingReads = memo.readActions?.some(ra => ra.status === "pending") ?? false;
 
+  // Shared resubmit form — used by both "returned" and "rejected + revision-allowed" paths.
+  const resubmitForm = (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.55, padding: "7px 10px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+        This prototype resubmits the existing memo content with an optional correction note. Full edit/resubmit form is deferred.
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--ink-2)", fontWeight: 600 }}>
+        หมายเหตุการแก้ไข{" "}
+        <span style={{ fontWeight: 400, color: "var(--muted)" }}>(ไม่บังคับ / optional)</span>
+      </div>
+      <textarea
+        className="em-textarea"
+        style={{ minHeight: 64 }}
+        placeholder="ระบุสิ่งที่แก้ไข เช่น แนบใบเสนอราคาแล้ว, แก้ไขวงเงินแล้ว"
+        value={revisionNote}
+        onChange={e => setRevisionNote(e.target.value)}
+        autoFocus
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          className="em-btn sm ghost"
+          style={{ flex: 1 }}
+          onClick={() => setResubmitMode(false)}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="em-btn sm primary"
+          style={{ flex: 2 }}
+          onClick={() => onResubmit(memo.id, revisionNote.trim() || undefined)}
+        >
+          <IconReturn size={13} /> Confirm Resubmit
+        </button>
+      </div>
+    </div>
+  );
+
+  const resubmitButton = (
+    <button
+      type="button"
+      className="em-btn"
+      style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
+      onClick={() => { setResubmitMode(true); setRevisionNote(""); }}
+    >
+      <IconReturn size={14} /> ส่งตรวจใหม่ (ยังไม่แก้ฟอร์ม)
+    </button>
+  );
+
   return (
     <div className="em-drawer-foot">
       {memo.status === "pending" ? (
-        returnMode ? (
+        rejectMode ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 12.5, color: "var(--rose)", fontWeight: 700 }}>
+              ระบุเหตุผลที่ปฏิเสธ <span style={{ color: "var(--rose)" }}>*</span>
+            </div>
+            <textarea
+              className="em-textarea"
+              style={{ minHeight: 72 }}
+              placeholder="เช่น ราคาสูงเกินงบ, ไม่ตรงกับแผนงาน, ข้อมูลไม่เพียงพอ"
+              value={localRejectReason}
+              onChange={e => setLocalRejectReason(e.target.value)}
+              autoFocus
+            />
+            <div style={{ fontSize: 12, color: "var(--ink-2)", fontWeight: 600 }}>
+              การดำเนินการหลังปฏิเสธ:
+            </div>
+            <div style={{ display: "flex", gap: 0, borderRadius: 7, overflow: "hidden", border: "1px solid var(--line-2)" }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1, padding: "7px 10px", fontSize: 12, cursor: "pointer",
+                  fontWeight: localRejectDisposition === "close" ? 700 : 500,
+                  background: localRejectDisposition === "close" ? "var(--rose-soft)" : "transparent",
+                  color: localRejectDisposition === "close" ? "var(--rose)" : "var(--muted)",
+                  border: "none", borderRight: "1px solid var(--line-2)",
+                }}
+                onClick={() => setLocalRejectDisposition("close")}
+              >
+                ปิดคำขอ (Close)
+              </button>
+              <button
+                type="button"
+                style={{
+                  flex: 1, padding: "7px 10px", fontSize: 12, cursor: "pointer",
+                  fontWeight: localRejectDisposition === "revision-allowed" ? 700 : 500,
+                  background: localRejectDisposition === "revision-allowed" ? "var(--amber-soft)" : "transparent",
+                  color: localRejectDisposition === "revision-allowed" ? "var(--amber)" : "var(--muted)",
+                  border: "none",
+                }}
+                onClick={() => setLocalRejectDisposition("revision-allowed")}
+              >
+                อนุญาตให้แก้ไข
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="em-btn sm ghost"
+                style={{ flex: 1 }}
+                onClick={() => { setRejectMode(false); setLocalRejectReason(""); setLocalRejectDisposition("close"); }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="em-btn sm danger"
+                style={{ flex: 2 }}
+                disabled={!localRejectReason.trim()}
+                onClick={() => onReject(memo.id, localRejectDisposition, localRejectReason.trim())}
+              >
+                <IconX size={13} /> ยืนยันปฏิเสธ
+              </button>
+            </div>
+          </div>
+        ) : returnMode ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 12.5, color: "var(--amber)", fontWeight: 700 }}>
               ระบุเหตุผลที่ส่งกลับ <span style={{ color: "var(--rose)" }}>*</span>
@@ -135,7 +254,7 @@ export function DrawerFooter({
               <button
                 className="em-btn danger"
                 style={{ flex: 1 }}
-                onClick={() => onAction(memo.id, "reject")}
+                onClick={() => { setRejectMode(true); setLocalRejectReason(""); setLocalRejectDisposition("close"); }}
               >
                 <IconX size={14} /> Reject
               </button>
@@ -154,55 +273,15 @@ export function DrawerFooter({
           </div>
         )
       ) : memo.status === "returned" ? (
-        resubmitMode ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.55, padding: "7px 10px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-              This prototype resubmits the existing memo content with an optional correction note. Full edit/resubmit form is deferred.
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--ink-2)", fontWeight: 600 }}>
-              หมายเหตุการแก้ไข{" "}
-              <span style={{ fontWeight: 400, color: "var(--muted)" }}>(ไม่บังคับ / optional)</span>
-            </div>
-            <textarea
-              className="em-textarea"
-              style={{ minHeight: 64 }}
-              placeholder="ระบุสิ่งที่แก้ไข เช่น แนบใบเสนอราคาแล้ว, แก้ไขวงเงินแล้ว"
-              value={revisionNote}
-              onChange={e => setRevisionNote(e.target.value)}
-              autoFocus
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                className="em-btn sm ghost"
-                style={{ flex: 1 }}
-                onClick={() => setResubmitMode(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="em-btn sm primary"
-                style={{ flex: 2 }}
-                onClick={() => onResubmit(memo.id, revisionNote.trim() || undefined)}
-              >
-                <IconReturn size={13} /> Confirm Resubmit
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="em-btn"
-            style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
-            onClick={() => { setResubmitMode(true); setRevisionNote(""); }}
-          >
-            <IconReturn size={14} /> ส่งตรวจใหม่ (ยังไม่แก้ฟอร์ม)
-          </button>
-        )
+        resubmitMode ? resubmitForm : resubmitButton
+      ) : memo.status === "rejected" && memo.rejectDisposition === "revision-allowed" ? (
+        resubmitMode ? resubmitForm : resubmitButton
       ) : (
         <div style={{ flex: 1, textAlign: "center", fontSize: 13, color: "var(--muted)" }}>
           This memo has been <strong>{memo.status}</strong>
+          {memo.status === "rejected" && (
+            <span style={{ marginLeft: 4 }}>(closed)</span>
+          )}
         </div>
       )}
     </div>

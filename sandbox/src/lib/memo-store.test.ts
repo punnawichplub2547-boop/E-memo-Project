@@ -246,6 +246,48 @@ describe("memoReducer — MARK_READ", () => {
   });
 });
 
+describe("memoReducer — REJECT_MEMO", () => {
+  const target: MemoRecord = { ...seedMemos[0], status: "pending" };
+  const other: MemoRecord = { ...seedMemos[1] };
+  const state = [target, other];
+
+  it("sets status to rejected with close disposition and stores rejectReason", () => {
+    const next = memoReducer(state, { type: "REJECT_MEMO", id: target.id, disposition: "close", reason: "ราคาสูงเกินงบ", updatedAt: "29 May 2026 14:00" });
+    const updated = next.find((m) => m.id === target.id)!;
+    expect(updated.status).toBe("rejected");
+    expect(updated.rejectDisposition).toBe("close");
+    expect(updated.rejectReason).toBe("ราคาสูงเกินงบ");
+    expect(updated.updatedAt).toBe("29 May 2026 14:00");
+  });
+
+  it("sets status to rejected with revision-allowed disposition", () => {
+    const next = memoReducer(state, { type: "REJECT_MEMO", id: target.id, disposition: "revision-allowed", reason: "ต้องแนบเอกสารเพิ่มเติม" });
+    const updated = next.find((m) => m.id === target.id)!;
+    expect(updated.status).toBe("rejected");
+    expect(updated.rejectDisposition).toBe("revision-allowed");
+    expect(updated.rejectReason).toBe("ต้องแนบเอกสารเพิ่มเติม");
+  });
+
+  it("falls back to existing updatedAt when none provided", () => {
+    const next = memoReducer(state, { type: "REJECT_MEMO", id: target.id, disposition: "close", reason: "test" });
+    expect(next.find((m) => m.id === target.id)!.updatedAt).toBe(target.updatedAt);
+  });
+
+  it("leaves other memos unchanged", () => {
+    const next = memoReducer(state, { type: "REJECT_MEMO", id: target.id, disposition: "close", reason: "test" });
+    expect(next.find((m) => m.id === other.id)).toEqual(other);
+  });
+
+  it("backward-compat: existing rejected memo with no rejectDisposition is not treated as revision-allowed", () => {
+    // Seed memo EM-2026-007 is already status: "rejected" with no rejectDisposition (legacy data).
+    const legacy = seedMemos.find((m) => m.status === "rejected")!;
+    expect(legacy.rejectDisposition).toBeUndefined();
+    // The drawer condition for showing Resubmit is: status === "rejected" && rejectDisposition === "revision-allowed".
+    // With rejectDisposition undefined, this evaluates to false — memo is treated as closed.
+    expect(legacy.rejectDisposition === "revision-allowed").toBe(false);
+  });
+});
+
 describe("memoReducer — SKIP_ALL_READS", () => {
   const withMixed: MemoRecord = {
     ...seedMemos[0],

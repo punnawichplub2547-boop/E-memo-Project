@@ -74,12 +74,15 @@ export default function QueuePage() {
       hour: "2-digit", minute: "2-digit", hour12: false,
     }).format(new Date());
 
-  const handleAction = (id: string, action: "approve" | "reject") => {
+  const handleAction = (id: string, action: "approve") => {
     if (action === "approve") {
       dispatch({ type: "ADVANCE_STEP", id, updatedAt: stampNow() });
-    } else {
-      dispatch({ type: "UPDATE_STATUS", id, status: "rejected", updatedAt: stampNow() });
     }
+    setSelected(null);
+  };
+
+  const handleReject = (id: string, disposition: "close" | "revision-allowed", reason: string) => {
+    dispatch({ type: "REJECT_MEMO", id, disposition, reason, updatedAt: stampNow() });
     setSelected(null);
   };
 
@@ -477,6 +480,7 @@ export default function QueuePage() {
                     memo={selectedMemo}
                     onClose={() => setSelected(null)}
                     onAction={handleAction}
+                    onReject={handleReject}
                     onReturn={handleReturn}
                     onResubmit={handleResubmit}
                     onMarkRead={handleMarkRead}
@@ -495,6 +499,7 @@ export default function QueuePage() {
             memo={selectedMemo}
             onClose={() => setSelected(null)}
             onAction={handleAction}
+            onReject={handleReject}
             onReturn={handleReturn}
             onResubmit={handleResubmit}
             onMarkRead={handleMarkRead}

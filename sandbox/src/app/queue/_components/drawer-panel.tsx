@@ -15,6 +15,7 @@ export function DrawerPanel({
   memo,
   onClose,
   onAction,
+  onReject,
   onReturn,
   onResubmit,
   onMarkRead,
@@ -23,7 +24,8 @@ export function DrawerPanel({
 }: {
   memo: MemoRecord;
   onClose: () => void;
-  onAction: (id: string, action: "approve" | "reject") => void;
+  onAction: (id: string, action: "approve") => void;
+  onReject: (id: string, disposition: "close" | "revision-allowed", reason: string) => void;
   onReturn: (id: string, reason: string) => void;
   onResubmit: (id: string, revisionNote?: string) => void;
   onMarkRead: (id: string, recipient: string) => void;
@@ -541,6 +543,7 @@ export function DrawerPanel({
       <DrawerFooter
         memo={memo}
         onAction={onAction}
+        onReject={onReject}
         onReturn={onReturn}
         onResubmit={onResubmit}
         onSkipAllReads={onSkipAllReads}

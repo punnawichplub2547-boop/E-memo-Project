@@ -108,6 +108,8 @@ export type MemoRecord = {
   readActions?: ReadAction[];
   returnReason?: string;
   revisionNote?: string;
+  rejectDisposition?: "close" | "revision-allowed";
+  rejectReason?: string;
   description?: string;
   budgetStatus?: BudgetStatus;
   accountCode?: string;
