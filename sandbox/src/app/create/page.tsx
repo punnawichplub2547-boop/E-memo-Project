@@ -18,7 +18,8 @@ import {
 } from "@/lib/approval";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import {
-  IconFileText, IconMail,
+  IconChevRight,
+  IconFileText, IconMail, IconRoute, IconSparkles,
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
@@ -50,6 +51,26 @@ const mockLoggedInUser = {
   department: "HR&GA",
   role: "Manager"
 };
+
+const ASSISTANT_PANEL_STORAGE_KEY = "ememo-create-assistant-panel";
+type AssistantTab = "routing" | "draft";
+const ASSISTANT_TABS_ID = "create-assistant-tabs";
+const ASSISTANT_PANEL_ID = "create-assistant-tabpanel";
+
+function readAssistantStorage(): { expanded: boolean; tab: AssistantTab } {
+  if (typeof window === "undefined") return { expanded: true, tab: "routing" };
+  try {
+    const raw = window.localStorage.getItem(ASSISTANT_PANEL_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { expanded?: boolean; tab?: AssistantTab };
+      return {
+        expanded: typeof parsed.expanded === "boolean" ? parsed.expanded : true,
+        tab: parsed.tab === "routing" || parsed.tab === "draft" ? parsed.tab : "routing",
+      };
+    }
+  } catch { /* ignore */ }
+  return { expanded: true, tab: "routing" };
+}
 
 export default function CreatePage() {
   const { dispatch } = useMemos();
@@ -86,6 +107,9 @@ export default function CreatePage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [assistantExpanded, setAssistantExpanded] = useState(true);
+  const [assistantTab, setAssistantTab] = useState<AssistantTab>("routing");
+  const [assistantHydrated, setAssistantHydrated] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const addRequestItem = () => {
@@ -148,6 +172,30 @@ export default function CreatePage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Apply persisted assistant-panel state after hydration so server and first
+  // client render both produce the stable defaults (expanded + routing tab).
+  useEffect(() => {
+    const applyStored = () => {
+      const stored = readAssistantStorage();
+      setAssistantExpanded(stored.expanded);
+      setAssistantTab(stored.tab);
+      setAssistantHydrated(true);
+    };
+    applyStored();
+  }, []);
+
+  // Write panel state to localStorage, but only after hydration so we never
+  // clobber a persisted preference with the default values from the first render.
+  useEffect(() => {
+    if (!assistantHydrated) return;
+    try {
+      window.localStorage.setItem(
+        ASSISTANT_PANEL_STORAGE_KEY,
+        JSON.stringify({ expanded: assistantExpanded, tab: assistantTab })
+      );
+    } catch { /* ignore */ }
+  }, [assistantExpanded, assistantTab, assistantHydrated]);
 
   const supportsPriceAdjustment = category === "raw-material" || category === "fixed-asset";
   const supportsProductionPlan = category === "raw-material";
@@ -243,7 +291,6 @@ export default function CreatePage() {
     () => requestItems.reduce((sum, r) => sum + Math.round(getEffectiveRequestQty(r.qty) * r.unitPrice), 0),
     [requestItems]
   );
-
   const handleAiSuggest = async () => {
     setIsAiLoading(true);
     setAiError(null);
@@ -428,95 +475,178 @@ export default function CreatePage() {
             }}
           />
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 2px 2px" }}>
+          <div className="em-create-stepper">
             <StepDot n="1" label="รายละเอียด Memo" active />
-            <div style={{ flex: 1, height: 1, background: "var(--line-2)", maxWidth: 60 }} />
+            <div className="em-create-step-connector is-first" aria-hidden="true" />
             <StepDot n="2" label="เส้นทางอนุมัติ" active />
-            <div style={{ flex: 1, height: 1, background: "var(--line-2)", maxWidth: 60 }} />
+            <div className="em-create-step-connector is-second" aria-hidden="true" />
             <StepDot n="3" label="ตรวจทานและส่ง" active />
-            <span style={{ fontSize: 10.5, color: "var(--muted)", marginLeft: 8, whiteSpace: "nowrap" }}>แบบฟอร์มเดียว</span>
+            <span className="em-create-step-note">แบบฟอร์มเดียว</span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, alignItems: "start" }}>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <MemoDetailsCard
-              subject={subject}
-              category={category}
-              department={department}
-              amount={amount}
-              budgetStatus={budgetStatus}
-              clockTimeLabel={clockTimeLabel}
-              clockDateLabel={clockDateLabel}
-              issuer={mockLoggedInUser}
-              isAiLoading={isAiLoading}
-              followsProductionPlan={followsProductionPlan}
-              isDeadStockOrSlowMovement={isDeadStockOrSlowMovement}
-              isPriceAdjustment={isPriceAdjustment}
-              priceAdjustmentReason={priceAdjustmentReason}
-              deptMonthlyOverBudgetTotal={deptMonthlyOverBudgetTotal}
-              supportsPriceAdjustment={supportsPriceAdjustment}
-              supportsProductionPlan={supportsProductionPlan}
-              supportsDeadStock={supportsDeadStock}
-              showDeptMonthly={showDeptMonthly}
-              effectiveIsPriceAdjustment={effectiveIsPriceAdjustment}
-              onSubjectChange={setSubject}
-              onCategoryChange={(v) => { setCategory(v); setChosenApprover(null); }}
-              onDepartmentChange={setDepartment}
-              onAmountChange={(v) => { setAmount(v); setChosenApprover(null); }}
-              onBudgetStatusChange={(v) => { setBudgetStatus(v); setChosenApprover(null); }}
-              onFollowsProductionPlanChange={(v) => { setFollowsProductionPlan(v); setChosenApprover(null); }}
-              onIsDeadStockChange={setIsDeadStockOrSlowMovement}
-              onIsPriceAdjustmentChange={(v) => { setIsPriceAdjustment(v); setChosenApprover(null); }}
-              onPriceAdjustmentReasonChange={setPriceAdjustmentReason}
-              onDeptMonthlyChange={(v) => { setDeptMonthlyOverBudgetTotal(v); setChosenApprover(null); }}
-              onAiSuggest={handleAiSuggest}
-            />
-
-            <DescriptionCard
-              description={description}
-              onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
-              aiError={aiError}
-              isPdfLoading={isPdfLoading}
-              onPdfClick={() => pdfInputRef.current?.click()}
-            />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
-              <RoutingCard
-                effectiveApprover={effectiveApprover}
-                tierClass={tierClass}
-                isOverridden={isOverridden}
-                effectiveIsDeadStock={effectiveIsDeadStock}
-                skipGmStep={skipGmStep}
-                routeOverrideReason={routeOverrideReason}
-                routeReview={routeReview}
-                recommendation={recommendation}
-                flow={flow}
-                onApproverChange={(v) => { setChosenApprover(v); setSkipGmStep(false); }}
-                onReset={() => { setChosenApprover(null); setSkipGmStep(false); setRouteOverrideReason(""); }}
-                onSkipGmChange={setSkipGmStep}
-                onRouteOverrideReasonChange={setRouteOverrideReason}
-              />
-
-              <DraftPreviewPanel
+          <div className={`em-create-top-shell ${assistantExpanded ? "is-expanded" : "is-collapsed"}${assistantHydrated ? " is-ready" : ""}`}>
+            <div className="em-create-main-col">
+              <MemoDetailsCard
                 subject={subject}
                 category={category}
                 department={department}
                 amount={amount}
-                description={description}
-                effectiveApprover={effectiveApprover}
-                selectedRoute={selectedRoute}
-                orderedReadRecipients={orderedReadRecipients}
-                routeReview={routeReview}
-                recommendation={recommendation}
-                currentDateLabel={currentDateLabel}
-                requestItems={requestItems}
-                requestItemsGrandTotal={requestItemsGrandTotal}
-                cleanOverrideReason={cleanOverrideReason}
-                issuerName={mockLoggedInUser.name}
+                budgetStatus={budgetStatus}
+                clockTimeLabel={clockTimeLabel}
+                clockDateLabel={clockDateLabel}
+                issuer={mockLoggedInUser}
+                isAiLoading={isAiLoading}
+                followsProductionPlan={followsProductionPlan}
+                isDeadStockOrSlowMovement={isDeadStockOrSlowMovement}
+                isPriceAdjustment={isPriceAdjustment}
+                priceAdjustmentReason={priceAdjustmentReason}
+                deptMonthlyOverBudgetTotal={deptMonthlyOverBudgetTotal}
+                supportsPriceAdjustment={supportsPriceAdjustment}
+                supportsProductionPlan={supportsProductionPlan}
+                supportsDeadStock={supportsDeadStock}
+                showDeptMonthly={showDeptMonthly}
+                effectiveIsPriceAdjustment={effectiveIsPriceAdjustment}
+                onSubjectChange={setSubject}
+                onCategoryChange={(v) => { setCategory(v); setChosenApprover(null); }}
+                onDepartmentChange={setDepartment}
+                onAmountChange={(v) => { setAmount(v); setChosenApprover(null); }}
+                onBudgetStatusChange={(v) => { setBudgetStatus(v); setChosenApprover(null); }}
+                onFollowsProductionPlanChange={(v) => { setFollowsProductionPlan(v); setChosenApprover(null); }}
+                onIsDeadStockChange={setIsDeadStockOrSlowMovement}
+                onIsPriceAdjustmentChange={(v) => { setIsPriceAdjustment(v); setChosenApprover(null); }}
+                onPriceAdjustmentReasonChange={setPriceAdjustmentReason}
+                onDeptMonthlyChange={(v) => { setDeptMonthlyOverBudgetTotal(v); setChosenApprover(null); }}
+                onAiSuggest={handleAiSuggest}
               />
+
+              <DescriptionCard
+                description={description}
+                onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
+                aiError={aiError}
+                isPdfLoading={isPdfLoading}
+                onPdfClick={() => pdfInputRef.current?.click()}
+              />
+            </div>
+
+            {/* Assistant column — single unified tree; CSS drives desktop/mobile layout */}
+            <div className={`em-create-assistant-col ${assistantExpanded ? "is-expanded" : "is-collapsed"}`}>
+
+              {/* Icon rail: display:none by default; CSS shows it on desktop when collapsed */}
+              <div className="em-create-assistant-rail" aria-label="Assistant rail">
+                <button
+                  type="button"
+                  className={`em-create-assistant-rail-btn ${assistantTab === "routing" ? "is-active" : ""}`}
+                  onClick={() => { setAssistantTab("routing"); setAssistantExpanded(true); }}
+                  title="Approver Routing"
+                  aria-label="Open Approver Routing panel"
+                >
+                  <IconRoute size={18} />
+                </button>
+                <button
+                  type="button"
+                  className={`em-create-assistant-rail-btn ${assistantTab === "draft" ? "is-active" : ""}`}
+                  onClick={() => { setAssistantTab("draft"); setAssistantExpanded(true); }}
+                  title="AI Draft Preview"
+                  aria-label="Open AI Draft Preview panel"
+                >
+                  <IconSparkles size={18} />
+                </button>
+              </div>
+
+              {/* Full panel: always rendered; CSS hides it on desktop when collapsed */}
+              <div className="em-create-assistant-panel">
+                <div className="em-create-assistant-head">
+                  <div
+                    id={ASSISTANT_TABS_ID}
+                    className="em-tabs em-create-assistant-tabs"
+                    role="tablist"
+                    aria-label="Create memo assistant tabs"
+                  >
+                    <button
+                      id="create-assistant-tab-routing"
+                      type="button"
+                      role="tab"
+                      aria-controls={ASSISTANT_PANEL_ID}
+                      aria-selected={assistantTab === "routing"}
+                      tabIndex={assistantTab === "routing" ? 0 : -1}
+                      className={`em-tab ${assistantTab === "routing" ? "active" : ""}`}
+                      onClick={() => setAssistantTab("routing")}
+                    >
+                      <IconRoute size={14} />
+                      Approver Routing
+                    </button>
+                    <button
+                      id="create-assistant-tab-draft"
+                      type="button"
+                      role="tab"
+                      aria-controls={ASSISTANT_PANEL_ID}
+                      aria-selected={assistantTab === "draft"}
+                      tabIndex={assistantTab === "draft" ? 0 : -1}
+                      className={`em-tab ${assistantTab === "draft" ? "active" : ""}`}
+                      onClick={() => setAssistantTab("draft")}
+                    >
+                      <IconSparkles size={14} />
+                      AI Draft Preview
+                    </button>
+                  </div>
+                  {/* Collapse button: display:none by default; CSS shows it on desktop only */}
+                  <button
+                    type="button"
+                    className="em-btn sm ghost em-create-assistant-collapse"
+                    onClick={() => setAssistantExpanded(false)}
+                    aria-label="Collapse assistant panel"
+                    title="Collapse assistant panel to icon rail"
+                  >
+                    <IconChevRight size={14} />
+                  </button>
+                </div>
+
+                {/* Both panes always mounted; CSS hides inactive pane via data-tab attribute */}
+                <div
+                  id={ASSISTANT_PANEL_ID}
+                  className="em-create-assistant-body"
+                  role="tabpanel"
+                  aria-labelledby={assistantTab === "routing" ? "create-assistant-tab-routing" : "create-assistant-tab-draft"}
+                  data-tab={assistantTab}
+                >
+                  <div className="em-create-tab-pane" data-pane="routing">
+                    <RoutingCard
+                      effectiveApprover={effectiveApprover}
+                      tierClass={tierClass}
+                      isOverridden={isOverridden}
+                      effectiveIsDeadStock={effectiveIsDeadStock}
+                      skipGmStep={skipGmStep}
+                      routeOverrideReason={routeOverrideReason}
+                      routeReview={routeReview}
+                      recommendation={recommendation}
+                      flow={flow}
+                      onApproverChange={(v) => { setChosenApprover(v); setSkipGmStep(false); }}
+                      onReset={() => { setChosenApprover(null); setSkipGmStep(false); setRouteOverrideReason(""); }}
+                      onSkipGmChange={setSkipGmStep}
+                      onRouteOverrideReasonChange={setRouteOverrideReason}
+                    />
+                  </div>
+                  <div className="em-create-tab-pane" data-pane="draft">
+                    <DraftPreviewPanel
+                      subject={subject}
+                      category={category}
+                      department={department}
+                      amount={amount}
+                      description={description}
+                      effectiveApprover={effectiveApprover}
+                      selectedRoute={selectedRoute}
+                      orderedReadRecipients={orderedReadRecipients}
+                      routeReview={routeReview}
+                      recommendation={recommendation}
+                      currentDateLabel={currentDateLabel}
+                      requestItems={requestItems}
+                      requestItemsGrandTotal={requestItemsGrandTotal}
+                      cleanOverrideReason={cleanOverrideReason}
+                      issuerName={mockLoggedInUser.name}
+                    />
+                  </div>
+                </div>
+              </div>
 
             </div>
           </div>

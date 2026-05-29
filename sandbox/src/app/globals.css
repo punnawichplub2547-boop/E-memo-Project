@@ -395,6 +395,255 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-create-content .em-card-head { padding: 14px 18px; }
 .em-create-content .em-card-body { padding: 16px 18px; }
 .em-create-content .em-form-grid { gap: 12px; }
+.em-create-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 2px;
+}
+.em-create-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.em-create-step-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line-2);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.em-create-step-dot.is-active {
+  background: var(--primary-grad);
+  color: #fff;
+  border: 0;
+  box-shadow:
+    0 4px 10px -2px rgba(37,99,235,0.38),
+    0 0 0 2px rgba(59,130,246,0.08);
+}
+.em-create-step-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.em-create-step-label.is-active {
+  color: var(--ink);
+}
+.em-create-step-connector {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  max-width: 60px;
+  background: linear-gradient(90deg, rgba(148,163,184,0.45) 0%, rgba(148,163,184,0.32) 100%);
+  position: relative;
+  overflow: visible;
+}
+/* Shared dot shape — invisible by default; animations drive opacity */
+.em-create-step-connector::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  top: 50%;
+  margin-top: -3px;
+  left: -6px;
+  opacity: 0;
+  background: rgb(59, 130, 246);
+  box-shadow:
+    0 0 4px 2px rgba(59, 130, 246, 0.55),
+    0 0 9px 4px rgba(59, 130, 246, 0.20);
+  pointer-events: none;
+}
+/* Connector 1 — travels first segment of the signal */
+.em-create-step-connector.is-first::after {
+  animation: emStepperDot1 5.5s linear infinite;
+}
+/* Connector 2 — picks up signal after the brief Step-2 handoff */
+.em-create-step-connector.is-second::after {
+  animation: emStepperDot2 5.5s linear infinite;
+}
+.em-create-step-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+/* Dot 1: travels 0–30%, fades 30–35%, invisible rest of cycle */
+@keyframes emStepperDot1 {
+  0%    { left: -6px;             opacity: 1; }
+  30%   { left: calc(100% + 6px); opacity: 1; }
+  35%   { left: calc(100% + 6px); opacity: 0; }
+  35.1% { left: -6px;             opacity: 0; }
+  100%  { left: -6px;             opacity: 0; }
+}
+/* Dot 2: invisible 0–40%, travels 40–70%, fades 70–75%, invisible rest */
+@keyframes emStepperDot2 {
+  0%    { left: -6px;             opacity: 0; }
+  39.9% { left: -6px;             opacity: 0; }
+  40%   { left: -6px;             opacity: 1; }
+  70%   { left: calc(100% + 6px); opacity: 1; }
+  75%   { left: calc(100% + 6px); opacity: 0; }
+  75.1% { left: -6px;             opacity: 0; }
+  100%  { left: -6px;             opacity: 0; }
+}
+.em-create-top-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.em-create-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.em-create-assistant-col {
+  min-width: 0;
+}
+.em-create-assistant-panel {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.em-create-assistant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.em-create-assistant-tabs {
+  flex: 1;
+  min-width: 0;
+}
+.em-create-assistant-tabs .em-tab {
+  border: 0;
+  background: transparent;
+}
+/* Collapse button: hidden on mobile, shown on desktop via @media below */
+.em-create-assistant-collapse {
+  display: none;
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+.em-create-assistant-body {
+  min-width: 0;
+}
+.em-create-assistant-body .em-card {
+  margin: 0;
+}
+/* Tab pane switching: CSS hides the inactive pane via data-tab on the body */
+.em-create-tab-pane { display: block; }
+.em-create-assistant-body[data-tab="routing"] .em-create-tab-pane[data-pane="draft"] { display: none; }
+.em-create-assistant-body[data-tab="draft"] .em-create-tab-pane[data-pane="routing"] { display: none; }
+/* Icon rail: hidden everywhere by default; shown on desktop when panel is collapsed */
+.em-create-assistant-rail {
+  display: none;
+  width: 64px;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), #FBFCFF);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.85) inset,
+    0 1px 2px rgba(15,27,60,0.04),
+    0 10px 28px -22px rgba(30,58,138,0.20);
+  padding: 8px;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.em-create-assistant-rail-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.em-create-assistant-rail-btn:hover {
+  color: var(--ink-2);
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+.em-create-assistant-rail-btn.is-active {
+  color: var(--primary);
+  border-color: var(--primary-soft);
+  background: var(--primary-grad-soft);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.12);
+}
+.em-create-assistant-rail-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(59,130,246,0.25),
+    0 0 0 2px rgba(59,130,246,0.12);
+}
+
+@media (min-width: 1100px) {
+  .em-create-top-shell.is-expanded {
+    grid-template-columns: minmax(0, 1fr) clamp(360px, 32vw, 520px);
+  }
+  .em-create-top-shell.is-collapsed {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+  /* Transition only after hydration so collapse-from-stored-pref doesn't animate on load */
+  .em-create-top-shell.is-ready {
+    transition: grid-template-columns 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .em-create-assistant-col {
+    overflow: visible;
+  }
+  /* On desktop when collapsed: show rail, hide panel */
+  .em-create-assistant-col.is-collapsed .em-create-assistant-rail { display: flex; }
+  .em-create-assistant-col.is-collapsed .em-create-assistant-panel { display: none; }
+  /* Show collapse button on desktop */
+  .em-create-assistant-collapse { display: flex; }
+}
+
+@media (max-width: 1099px) {
+  .em-create-assistant-col {
+    width: 100%;
+  }
+  .em-create-assistant-panel {
+    width: 100%;
+  }
+  .em-create-assistant-head {
+    align-items: stretch;
+  }
+  .em-create-assistant-tabs {
+    width: 100%;
+  }
+  .em-create-assistant-tabs .em-tab {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .em-create-step-connector::after {
+    animation: none;
+    /* opacity stays at 0 (base) — connectors render as plain static lines */
+  }
+  .em-create-top-shell.is-ready {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
 
 /* ===== Cards ===== */
 .em-card {
