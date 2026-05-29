@@ -619,6 +619,36 @@ export default function CreatePage() {
                       onSkipGmChange={setSkipGmStep}
                       onRouteOverrideReasonChange={setRouteOverrideReason}
                     />
+                    <div style={{
+                      marginTop: 12,
+                      background: "var(--surface)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "var(--r-md)",
+                      padding: "12px 14px",
+                    }}>
+                      <div className="em-eyebrow" style={{ fontSize: 11, marginBottom: 8 }}>
+                        ผู้รับทราบ / Read Recipients
+                      </div>
+                      <div className="em-field">
+                        <textarea
+                          className="em-textarea"
+                          style={{ minHeight: 60 }}
+                          value={readRecipients}
+                          placeholder="ACC/FIN, QA/QC, Production Manager"
+                          onChange={(e) => setReadRecipients(e.target.value)}
+                        />
+                        <div className="em-help">คั่นด้วย comma หรือขึ้นบรรทัดใหม่ · ลำดับจะถูกบันทึกตามที่ระบุ</div>
+                        {orderedReadRecipients.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                            {orderedReadRecipients.map((r, i) => (
+                              <span key={`${r}-${i}`} className="em-tier" style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}>
+                                {i + 1}. {r}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="em-create-tab-pane" data-pane="draft">
                     <DraftPreviewPanel
@@ -665,9 +695,6 @@ export default function CreatePage() {
               <BudgetCard
                 accountCode={accountCode}
                 setAccountCode={setAccountCode}
-                readRecipients={readRecipients}
-                setReadRecipients={setReadRecipients}
-                orderedReadRecipients={orderedReadRecipients}
                 budgetPlan={budgetPlan}
                 setBudgetPlan={setBudgetPlan}
                 budgetUsed={budgetUsed}
