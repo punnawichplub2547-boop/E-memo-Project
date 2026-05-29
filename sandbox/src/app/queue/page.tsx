@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
+import { formatTimestamp } from "@/lib/format-timestamp";
 import { approvalLabels } from "@/lib/approval";
 import {
   IconDownload, IconPlus, IconFilter, IconSearch, IconSort,
@@ -68,11 +69,7 @@ export default function QueuePage() {
     returned: memos.filter((m) => m.status === "returned").length,
   };
 
-  const stampNow = () =>
-    new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(new Date());
+  const stampNow = () => formatTimestamp(new Date());
 
   const handleAction = (id: string, action: "approve") => {
     if (action === "approve") {

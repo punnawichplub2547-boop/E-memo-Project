@@ -17,6 +17,7 @@ import {
   RequestItem,
 } from "@/lib/approval";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
+import { formatTimestamp } from "@/lib/format-timestamp";
 import {
   IconChevRight,
   IconFileText, IconMail, IconRoute, IconSparkles,
@@ -406,14 +407,7 @@ export default function CreatePage() {
     }
     const now = new Date();
     const id = `EM-${now.getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
-    const createdTimestamp = new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    }).format(now);
+    const createdTimestamp = formatTimestamp(now);
     dispatch({
       type: "ADD_MEMO",
       memo: {
