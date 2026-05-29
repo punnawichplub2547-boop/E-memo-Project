@@ -70,9 +70,10 @@ describe("memoReducer — RESUBMIT_MEMO", () => {
     expect(next[0].workflowState).toBe("Issued");
   });
 
-  it("preserves returnReason for audit", () => {
+  it("clears returnReason from live record after resubmit — reason is preserved in revisions", () => {
     const next = memoReducer([returnedBase], { type: "RESUBMIT_MEMO", id: returnedBase.id });
-    expect(next[0].returnReason).toBe("เอกสารไม่ครบ");
+    expect(next[0].returnReason).toBeUndefined();
+    expect(next[0].revisions![0].returnReason).toBe("เอกสารไม่ครบ");
   });
 
   it("stores revisionNote when provided", () => {
@@ -285,6 +286,165 @@ describe("memoReducer — REJECT_MEMO", () => {
     // The drawer condition for showing Resubmit is: status === "rejected" && rejectDisposition === "revision-allowed".
     // With rejectDisposition undefined, this evaluates to false — memo is treated as closed.
     expect(legacy.rejectDisposition === "revision-allowed").toBe(false);
+  });
+});
+
+describe("memoReducer — RESUBMIT_MEMO revision semantics", () => {
+  const revBase: MemoRecord = {
+    id: "EM-2026-REV",
+    title: "Test Revision Memo",
+    requester: "Test User",
+    department: "IT",
+    category: "general-purchase",
+    amount: 5000,
+    status: "returned",
+    currentStep: "Manager / Top Section",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    returnReason: "เอกสารไม่ครบ",
+    cycleHours: 0,
+    updatedAt: "01 Jun 2026 14:00",
+  };
+
+  it("creates a revision entry and increments revisionNo on first resubmit from returned status", () => {
+    const result = memoReducer([revBase], { type: "RESUBMIT_MEMO", id: revBase.id });
+    expect(result[0].revisionNo).toBe(1);
+    expect(result[0].revisions).toHaveLength(1);
+    expect(result[0].revisions![0].revisionNo).toBe(0);
+    expect(result[0].revisions![0].source).toBe("return");
+  });
+
+  it("treats missing revisionNo as Rev.0 — first resubmit yields Rev.1", () => {
+    const noRevNo: MemoRecord = { ...revBase, revisionNo: undefined };
+    const result = memoReducer([noRevNo], { type: "RESUBMIT_MEMO", id: noRevNo.id });
+    expect(result[0].revisionNo).toBe(1);
+    expect(result[0].revisions![0].revisionNo).toBe(0);
+  });
+
+  it("snapshot captures content from before the resubmit", () => {
+    const result = memoReducer([revBase], { type: "RESUBMIT_MEMO", id: revBase.id });
+    const snap = result[0].revisions![0].snapshot;
+    expect(snap.title).toBe("Test Revision Memo");
+    expect(snap.amount).toBe(5000);
+    expect(snap.category).toBe("general-purchase");
+    expect(snap.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
+  });
+
+  it("preserves returnReason in revision entry when source is return", () => {
+    const result = memoReducer([revBase], { type: "RESUBMIT_MEMO", id: revBase.id });
+    expect(result[0].revisions![0].returnReason).toBe("เอกสารไม่ครบ");
+    expect(result[0].revisions![0].rejectReason).toBeUndefined();
+  });
+
+  it("stores revisionNote in the revision entry when provided", () => {
+    const result = memoReducer([revBase], { type: "RESUBMIT_MEMO", id: revBase.id, revisionNote: "แนบใบเสนอราคาแล้ว" });
+    expect(result[0].revisions![0].revisionNote).toBe("แนบใบเสนอราคาแล้ว");
+  });
+
+  it("second resubmit yields revisionNo 2 and two revision entries", () => {
+    const afterFirst = memoReducer([revBase], { type: "RESUBMIT_MEMO", id: revBase.id, updatedAt: "02 Jun 2026 09:00" });
+    const returnedAgain = memoReducer(afterFirst, {
+      type: "RETURN_MEMO",
+      id: revBase.id,
+      returnReason: "ยังขาดเอกสาร",
+      updatedAt: "03 Jun 2026 14:00",
+    });
+    const afterSecond = memoReducer(returnedAgain, { type: "RESUBMIT_MEMO", id: revBase.id, updatedAt: "04 Jun 2026 10:00" });
+    expect(afterSecond[0].revisionNo).toBe(2);
+    expect(afterSecond[0].revisions).toHaveLength(2);
+    expect(afterSecond[0].revisions![0].revisionNo).toBe(0);
+    expect(afterSecond[0].revisions![1].revisionNo).toBe(1);
+    expect(afterSecond[0].revisions![1].source).toBe("return");
+    expect(afterSecond[0].revisions![1].returnReason).toBe("ยังขาดเอกสาร");
+  });
+
+  it("creates revision entry from rejected+revision-allowed with correct source and rejectReason", () => {
+    const rejectedRevision: MemoRecord = {
+      ...revBase,
+      status: "rejected",
+      rejectDisposition: "revision-allowed",
+      rejectReason: "ราคาเกินวงเงิน",
+      returnReason: undefined,
+    };
+    const result = memoReducer([rejectedRevision], { type: "RESUBMIT_MEMO", id: rejectedRevision.id });
+    expect(result[0].revisionNo).toBe(1);
+    expect(result[0].revisions![0].source).toBe("rejection-allowed");
+    expect(result[0].revisions![0].rejectReason).toBe("ราคาเกินวงเงิน");
+    expect(result[0].revisions![0].returnReason).toBeUndefined();
+  });
+
+  it("does NOT create a revision entry for rejected+close — memo stays unchanged", () => {
+    const closedRejected: MemoRecord = {
+      ...revBase,
+      status: "rejected",
+      rejectDisposition: "close",
+      rejectReason: "ปิดคำขอ",
+    };
+    const result = memoReducer([closedRejected], { type: "RESUBMIT_MEMO", id: closedRejected.id });
+    expect(result[0].status).toBe("rejected");
+    expect(result[0].revisionNo).toBeUndefined();
+    expect(result[0].revisions).toBeUndefined();
+  });
+
+  it("does NOT create a revision entry for a pending memo — memo stays unchanged", () => {
+    const pendingMemo: MemoRecord = { ...revBase, status: "pending" };
+    const result = memoReducer([pendingMemo], { type: "RESUBMIT_MEMO", id: pendingMemo.id });
+    expect(result[0].status).toBe("pending");
+    expect(result[0].revisionNo).toBeUndefined();
+    expect(result[0].revisions).toBeUndefined();
+  });
+
+  // Issue 1 — clearing live reject fields
+  it("clears rejectReason and rejectDisposition from live record after resubmit from rejected+revision-allowed", () => {
+    const rejectedRevision: MemoRecord = {
+      ...revBase,
+      status: "rejected",
+      rejectDisposition: "revision-allowed",
+      rejectReason: "ราคาเกินวงเงิน",
+      returnReason: undefined,
+    };
+    const result = memoReducer([rejectedRevision], { type: "RESUBMIT_MEMO", id: rejectedRevision.id });
+    expect(result[0].rejectReason).toBeUndefined();
+    expect(result[0].rejectDisposition).toBeUndefined();
+    expect(result[0].revisions![0].rejectReason).toBe("ราคาเกินวงเงิน");
+  });
+
+  // Issue 2 — submittedAt accuracy
+  it("snapshot submittedAt uses createdAt (submission time), not updatedAt (return/reject time)", () => {
+    const memo: MemoRecord = {
+      ...revBase,
+      createdAt: "01 Jun 2026 10:00",
+      updatedAt: "02 Jun 2026 14:00", // overwritten by RETURN_MEMO to return time
+    };
+    const result = memoReducer([memo], { type: "RESUBMIT_MEMO", id: memo.id, updatedAt: "03 Jun 2026 09:00" });
+    expect(result[0].revisions![0].submittedAt).toBe("01 Jun 2026 10:00");
+  });
+
+  it("snapshot submittedAt falls back to updatedAt when createdAt is absent (seed memo pattern)", () => {
+    const memoNoCreatedAt: MemoRecord = {
+      ...revBase,
+      createdAt: undefined,
+      updatedAt: "01 Jun 2026 14:00",
+    };
+    const result = memoReducer([memoNoCreatedAt], { type: "RESUBMIT_MEMO", id: memoNoCreatedAt.id, updatedAt: "02 Jun 2026 09:00" });
+    expect(result[0].revisions![0].submittedAt).toBe("01 Jun 2026 14:00");
+  });
+
+  it("second resubmit snapshot submittedAt uses revisionSubmittedAt from first resubmit, not the return time", () => {
+    const memoWithCreatedAt: MemoRecord = { ...revBase, createdAt: "01 Jun 2026 10:00", updatedAt: "01 Jun 2026 10:00" };
+    // First resubmit at "02 Jun 09:00" → live revisionSubmittedAt set to this timestamp
+    const afterFirst = memoReducer([memoWithCreatedAt], {
+      type: "RESUBMIT_MEMO", id: revBase.id, updatedAt: "02 Jun 2026 09:00",
+    });
+    // RETURN_MEMO overwrites updatedAt to the return time — revisionSubmittedAt must survive this
+    const returnedAgain = memoReducer(afterFirst, {
+      type: "RETURN_MEMO", id: revBase.id, returnReason: "ยังขาดเอกสาร", updatedAt: "03 Jun 2026 14:00",
+    });
+    // Second resubmit — snapshot of Rev.1 must show "02 Jun 09:00" (when Rev.1 was submitted), not "03 Jun 14:00" (return time)
+    const afterSecond = memoReducer(returnedAgain, {
+      type: "RESUBMIT_MEMO", id: revBase.id, updatedAt: "04 Jun 2026 10:00",
+    });
+    expect(afterSecond[0].revisions![1].submittedAt).toBe("02 Jun 2026 09:00");
+    expect(afterSecond[0].revisions![1].submittedAt).not.toBe("03 Jun 2026 14:00");
   });
 });
 

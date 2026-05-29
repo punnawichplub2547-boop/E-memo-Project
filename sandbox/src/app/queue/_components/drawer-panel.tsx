@@ -78,6 +78,11 @@ export function DrawerPanel({
             >
               {isMd ? <IconCrown size={11} /> : <IconUsers size={11} />} {memo.currentStep}
             </span>
+            {(memo.revisionNo ?? 0) > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)", letterSpacing: "0.02em" }}>
+                Rev.{memo.revisionNo}
+              </span>
+            )}
           </div>
           <div
             style={{
@@ -538,6 +543,41 @@ export function DrawerPanel({
             <span>Updated · {memo.updatedAt}</span>
           </div>
         </section>
+
+        {/* Revision history — shown only when at least one resubmit has occurred */}
+        {memo.revisions && memo.revisions.length > 0 && (
+          <section>
+            <div className="em-eyebrow" style={{ marginBottom: 8 }}>Revision History</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {memo.revisions.map((rev) => (
+                <div key={rev.revisionNo} style={{ padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--line)", fontSize: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: rev.returnReason || rev.rejectReason || rev.revisionNote ? 6 : 0 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink-2)" }}>
+                      Rev.{rev.revisionNo}
+                    </span>
+                    <span style={{ color: "var(--muted)", fontSize: 11 }}>→</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink-2)" }}>
+                      Rev.{rev.revisionNo + 1}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: rev.source === "return" ? "var(--amber)" : "var(--rose)", marginLeft: 2 }}>
+                      {rev.source === "return" ? "ส่งกลับ" : "ปฏิเสธ (อนุญาตแก้ไข)"}
+                    </span>
+                    <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 11, whiteSpace: "nowrap" }}>{rev.submittedAt}</span>
+                  </div>
+                  {rev.returnReason && (
+                    <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 2 }}>เหตุผล: {rev.returnReason}</div>
+                  )}
+                  {rev.rejectReason && (
+                    <div style={{ fontSize: 11.5, color: "var(--rose)", marginTop: 2 }}>ปฏิเสธ: {rev.rejectReason}</div>
+                  )}
+                  {rev.revisionNote && (
+                    <div style={{ fontSize: 11.5, color: "#047857", marginTop: 2 }}>หมายเหตุ: {rev.revisionNote}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       <DrawerFooter

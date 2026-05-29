@@ -89,6 +89,46 @@ export type RequestItem = {
   unitPrice: number;
 };
 
+export type RevisionSource = "initial" | "return" | "rejection-allowed";
+
+export type MemoSnapshot = {
+  title: string;
+  category: ApprovalCategory;
+  department: string;
+  amount: number;
+  description?: string;
+  budgetStatus?: BudgetStatus;
+  accountCode?: string;
+  budgetPlan?: number;
+  budgetUsed?: number;
+  requestItems?: RequestItem[];
+  priceComparisons?: PriceComparison[];
+  selectedVendorId?: string;
+  selectedVendorReason?: string;
+  priceAdjustmentReason?: string;
+  isPriceAdjustment?: boolean;
+  followsProductionPlan?: boolean;
+  isDeadStockOrSlowMovement?: boolean;
+  departmentMonthlyOverBudgetTotal?: number;
+  readRecipients?: string[];
+  recommendedFinalApprover?: ApprovalLevel;
+  recommendedRoute?: ApprovalLevel[];
+  selectedRoute?: ApprovalLevel[];
+  routeMode?: ApprovalRouteMode;
+  routeOverrideReason?: string;
+  notifyMD?: boolean;
+};
+
+export type MemoRevision = {
+  revisionNo: number;
+  source: RevisionSource;
+  returnReason?: string;
+  rejectReason?: string;
+  revisionNote?: string;
+  submittedAt: string;
+  snapshot: MemoSnapshot;
+};
+
 export type MemoRecord = {
   id: string;
   title: string;
@@ -110,6 +150,9 @@ export type MemoRecord = {
   revisionNote?: string;
   rejectDisposition?: "close" | "revision-allowed";
   rejectReason?: string;
+  revisionNo?: number;
+  revisionSubmittedAt?: string;
+  revisions?: MemoRevision[];
   description?: string;
   budgetStatus?: BudgetStatus;
   accountCode?: string;

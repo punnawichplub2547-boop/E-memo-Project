@@ -136,6 +136,11 @@ export default function HistoryPage() {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                               <span className="em-id" style={{ fontSize: 11.5 }}>{m.id}</span>
+                              {(m.revisionNo ?? 0) > 0 && (
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4, background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>
+                                  Rev.{m.revisionNo}
+                                </span>
+                              )}
                               {isMd && <IconCrown size={13} style={{ color: "var(--gold)" }} />}
                               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{m.title}</span>
                             </div>

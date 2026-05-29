@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer } from "react";
-import { seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ReadAction } from "./approval";
+import { seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ReadAction, MemoRevision, MemoSnapshot, RevisionSource } from "./approval";
 
 type Action =
   | { type: "ADD_MEMO"; memo: MemoRecord }
@@ -68,20 +68,68 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
       return state.map((m) =>
         m.id === action.id ? { ...m, status: "returned", returnReason: action.returnReason, updatedAt: action.updatedAt ?? m.updatedAt } : m
       );
-    case "RESUBMIT_MEMO":
-      return state.map((m) =>
-        m.id === action.id
-          ? {
-              ...m,
-              status: "pending",
-              currentStep: m.selectedRoute?.[0] ?? "Manager / Top Section",
-              workflowState: "Issued",
-              revisionNote: action.revisionNote,
-              updatedAt: action.updatedAt ?? m.updatedAt,
-              readActions: m.readActions?.map((ra): ReadAction => ({ recipient: ra.recipient, status: "pending" })),
-            }
-          : m
-      );
+    case "RESUBMIT_MEMO": {
+      return state.map((m) => {
+        if (m.id !== action.id) return m;
+        const isValidResubmit =
+          m.status === "returned" ||
+          (m.status === "rejected" && m.rejectDisposition === "revision-allowed");
+        if (!isValidResubmit) return m;
+        const currentRevNo = m.revisionNo ?? 0;
+        const source: RevisionSource = m.status === "returned" ? "return" : "rejection-allowed";
+        const snapshot: MemoSnapshot = {
+          title: m.title,
+          category: m.category,
+          department: m.department,
+          amount: m.amount,
+          description: m.description,
+          budgetStatus: m.budgetStatus,
+          accountCode: m.accountCode,
+          budgetPlan: m.budgetPlan,
+          budgetUsed: m.budgetUsed,
+          requestItems: m.requestItems,
+          priceComparisons: m.priceComparisons,
+          selectedVendorId: m.selectedVendorId,
+          selectedVendorReason: m.selectedVendorReason,
+          priceAdjustmentReason: m.priceAdjustmentReason,
+          isPriceAdjustment: m.isPriceAdjustment,
+          followsProductionPlan: m.followsProductionPlan,
+          isDeadStockOrSlowMovement: m.isDeadStockOrSlowMovement,
+          departmentMonthlyOverBudgetTotal: m.departmentMonthlyOverBudgetTotal,
+          readRecipients: m.readRecipients,
+          recommendedFinalApprover: m.recommendedFinalApprover,
+          recommendedRoute: m.recommendedRoute,
+          selectedRoute: m.selectedRoute,
+          routeMode: m.routeMode,
+          routeOverrideReason: m.routeOverrideReason,
+          notifyMD: m.notifyMD,
+        };
+        const newRevision: MemoRevision = {
+          revisionNo: currentRevNo,
+          source,
+          returnReason: m.returnReason,
+          rejectReason: m.rejectReason,
+          revisionNote: action.revisionNote,
+          submittedAt: m.revisionSubmittedAt ?? m.createdAt ?? m.updatedAt,
+          snapshot,
+        };
+        return {
+          ...m,
+          status: "pending" as const,
+          currentStep: m.selectedRoute?.[0] ?? "Manager / Top Section",
+          workflowState: "Issued" as const,
+          revisionNo: currentRevNo + 1,
+          revisions: [...(m.revisions ?? []), newRevision],
+          revisionNote: action.revisionNote,
+          updatedAt: action.updatedAt ?? m.updatedAt,
+          readActions: m.readActions?.map((ra): ReadAction => ({ recipient: ra.recipient, status: "pending" })),
+          returnReason: undefined,
+          rejectReason: undefined,
+          rejectDisposition: undefined,
+          revisionSubmittedAt: action.updatedAt ?? m.updatedAt,
+        };
+      });
+    }
     case "REJECT_MEMO":
       return state.map((m) =>
         m.id === action.id
