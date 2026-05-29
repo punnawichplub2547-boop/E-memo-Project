@@ -489,3 +489,131 @@ describe("memoReducer — SKIP_ALL_READS", () => {
     expect(next.find((m) => m.id === other.id)).toEqual(other);
   });
 });
+
+describe("memoReducer — SUBMIT_REVISION", () => {
+  const revBase: MemoRecord = {
+    id: "EM-2026-SVREV",
+    title: "Original Title",
+    requester: "Test User",
+    department: "IT",
+    category: "general-purchase",
+    amount: 5000,
+    status: "returned",
+    currentStep: "Manager / Top Section",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    returnReason: "เอกสารไม่ครบ",
+    cycleHours: 0,
+    createdAt: "01 Jun 2026 10:00",
+    updatedAt: "02 Jun 2026 14:00",
+  };
+
+  const basePayload = {
+    type: "SUBMIT_REVISION" as const,
+    id: revBase.id,
+    title: "Updated Title",
+    category: "service-contract" as const,
+    department: "HR&GA",
+    amount: 8000,
+    description: "Updated description",
+    budgetStatus: "in-budget" as const,
+    selectedRoute: ["Manager / Top Section"] as const,
+    updatedAt: "03 Jun 2026 09:00",
+  };
+
+  it("sets status to pending and increments revisionNo from returned status", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].status).toBe("pending");
+    expect(result[0].revisionNo).toBe(1);
+  });
+
+  it("applies new content fields to the live memo", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].title).toBe("Updated Title");
+    expect(result[0].category).toBe("service-contract");
+    expect(result[0].department).toBe("HR&GA");
+    expect(result[0].amount).toBe(8000);
+    expect(result[0].description).toBe("Updated description");
+  });
+
+  it("snapshot captures OLD content before the revision edits", () => {
+    const result = memoReducer([revBase], basePayload);
+    const snap = result[0].revisions![0].snapshot;
+    expect(snap.title).toBe("Original Title");
+    expect(snap.category).toBe("general-purchase");
+    expect(snap.amount).toBe(5000);
+    expect(snap.department).toBe("IT");
+  });
+
+  it("resets currentStep to first step of the new selectedRoute", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].currentStep).toBe("Manager / Top Section");
+  });
+
+  it("sets workflowState to Issued", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].workflowState).toBe("Issued");
+  });
+
+  it("clears returnReason, rejectReason, rejectDisposition from live record", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].returnReason).toBeUndefined();
+    expect(result[0].rejectReason).toBeUndefined();
+    expect(result[0].rejectDisposition).toBeUndefined();
+  });
+
+  it("preserves returnReason in the revision snapshot entry", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].revisions![0].returnReason).toBe("เอกสารไม่ครบ");
+  });
+
+  it("sets revision source to 'return' for returned memo", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].revisions![0].source).toBe("return");
+  });
+
+  it("works from rejected+revision-allowed with correct source and rejectReason in snapshot", () => {
+    const rejected: MemoRecord = {
+      ...revBase,
+      status: "rejected",
+      rejectDisposition: "revision-allowed",
+      rejectReason: "ราคาเกินวงเงิน",
+      returnReason: undefined,
+    };
+    const result = memoReducer([rejected], { ...basePayload, id: rejected.id });
+    expect(result[0].status).toBe("pending");
+    expect(result[0].revisions![0].source).toBe("rejection-allowed");
+    expect(result[0].revisions![0].rejectReason).toBe("ราคาเกินวงเงิน");
+    expect(result[0].revisions![0].returnReason).toBeUndefined();
+  });
+
+  it("does NOT apply revision to pending memos — memo stays unchanged", () => {
+    const pending: MemoRecord = { ...revBase, status: "pending", returnReason: undefined };
+    const result = memoReducer([pending], basePayload);
+    expect(result[0].title).toBe("Original Title");
+    expect(result[0].revisionNo).toBeUndefined();
+    expect(result[0].revisions).toBeUndefined();
+  });
+
+  it("does NOT apply revision to rejected+close memos", () => {
+    const closed: MemoRecord = { ...revBase, status: "rejected", rejectDisposition: "close" };
+    const result = memoReducer([closed], basePayload);
+    expect(result[0].title).toBe("Original Title");
+    expect(result[0].revisions).toBeUndefined();
+  });
+
+  it("snapshot submittedAt uses createdAt of the memo being revised", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].revisions![0].submittedAt).toBe("01 Jun 2026 10:00");
+  });
+
+  it("sets revisionSubmittedAt to the dispatch updatedAt for the next revision cycle", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].revisionSubmittedAt).toBe("03 Jun 2026 09:00");
+  });
+
+  it("leaves other memos unchanged", () => {
+    const other: MemoRecord = { ...seedMemos[1] };
+    const result = memoReducer([revBase, other], basePayload);
+    expect(result.find((m) => m.id === other.id)).toEqual(other);
+  });
+});

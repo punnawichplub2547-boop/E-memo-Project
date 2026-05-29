@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
@@ -19,8 +20,7 @@ import {
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import {
-  IconChevRight,
-  IconFileText, IconMail, IconRoute, IconSparkles,
+  IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles,
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
@@ -31,7 +31,7 @@ import { DescriptionCard } from "./_components/DescriptionCard";
 import { MemoDetailsCard } from "./_components/MemoDetailsCard";
 import { RoutingCard } from "./_components/RoutingCard";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
-import { useRouter } from "next/navigation";
+import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
 
 // TODO: Promote ordered read/review recipients into sequential workflow steps
 // once queue actions can advance per-reader. For now, the prototype preserves
@@ -53,65 +53,105 @@ const mockLoggedInUser = {
   role: "Manager"
 };
 
-const ASSISTANT_PANEL_STORAGE_KEY = "ememo-create-assistant-panel";
-type AssistantTab = "routing" | "draft";
 const ASSISTANT_TABS_ID = "create-assistant-tabs";
 const ASSISTANT_PANEL_ID = "create-assistant-tabpanel";
 
-function readAssistantStorage(): { expanded: boolean; tab: AssistantTab } {
-  if (typeof window === "undefined") return { expanded: true, tab: "routing" };
-  try {
-    const raw = window.localStorage.getItem(ASSISTANT_PANEL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as { expanded?: boolean; tab?: AssistantTab };
-      return {
-        expanded: typeof parsed.expanded === "boolean" ? parsed.expanded : true,
-        tab: parsed.tab === "routing" || parsed.tab === "draft" ? parsed.tab : "routing",
-      };
-    }
-  } catch { /* ignore */ }
-  return { expanded: true, tab: "routing" };
-}
-
-export default function CreatePage() {
-  const { dispatch } = useMemos();
+function CreatePageContent() {
+  const searchParams = useSearchParams();
+  const reviseId = searchParams.get("revise") ?? null;
+  const { memos, dispatch } = useMemos();
   const router = useRouter();
 
-  const [subject, setSubject] = useState("ขออนุมัติซื้ออุปกรณ์สำนักงาน Q2/2026");
-  const [category, setCategory] = useState<ApprovalCategory>("general-purchase");
-  const [department, setDepartment] = useState(mockLoggedInUser.department);
-  const [amount, setAmount] = useState(32000);
-  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus>("in-budget");
-  const [description, setDescription] = useState("ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&GA");
+  // Compute revision context before any useState so lazy initializers can reference it.
+  // reviseMemo is null when reviseId is absent, not found, or not in a resubmittable state.
+  const reviseMemo = reviseId ? (memos.find(m => m.id === reviseId) ?? null) : null;
+  const isRevisionMode = reviseMemo !== null && (
+    reviseMemo.status === "returned" ||
+    (reviseMemo.status === "rejected" && reviseMemo.rejectDisposition === "revision-allowed")
+  );
 
-  const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
-  const [isPriceAdjustment, setIsPriceAdjustment] = useState(false);
-  const [followsProductionPlan, setFollowsProductionPlan] = useState(false);
-  const [isDeadStockOrSlowMovement, setIsDeadStockOrSlowMovement] = useState(false);
-  const [deptMonthlyOverBudgetTotal, setDeptMonthlyOverBudgetTotal] = useState(0);
+  // ── Content fields — seed from reviseMemo in revision mode, else use defaults ──
+  const [subject, setSubject] = useState(() =>
+    isRevisionMode ? (reviseMemo!.title ?? "") : "ขออนุมัติซื้ออุปกรณ์สำนักงาน Q2/2026"
+  );
+  const [category, setCategory] = useState<ApprovalCategory>(() =>
+    isRevisionMode ? (reviseMemo!.category ?? "general-purchase") : "general-purchase"
+  );
+  const [department, setDepartment] = useState(() =>
+    isRevisionMode ? (reviseMemo!.department ?? mockLoggedInUser.department) : mockLoggedInUser.department
+  );
+  const [amount, setAmount] = useState(() =>
+    isRevisionMode ? (reviseMemo!.amount ?? 0) : 32000
+  );
+  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus>(() =>
+    isRevisionMode ? (reviseMemo!.budgetStatus ?? "in-budget") : "in-budget"
+  );
+  const [description, setDescription] = useState(() =>
+    isRevisionMode
+      ? (reviseMemo!.description ?? "")
+      : "ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&GA"
+  );
+  const [isPriceAdjustment, setIsPriceAdjustment] = useState(() =>
+    isRevisionMode ? (reviseMemo!.isPriceAdjustment ?? false) : false
+  );
+  const [followsProductionPlan, setFollowsProductionPlan] = useState(() =>
+    isRevisionMode ? (reviseMemo!.followsProductionPlan ?? false) : false
+  );
+  const [isDeadStockOrSlowMovement, setIsDeadStockOrSlowMovement] = useState(() =>
+    isRevisionMode ? (reviseMemo!.isDeadStockOrSlowMovement ?? false) : false
+  );
+  const [deptMonthlyOverBudgetTotal, setDeptMonthlyOverBudgetTotal] = useState(() =>
+    isRevisionMode ? (reviseMemo!.departmentMonthlyOverBudgetTotal ?? 0) : 0
+  );
+  const [readRecipients, setReadRecipients] = useState(() =>
+    isRevisionMode ? (reviseMemo!.readRecipients?.join(", ") ?? "") : "HR&GA, ACC/FIN"
+  );
+  const [accountCode, setAccountCode] = useState(() =>
+    isRevisionMode ? (reviseMemo!.accountCode ?? "") : "GA-OPS-2026"
+  );
+  const [budgetPlan, setBudgetPlan] = useState(() =>
+    isRevisionMode ? (reviseMemo!.budgetPlan ?? 0) : 150000
+  );
+  const [budgetUsed, setBudgetUsed] = useState(() =>
+    isRevisionMode ? (reviseMemo!.budgetUsed ?? 0) : 68000
+  );
+  const [priceComparisons, setPriceComparisons] = useState<PriceComparison[]>(() => {
+    if (isRevisionMode && (reviseMemo!.priceComparisons?.length ?? 0) > 0) {
+      return reviseMemo!.priceComparisons!;
+    }
+    return [{ id: "1", vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: true }];
+  });
+  const [selectedVendorReason, setSelectedVendorReason] = useState(() =>
+    isRevisionMode ? (reviseMemo!.selectedVendorReason ?? "") : ""
+  );
+  const [requestItems, setRequestItems] = useState<RequestItem[]>(() => {
+    if (isRevisionMode && (reviseMemo!.requestItems?.length ?? 0) > 0) {
+      return reviseMemo!.requestItems!;
+    }
+    return [{ id: "1", name: "", unit: "ชิ้น", qty: 1, unitPrice: 0 }];
+  });
+  const [priceAdjustmentReason, setPriceAdjustmentReason] = useState(() =>
+    isRevisionMode ? (reviseMemo!.priceAdjustmentReason ?? "") : ""
+  );
+
+  // ── Routing fields — always default to fresh recommendation (user decision) ──
+  // The recommendation is recomputed from the prefilled content fields, so the
+  // routing card shows the correct Book1 recommendation for the revised data.
   const [chosenApprover, setChosenApprover] = useState<ApprovalLevel | null>(null);
   const [skipGmStep, setSkipGmStep] = useState(false);
   const [routeOverrideReason, setRouteOverrideReason] = useState("");
-  const [readRecipients, setReadRecipients] = useState("HR&GA, ACC/FIN");
-  const [accountCode, setAccountCode] = useState("GA-OPS-2026");
-  const [budgetPlan, setBudgetPlan] = useState(150000);
-  const [budgetUsed, setBudgetUsed] = useState(68000);
-  const [priceComparisons, setPriceComparisons] = useState<PriceComparison[]>([
-    { id: "1", vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: true },
-  ]);
-  const [selectedVendorReason, setSelectedVendorReason] = useState("");
-  const [requestItems, setRequestItems] = useState<RequestItem[]>([
-    { id: "1", name: "", unit: "ชิ้น", qty: 1, unitPrice: 0 },
-  ]);
-  const [priceAdjustmentReason, setPriceAdjustmentReason] = useState("");
+
+  // ── UI / AI state — always defaults ──
+  const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [assistantExpanded, setAssistantExpanded] = useState(true);
-  const [assistantTab, setAssistantTab] = useState<AssistantTab>("routing");
-  const [assistantHydrated, setAssistantHydrated] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Assistant panel state — extracted to hook for localStorage persistence ──
+  const { assistantExpanded, assistantTab, assistantHydrated, setAssistantExpanded, setAssistantTab } =
+    useCreateMemoAssistant();
 
   const addRequestItem = () => {
     setRequestItems(prev => [...prev, {
@@ -173,30 +213,6 @@ export default function CreatePage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
-
-  // Apply persisted assistant-panel state after hydration so server and first
-  // client render both produce the stable defaults (expanded + routing tab).
-  useEffect(() => {
-    const applyStored = () => {
-      const stored = readAssistantStorage();
-      setAssistantExpanded(stored.expanded);
-      setAssistantTab(stored.tab);
-      setAssistantHydrated(true);
-    };
-    applyStored();
-  }, []);
-
-  // Write panel state to localStorage, but only after hydration so we never
-  // clobber a persisted preference with the default values from the first render.
-  useEffect(() => {
-    if (!assistantHydrated) return;
-    try {
-      window.localStorage.setItem(
-        ASSISTANT_PANEL_STORAGE_KEY,
-        JSON.stringify({ expanded: assistantExpanded, tab: assistantTab })
-      );
-    } catch { /* ignore */ }
-  }, [assistantExpanded, assistantTab, assistantHydrated]);
 
   const supportsPriceAdjustment = category === "raw-material" || category === "fixed-asset";
   const supportsProductionPlan = category === "raw-material";
@@ -402,10 +418,52 @@ export default function CreatePage() {
   };
 
   const handleSubmit = (status: "draft" | "pending") => {
-    if (status === "pending" && !canSubmitPending) {
+    if (status === "pending" && !canSubmitPending) return;
+    if (status === "draft" && isRevisionMode) return; // Save Draft is not available in revision mode
+
+    const now = new Date();
+    const stamp = formatTimestamp(now);
+
+    if (isRevisionMode) {
+      // Dispatch SUBMIT_REVISION — applies new content to the existing memo and increments revision.
+      dispatch({
+        type: "SUBMIT_REVISION",
+        id: reviseMemo!.id,
+        title: subject,
+        category,
+        department,
+        amount,
+        description: description.trim() || undefined,
+        budgetStatus,
+        accountCode: accountCode.trim() || undefined,
+        budgetPlan,
+        budgetUsed,
+        requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
+        priceComparisons,
+        selectedVendorId: selectedVendor?.id,
+        selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
+        priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
+        isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
+        followsProductionPlan: effectiveFollowsProductionPlan || undefined,
+        isDeadStockOrSlowMovement: effectiveIsDeadStock || undefined,
+        departmentMonthlyOverBudgetTotal: showDeptMonthly && deptMonthlyOverBudgetTotal > 0 ? deptMonthlyOverBudgetTotal : undefined,
+        readRecipients: orderedReadRecipients,
+        readActions: orderedReadRecipients.length > 0
+          ? orderedReadRecipients.map((r): ReadAction => ({ recipient: r, status: "pending" }))
+          : undefined,
+        recommendedFinalApprover: recommendation.recommendedFinalApprover,
+        recommendedRoute: routeReview.recommendedRoute,
+        selectedRoute,
+        routeMode: routeReview.mode,
+        routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
+        notifyMD: recommendation.notifyMD,
+        updatedAt: stamp,
+      });
+      router.push("/queue");
       return;
     }
-    const now = new Date();
+
+    // Normal new-memo path
     const id = `EM-${now.getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
     const createdTimestamp = formatTimestamp(now);
     dispatch({
@@ -449,11 +507,22 @@ export default function CreatePage() {
       <Sidebar />
       <div className="em-work">
         <Topbar
-          crumbs={["สร้าง Memo", "ฉบับร่างใหม่"]}
-          title="สร้าง E-Memo"
+          crumbs={isRevisionMode
+            ? ["Approval Queue", `${reviseMemo!.id} → แก้ไข`]
+            : ["สร้าง Memo", "ฉบับร่างใหม่"]}
+          title={isRevisionMode ? "แก้ไขและส่งใหม่" : "สร้าง E-Memo"}
           actions={<>
-            <button className="em-btn" onClick={() => handleSubmit("draft")}><IconFileText size={15} /> Save Draft</button>
-            <button className="em-btn primary" disabled={!canSubmitPending} onClick={() => handleSubmit("pending")}><IconMail size={15} /> Send to Approval</button>
+            {!isRevisionMode && (
+              <button className="em-btn" onClick={() => handleSubmit("draft")}>
+                <IconFileText size={15} /> Save Draft
+              </button>
+            )}
+            <button className="em-btn primary" disabled={!canSubmitPending} onClick={() => handleSubmit("pending")}>
+              <IconMail size={15} />
+              {isRevisionMode
+                ? `ส่งแก้ไข (Rev.${(reviseMemo!.revisionNo ?? 0) + 1})`
+                : "Send to Approval"}
+            </button>
           </>}
         />
         <div className="em-content em-create-content">
@@ -468,6 +537,57 @@ export default function CreatePage() {
               if (file) handlePdfUpload(file);
             }}
           />
+
+          {/* Revision mode banner — shows memo ID, target revision, return/reject reason, and cancel */}
+          {isRevisionMode && (
+            <div style={{
+              padding: "10px 16px",
+              borderRadius: "var(--r-md)",
+              background: "rgba(251,191,36,0.10)",
+              border: "1px solid rgba(180,83,9,0.22)",
+              color: "var(--amber)",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 4,
+            }}>
+              <strong>แก้ไขและส่งใหม่:</strong>
+              <span>{reviseMemo!.id}</span>
+              <span style={{
+                fontWeight: 700,
+                background: "var(--surface-2)",
+                border: "1px solid var(--line)",
+                borderRadius: 4,
+                padding: "1px 6px",
+                fontSize: 11,
+              }}>
+                Rev.{(reviseMemo!.revisionNo ?? 0) + 1}
+              </span>
+              {reviseMemo!.returnReason && (
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>
+                  เหตุผลที่ส่งกลับ: {reviseMemo!.returnReason}
+                </span>
+              )}
+              {reviseMemo!.rejectReason && (
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>
+                  ปฏิเสธ: {reviseMemo!.rejectReason}
+                </span>
+              )}
+              <span style={{ color: "var(--muted)", fontSize: 12, fontStyle: "italic" }}>
+                เส้นทางอนุมัติคำนวณใหม่จากข้อมูลที่แก้ไข
+              </span>
+              <button
+                type="button"
+                className="em-btn sm ghost"
+                style={{ marginLeft: "auto" }}
+                onClick={() => router.push("/queue")}
+              >
+                ยกเลิก
+              </button>
+            </div>
+          )}
 
           <div className="em-create-stepper">
             <StepDot n="1" label="รายละเอียด Memo" active />
@@ -734,5 +854,20 @@ export default function CreatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Suspense wrapper required for useSearchParams() in Next.js App Router.
+function CreatePageWithParams() {
+  const searchParams = useSearchParams();
+  const reviseId = searchParams.get("revise") ?? null;
+  return <CreatePageContent key={reviseId ?? "new"} />;
+}
+
+export default function CreatePage() {
+  return (
+    <Suspense fallback={null}>
+      <CreatePageWithParams />
+    </Suspense>
   );
 }

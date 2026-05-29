@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { MemoRecord } from "@/lib/approval";
-import { IconCheck, IconReturn, IconX } from "@/components/icons";
+import { IconCheck, IconPen, IconReturn, IconX } from "@/components/icons";
 
 export function DrawerFooter({
   memo,
@@ -19,6 +20,8 @@ export function DrawerFooter({
   onResubmit: (id: string, revisionNote?: string) => void;
   onSkipAllReads: (id: string, reason: string) => void;
 }) {
+  const router = useRouter();
+
   // key={selectedMemo.id} on the parent DrawerPanel guarantees full remount on memo
   // selection change, so simple boolean states are safe here.
   const [rejectMode, setRejectMode] = useState(false);
@@ -72,15 +75,27 @@ export function DrawerFooter({
     </div>
   );
 
-  const resubmitButton = (
-    <button
-      type="button"
-      className="em-btn"
-      style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
-      onClick={() => { setResubmitMode(true); setRevisionNote(""); }}
-    >
-      <IconReturn size={14} /> ส่งตรวจใหม่ (ยังไม่แก้ฟอร์ม)
-    </button>
+  // Two-button layout for returned/rejected-revision-allowed memos.
+  // Primary: open revision edit form. Secondary: quick resubmit without editing.
+  const revisionActions = (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+      <button
+        type="button"
+        className="em-btn primary"
+        style={{ flex: 1 }}
+        onClick={() => router.push(`/create?revise=${memo.id}`)}
+      >
+        <IconPen size={14} /> แก้ไขและส่งใหม่
+      </button>
+      <button
+        type="button"
+        className="em-btn"
+        style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
+        onClick={() => { setResubmitMode(true); setRevisionNote(""); }}
+      >
+        <IconReturn size={14} /> ส่งตรวจใหม่ (ยังไม่แก้ฟอร์ม)
+      </button>
+    </div>
   );
 
   return (
@@ -273,9 +288,9 @@ export function DrawerFooter({
           </div>
         )
       ) : memo.status === "returned" ? (
-        resubmitMode ? resubmitForm : resubmitButton
+        resubmitMode ? resubmitForm : revisionActions
       ) : memo.status === "rejected" && memo.rejectDisposition === "revision-allowed" ? (
-        resubmitMode ? resubmitForm : resubmitButton
+        resubmitMode ? resubmitForm : revisionActions
       ) : (
         <div style={{ flex: 1, textAlign: "center", fontSize: 13, color: "var(--muted)" }}>
           This memo has been <strong>{memo.status}</strong>
