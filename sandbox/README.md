@@ -49,7 +49,7 @@ This project ships with `compose.yaml` using:
 - `restart: unless-stopped`
 - fixed container name: `hr-ememo-sandbox`
 - host port `3000` mapped to container port `3000`
-- MySQL 8 service `hr-ememo-mysql` for DB-1 schema validation
+- MySQL 8 service `hr-ememo-db` for DB-1 schema validation
 - host port `3307` mapped to MySQL container port `3306` by default
 - schema init file mounted from `db/init/001-db1-schema.sql`
 
