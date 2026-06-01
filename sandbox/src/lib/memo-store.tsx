@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useReducer } from "react";
+import React, { createContext, useContext, useEffect, useReducer } from "react";
 import {
   seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalCategory, BudgetStatus,
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
@@ -8,6 +8,7 @@ import {
 } from "./approval";
 
 type Action =
+  | { type: "HYDRATE_MEMOS"; memos: MemoRecord[] }
   | { type: "ADD_MEMO"; memo: MemoRecord }
   | { type: "UPDATE_STATUS"; id: string; status: MemoStatus; updatedAt?: string }
   | { type: "UPDATE_STEP"; id: string; step: ApprovalLevel; updatedAt?: string }
@@ -101,6 +102,8 @@ function buildMemoRevision(
 
 export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
   switch (action.type) {
+    case "HYDRATE_MEMOS":
+      return action.memos;
     case "ADD_MEMO":
       return [action.memo, ...state];
     case "UPDATE_STATUS":
@@ -252,6 +255,25 @@ const MemoContext = createContext<MemoContextValue | null>(null);
 
 export function MemoProvider({ children }: { children: React.ReactNode }) {
   const [memos, dispatch] = useReducer(memoReducer, seedMemos);
+  useEffect(() => {
+    let cancelled = false;
+    async function hydrateMemos() {
+      try {
+        const response = await fetch("/api/memos", { cache: "no-store" });
+        if (!response.ok) return;
+        const dbMemos = await response.json() as MemoRecord[];
+        if (!cancelled && Array.isArray(dbMemos)) {
+          dispatch({ type: "HYDRATE_MEMOS", memos: dbMemos });
+        }
+      } catch {
+        // Keep seedMemos as the prototype fallback when DB-1 is unavailable.
+      }
+    }
+    void hydrateMemos();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <MemoContext.Provider value={{ memos, dispatch }}>
       {children}

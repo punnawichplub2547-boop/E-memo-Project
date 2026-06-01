@@ -1,6 +1,6 @@
 # DB-1 Schema Plan — HR&GA E-Memo Online
 
-**Status:** Pre-implementation planning — no database code written yet  
+**Status:** DB-1 implemented through read path — write persistence not started
 **Date:** 2026-06-01  
 **Target database:** MySQL 8.x  
 **Phase:** DB-1 (schema creation, seed data, read path only)  
@@ -24,7 +24,7 @@ DB-1 is the first persistence layer for the HR&GA E-Memo prototype. Its scope is
 - Normalization of `requestItems` or `priceComparisons` into their own tables
 - Real cycle time computation
 
-Write persistence is DB-2. The prototype reducer and in-memory `MemoProvider` state remain the mutation layer during DB-1. The SA's Phase 2 roadmap is the governing design reference.
+Write persistence is DB-2. The prototype reducer remains the mutation layer during DB-1: `MemoProvider` hydrates its initial state from `GET /api/memos` when available, then local reducer actions update memory only. The SA's Phase 2 roadmap is the governing design reference.
 
 ---
 
@@ -619,7 +619,7 @@ SELECT memo_id, action_type, acted_at FROM workflow_step_actions;
 
 ### Step 3 — Read path API
 
-Create a `GET /api/memos` Next.js route handler that:
+Implemented: `GET /api/memos` is a Next.js route handler that:
 
 1. Queries `memos` left-joined with `read_actions` on `memo_id` and `revision_no = memos.revision_no`.
 2. Serializes each `memos` row to the `MemoRecord` shape:
@@ -630,7 +630,7 @@ Create a `GET /api/memos` Next.js route handler that:
    - Reconstructs `readActions[]` from joined `read_actions` rows; leaves it `undefined` when no rows exist
 3. Returns a JSON array of `MemoRecord`-shaped objects.
 
-Switch `MemoProvider`'s initial state from `seedMemos` to the result of this API call on first load. Mutations still go to the reducer in-memory during DB-1. A page refresh reloads from DB (seed data only). This is expected behavior for DB-1.
+`MemoProvider` starts with `seedMemos` as a safe fallback, then hydrates from this API on first load. Mutations still go to the reducer in-memory during DB-1. A page refresh reloads from DB seed data. This is expected behavior for DB-1.
 
 Verify by loading `/queue` and confirming:
 

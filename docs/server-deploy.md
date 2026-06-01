@@ -14,7 +14,7 @@ cd Hrproject/sandbox
 docker compose up -d --build
 ```
 
-The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container for DB-1 schema validation; the app still uses in-memory prototype state until the read-path API is implemented.
+The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available, while workflow mutations remain in-memory prototype state until DB-2.
 
 ## Keep It Running
 
@@ -90,6 +90,6 @@ docker compose up -d --build
 ## Notes
 
 - Current app mutations are still prototype in-memory state.
-- MySQL is present for DB-1 schema validation; the app does not read/write it yet.
+- MySQL backs the DB-1 read path through `GET /api/memos`; write persistence starts in DB-2.
 - If port `3000` is already used on the server, change the left side of `3000:3000` in `compose.yaml`.
 - If port `3307` is already used on the server, set `MYSQL_HOST_PORT` to another free host port. The container-side port stays `3306`.
