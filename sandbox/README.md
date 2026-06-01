@@ -49,6 +49,11 @@ This project ships with `compose.yaml` using:
 - `restart: unless-stopped`
 - fixed container name: `hr-ememo-sandbox`
 - host port `3000` mapped to container port `3000`
+- MySQL 8 service `hr-ememo-mysql` for DB-1 schema validation
+- host port `3307` mapped to MySQL container port `3306` by default
+- schema init file mounted from `db/init/001-db1-schema.sql`
+
+Use `env.compose.example` as a template if the server should override the default dev MySQL credentials through a `.env` file.
 
 Useful server commands:
 
@@ -61,13 +66,23 @@ docker compose down
 
 If the server reboots, the container will start again automatically as long as the Docker service itself starts on boot.
 
+To reset the local DB-1 prototype database and re-run the schema init file:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+This deletes the MySQL Docker volume, so use it only for disposable prototype data.
+
 ## Current Scope
 
 - Dashboard for memo volume, pending approvals, approval cycle time, and approval queue.
 - AI draft memo panel with automatic approver recommendation from the approval matrix.
 - Workflow timeline from requester through Manager, GM, and MD.
 - Search panel for historical memo lookup by keyword, memo number, requester, or category.
-- Static seed data only. No database, authentication, email delivery, or real AI API integration yet.
+- Static seed data in the app only. DB-1 MySQL schema exists for validation, but the app does not read/write the database yet.
+- No authentication, email delivery, or production AI integration yet.
 
 ## Confirmed Prototype Direction
 

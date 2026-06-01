@@ -576,7 +576,7 @@ DB-1 is three discrete steps, each independently verifiable.
 
 ### Step 1 — Schema migration
 
-Create the four tables in the MySQL instance chosen for DB-1. The current `sandbox/docker-compose.yml` only runs the Next.js prototype service; it does not yet define a MySQL service. If Docker is used for DB-1, add a separate MySQL 8 service before running the schema migration. No application code changes are required for this step.
+Create the four tables in the MySQL instance defined by the Docker Compose files under `sandbox/`. The DB-1 schema is mounted into MySQL through `sandbox/db/init/001-db1-schema.sql`, which runs automatically only when the MySQL data volume is initialized for the first time. No application code changes are required for this step.
 
 Verify:
 
@@ -655,7 +655,7 @@ Verify by loading `/queue` and confirming:
 
 **actor_name is always the mock user "อำภา หิงคำ".** All seed `workflow_step_actions` rows and all DB-2 write rows carry this name until Phase 5 replaces it with `actor_user_id`. Correct for an auditable single-user prototype.
 
-**MySQL vs SQLite.** The SA targets MySQL 8, and the schema above is written for MySQL 8. The current Docker Compose file does not include a database engine yet. If SQLite is chosen for faster prototype iteration, treat it as a temporary adapter: SQLite stores JSON as text with JSON functions rather than MySQL's native JSON column behavior, so schema and migration SQL must be adjusted deliberately.
+**MySQL vs SQLite.** The SA targets MySQL 8, and the schema above is written for MySQL 8. Docker Compose now includes a MySQL 8 service for DB-1 schema validation. If SQLite is chosen later for faster prototype iteration, treat it as a temporary adapter: SQLite stores JSON as text with JSON functions rather than MySQL's native JSON column behavior, so schema and migration SQL must be adjusted deliberately.
 
 ---
 
