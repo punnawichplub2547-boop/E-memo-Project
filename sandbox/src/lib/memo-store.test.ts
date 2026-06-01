@@ -419,16 +419,6 @@ describe("memoReducer — RESUBMIT_MEMO revision semantics", () => {
     expect(result[0].revisions![0].submittedAt).toBe("01 Jun 2026 10:00");
   });
 
-  it("snapshot submittedAt falls back to updatedAt when createdAt is absent (seed memo pattern)", () => {
-    const memoNoCreatedAt: MemoRecord = {
-      ...revBase,
-      createdAt: undefined,
-      updatedAt: "01 Jun 2026 14:00",
-    };
-    const result = memoReducer([memoNoCreatedAt], { type: "RESUBMIT_MEMO", id: memoNoCreatedAt.id, updatedAt: "02 Jun 2026 09:00" });
-    expect(result[0].revisions![0].submittedAt).toBe("01 Jun 2026 14:00");
-  });
-
   it("second resubmit snapshot submittedAt uses revisionSubmittedAt from first resubmit, not the return time", () => {
     const memoWithCreatedAt: MemoRecord = { ...revBase, createdAt: "01 Jun 2026 10:00", updatedAt: "01 Jun 2026 10:00" };
     // First resubmit at "02 Jun 09:00" → live revisionSubmittedAt set to this timestamp

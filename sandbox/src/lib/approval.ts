@@ -169,7 +169,7 @@ export type MemoRecord = {
   isDeadStockOrSlowMovement?: boolean;
   departmentMonthlyOverBudgetTotal?: number;
   cycleHours: number;
-  createdAt?: string;
+  createdAt: string;
   updatedAt: string;
 };
 
@@ -398,6 +398,7 @@ export const seedMemos: MemoRecord[] = [
     status: "pending",
     currentStep: "Manager / Top Section",
     cycleHours: 12,
+    createdAt: "17 May 2026 17:00",
     updatedAt: "18 May 2026 09:20"
   },
   {
@@ -410,6 +411,7 @@ export const seedMemos: MemoRecord[] = [
     status: "pending",
     currentStep: "General Manager",
     cycleHours: 20,
+    createdAt: "17 May 2026 10:00",
     updatedAt: "18 May 2026 08:10"
   },
   {
@@ -422,6 +424,7 @@ export const seedMemos: MemoRecord[] = [
     status: "approved",
     currentStep: "Managing Director",
     cycleHours: 16,
+    createdAt: "17 May 2026 08:00",
     updatedAt: "17 May 2026 16:40"
   },
   {
@@ -434,6 +437,7 @@ export const seedMemos: MemoRecord[] = [
     status: "pending",
     currentStep: "General Manager",
     cycleHours: 28,
+    createdAt: "16 May 2026 10:00",
     updatedAt: "17 May 2026 14:05"
   },
   {
@@ -446,6 +450,7 @@ export const seedMemos: MemoRecord[] = [
     status: "approved",
     currentStep: "General Manager",
     cycleHours: 15,
+    createdAt: "16 May 2026 08:00",
     updatedAt: "16 May 2026 11:30"
   },
   {
@@ -458,6 +463,7 @@ export const seedMemos: MemoRecord[] = [
     status: "rejected",
     currentStep: "Managing Director",
     cycleHours: 18,
+    createdAt: "15 May 2026 15:00",
     updatedAt: "16 May 2026 10:05"
   },
   {
@@ -470,6 +476,7 @@ export const seedMemos: MemoRecord[] = [
     status: "approved",
     currentStep: "General Manager",
     cycleHours: 17,
+    createdAt: "15 May 2026 09:00",
     updatedAt: "15 May 2026 15:25"
   },
   {
@@ -482,6 +489,7 @@ export const seedMemos: MemoRecord[] = [
     status: "pending",
     currentStep: "General Manager",
     cycleHours: 18,
+    createdAt: "14 May 2026 19:00",
     updatedAt: "15 May 2026 13:00"
   }
 ];
