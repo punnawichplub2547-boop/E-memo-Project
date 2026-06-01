@@ -1,6 +1,6 @@
 # DB-1 Schema Plan — HR&GA E-Memo Online
 
-**Status:** DB-1 implemented; DB-2 started with ADD_MEMO and ADVANCE_STEP write persistence
+**Status:** DB-1 implemented; DB-2 started with ADD_MEMO, ADVANCE_STEP, and RETURN_MEMO write persistence
 **Date:** 2026-06-01  
 **Target database:** MySQL 8.x  
 **Phase:** DB-1 (schema creation, seed data, read path only)  

@@ -94,6 +94,52 @@ export function buildAdvanceStepPayload(body: AdvanceStepBody): AdvanceStepPaylo
   };
 }
 
+export type ReturnMemoBody = {
+  stepLabel: string;
+  returnReason: string;
+  revisionNo: number;
+  updatedAt: string;
+};
+
+export type ReturnMemoPayload = {
+  memoUpdate: {
+    status: "returned";
+    return_reason: string;
+    updated_at: string;
+  };
+  workflowAction: {
+    revision_no: number;
+    action_type: "return_for_revision";
+    step_label: string;
+    actor_name: null;
+    result: null;
+    reason: string;
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+export function buildReturnMemoPayload(body: ReturnMemoBody): ReturnMemoPayload {
+  const updatedAtUtc = toMysqlUtcDateTime(body.updatedAt);
+  return {
+    memoUpdate: {
+      status: "returned",
+      return_reason: body.returnReason,
+      updated_at: updatedAtUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: "return_for_revision",
+      step_label: body.stepLabel,
+      actor_name: null,
+      result: null,
+      reason: body.returnReason,
+      acted_at: updatedAtUtc,
+      metadata_json: null,
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;

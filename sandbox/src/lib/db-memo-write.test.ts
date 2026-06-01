@@ -5,6 +5,7 @@ import {
   buildMemoWritePayload,
   buildNewMemoReadActionRows,
   buildNewMemoWorkflowAction,
+  buildReturnMemoPayload,
 } from "./db-memo-write";
 
 describe("DB memo write helpers", () => {
@@ -166,5 +167,56 @@ describe("buildAdvanceStepPayload", () => {
 
     expect(payload.workflowAction.actor_name).toBeNull();
     expect(payload.workflowAction.metadata_json).toBeNull();
+  });
+});
+
+describe("buildReturnMemoPayload", () => {
+  it("produces action_type=return_for_revision with null result", () => {
+    const payload = buildReturnMemoPayload({
+      stepLabel: "General Manager",
+      returnReason: "เอกสารไม่ครบ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.action_type).toBe("return_for_revision");
+    expect(payload.workflowAction.result).toBeNull();
+    expect(payload.memoUpdate.status).toBe("returned");
+  });
+
+  it("returnReason appears in both memoUpdate.return_reason and workflowAction.reason", () => {
+    const payload = buildReturnMemoPayload({
+      stepLabel: "Manager / Top Section",
+      returnReason: "ต้องแนบใบเสนอราคาเพิ่มเติม",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.return_reason).toBe("ต้องแนบใบเสนอราคาเพิ่มเติม");
+    expect(payload.workflowAction.reason).toBe("ต้องแนบใบเสนอราคาเพิ่มเติม");
+  });
+
+  it("step_label is the step before returning and revision_no is preserved", () => {
+    const payload = buildReturnMemoPayload({
+      stepLabel: "Managing Director",
+      returnReason: "ราคาสูงเกินงบ",
+      revisionNo: 2,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.step_label).toBe("Managing Director");
+    expect(payload.workflowAction.revision_no).toBe(2);
+  });
+
+  it("updatedAt is converted to UTC MySQL DATETIME for both memoUpdate and workflowAction", () => {
+    const payload = buildReturnMemoPayload({
+      stepLabel: "General Manager",
+      returnReason: "ข้อมูลไม่ครบ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
+    expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
   });
 });

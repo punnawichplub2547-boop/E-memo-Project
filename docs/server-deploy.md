@@ -14,7 +14,7 @@ cd Hrproject/sandbox
 docker compose up -d --build
 ```
 
-The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. New memo creation and approval advancement are persisted to DB; later workflow mutations still remain in-memory prototype state.
+The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. New memo creation, approval advancement, and return-for-revision are persisted to DB; later workflow mutations (reject, read, revision) still remain in-memory prototype state.
 
 ## Keep It Running
 
@@ -89,8 +89,8 @@ docker compose up -d --build
 
 ## Notes
 
-- New memo creation and approval advancement are persisted to DB.
-- Return, reject, read, and revision mutations are still prototype in-memory state.
+- New memo creation, approval advancement, and return-for-revision are persisted to DB.
+- Reject, read, and revision mutations are still prototype in-memory state.
 - MySQL backs the DB-1 read path through `GET /api/memos`; write persistence starts in DB-2.
 - If port `3000` is already used on the server, change the left side of `3000:3000` in `compose.yaml`.
 - If port `3307` is already used on the server, set `MYSQL_HOST_PORT` to another free host port. The container-side port stays `3306`.
