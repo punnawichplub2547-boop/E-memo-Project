@@ -6,6 +6,7 @@ import {
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
+import type { AdvanceStepBody } from "./db-memo-write";
 
 type Action =
   | { type: "HYDRATE_MEMOS"; memos: MemoRecord[] }
@@ -256,11 +257,22 @@ const MemoContext = createContext<MemoContextValue | null>(null);
 export function MemoProvider({ children }: { children: React.ReactNode }) {
   const [memos, reducerDispatch] = useReducer(memoReducer, seedMemos);
   const dispatch = useCallback<React.Dispatch<Action>>((action) => {
-    reducerDispatch(action);
-    if (action.type === "ADD_MEMO") {
-      void persistNewMemo(action.memo);
+    if (action.type === "ADVANCE_STEP") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        void persistAdvanceStep(action.id, prevMemo, nextMemo, action.updatedAt);
+      }
+    } else {
+      reducerDispatch(action);
+      if (action.type === "ADD_MEMO") {
+        void persistNewMemo(action.memo);
+      }
     }
-  }, []);
+  }, [memos]);
   useEffect(() => {
     let cancelled = false;
     async function hydrateMemos() {
@@ -269,7 +281,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) return;
         const dbMemos = await response.json() as MemoRecord[];
         if (!cancelled && Array.isArray(dbMemos)) {
-          dispatch({ type: "HYDRATE_MEMOS", memos: dbMemos });
+          reducerDispatch({ type: "HYDRATE_MEMOS", memos: dbMemos });
         }
       } catch {
         // Keep seedMemos as the prototype fallback when DB-1 is unavailable.
@@ -279,12 +291,40 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [dispatch]);
+  }, []);
   return (
     <MemoContext.Provider value={{ memos, dispatch }}>
       {children}
     </MemoContext.Provider>
   );
+}
+
+async function persistAdvanceStep(
+  memoId: string,
+  prev: MemoRecord,
+  next: MemoRecord,
+  updatedAt?: string,
+) {
+  const body: AdvanceStepBody = {
+    stepLabel: prev.currentStep,
+    nextCurrentStep: next.currentStep,
+    nextStatus: next.status,
+    nextWorkflowState: next.workflowState ?? "Checked",
+    revisionNo: next.revisionNo ?? 0,
+    updatedAt: updatedAt ?? next.updatedAt,
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/advance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] ADVANCE_STEP persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] ADVANCE_STEP persist failed", error);
+  }
 }
 
 async function persistNewMemo(memo: MemoRecord) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MemoRecord, ReadAction } from "./approval";
 import {
+  buildAdvanceStepPayload,
   buildMemoWritePayload,
   buildNewMemoReadActionRows,
   buildNewMemoWorkflowAction,
@@ -66,5 +67,104 @@ describe("DB memo write helpers", () => {
 
   it("does not build read action rows when no readActions exist", () => {
     expect(buildNewMemoReadActionRows({ ...memo, readActions: undefined })).toEqual([]);
+  });
+});
+
+describe("buildAdvanceStepPayload", () => {
+  it("intermediate step produces check/intermediate with updated current_step and pending status", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "General Manager",
+      nextStatus: "pending",
+      nextWorkflowState: "Checked",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.action_type).toBe("check");
+    expect(payload.workflowAction.result).toBe("intermediate");
+    expect(payload.memoUpdate.status).toBe("pending");
+    expect(payload.memoUpdate.workflow_state).toBe("Checked");
+    expect(payload.memoUpdate.current_step).toBe("General Manager");
+  });
+
+  it("final step produces approve/final with approved status and Approved workflow_state", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "General Manager",
+      nextCurrentStep: "General Manager",
+      nextStatus: "approved",
+      nextWorkflowState: "Approved",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.action_type).toBe("approve");
+    expect(payload.workflowAction.result).toBe("final");
+    expect(payload.memoUpdate.status).toBe("approved");
+    expect(payload.memoUpdate.workflow_state).toBe("Approved");
+    expect(payload.memoUpdate.current_step).toBe("General Manager");
+  });
+
+  it("step_label is the step before advancing in both intermediate and final cases", () => {
+    const intermediate = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "General Manager",
+      nextStatus: "pending",
+      nextWorkflowState: "Checked",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+    const final = buildAdvanceStepPayload({
+      stepLabel: "Managing Director",
+      nextCurrentStep: "Managing Director",
+      nextStatus: "approved",
+      nextWorkflowState: "Approved",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(intermediate.workflowAction.step_label).toBe("Manager / Top Section");
+    expect(final.workflowAction.step_label).toBe("Managing Director");
+  });
+
+  it("revision_no from body is preserved in the workflow action row", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "Manager / Top Section",
+      nextStatus: "approved",
+      nextWorkflowState: "Approved",
+      revisionNo: 2,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.revision_no).toBe(2);
+  });
+
+  it("updatedAt is converted to UTC MySQL DATETIME for both memoUpdate and workflowAction", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "General Manager",
+      nextStatus: "pending",
+      nextWorkflowState: "Checked",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
+    expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("actor_name and metadata_json are always null", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "General Manager",
+      nextStatus: "pending",
+      nextWorkflowState: "Checked",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.metadata_json).toBeNull();
   });
 });

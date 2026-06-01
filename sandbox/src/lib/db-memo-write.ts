@@ -45,6 +45,55 @@ export function buildNewMemoWorkflowAction(row: MemoSeedRow): NewMemoWorkflowAct
   };
 }
 
+export type AdvanceStepBody = {
+  stepLabel: string;
+  nextCurrentStep: string;
+  nextStatus: string;
+  nextWorkflowState: string;
+  revisionNo: number;
+  updatedAt: string;
+};
+
+export type AdvanceStepPayload = {
+  memoUpdate: {
+    status: string;
+    workflow_state: string;
+    current_step: string;
+    updated_at: string;
+  };
+  workflowAction: {
+    revision_no: number;
+    action_type: "check" | "approve";
+    step_label: string;
+    actor_name: null;
+    result: "intermediate" | "final";
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+export function buildAdvanceStepPayload(body: AdvanceStepBody): AdvanceStepPayload {
+  const updatedAtUtc = toMysqlUtcDateTime(body.updatedAt);
+  const isFinal = body.nextStatus === "approved";
+  return {
+    memoUpdate: {
+      status: body.nextStatus,
+      workflow_state: body.nextWorkflowState,
+      current_step: body.nextCurrentStep,
+      updated_at: updatedAtUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: isFinal ? "approve" : "check",
+      step_label: body.stepLabel,
+      actor_name: null,
+      result: isFinal ? "final" : "intermediate",
+      acted_at: updatedAtUtc,
+      metadata_json: null,
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;
