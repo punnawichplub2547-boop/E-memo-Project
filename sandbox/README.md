@@ -89,7 +89,8 @@ The seed script inserts 8 memos and one `submit` workflow action per memo. It is
 - AI draft memo panel with automatic approver recommendation from the approval matrix.
 - Workflow timeline from requester through Manager, GM, and MD.
 - Search panel for historical memo lookup by keyword, memo number, requester, or category.
-- DB-1 read path is active: `MemoProvider` hydrates initial memos from `GET /api/memos` when MySQL is available, then keeps workflow mutations in memory.
+- DB-1 read path is active: `MemoProvider` hydrates initial memos from `GET /api/memos` when MySQL is available.
+- DB-2 has started: new memo creation (`ADD_MEMO`) is persisted to MySQL, while later workflow mutations still stay in memory.
 - If the DB/API is unavailable, the app falls back to static `seedMemos` so the prototype remains usable.
 - No authentication, email delivery, or production AI integration yet.
 

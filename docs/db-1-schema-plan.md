@@ -1,6 +1,6 @@
 # DB-1 Schema Plan — HR&GA E-Memo Online
 
-**Status:** DB-1 implemented through read path — write persistence not started
+**Status:** DB-1 implemented; DB-2 started with ADD_MEMO write persistence
 **Date:** 2026-06-01  
 **Target database:** MySQL 8.x  
 **Phase:** DB-1 (schema creation, seed data, read path only)  
@@ -24,7 +24,7 @@ DB-1 is the first persistence layer for the HR&GA E-Memo prototype. Its scope is
 - Normalization of `requestItems` or `priceComparisons` into their own tables
 - Real cycle time computation
 
-Write persistence is DB-2. The prototype reducer remains the mutation layer during DB-1: `MemoProvider` hydrates its initial state from `GET /api/memos` when available, then local reducer actions update memory only. The SA's Phase 2 roadmap is the governing design reference.
+Write persistence is DB-2. The first DB-2 slice persists newly created memos from `ADD_MEMO`; all other workflow mutations still update memory only. `MemoProvider` hydrates its initial state from `GET /api/memos` when available. The SA's Phase 2 roadmap is the governing design reference.
 
 ---
 

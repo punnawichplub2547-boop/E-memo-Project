@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
 import {
   seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalCategory, BudgetStatus,
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
@@ -254,7 +254,13 @@ interface MemoContextValue {
 const MemoContext = createContext<MemoContextValue | null>(null);
 
 export function MemoProvider({ children }: { children: React.ReactNode }) {
-  const [memos, dispatch] = useReducer(memoReducer, seedMemos);
+  const [memos, reducerDispatch] = useReducer(memoReducer, seedMemos);
+  const dispatch = useCallback<React.Dispatch<Action>>((action) => {
+    reducerDispatch(action);
+    if (action.type === "ADD_MEMO") {
+      void persistNewMemo(action.memo);
+    }
+  }, []);
   useEffect(() => {
     let cancelled = false;
     async function hydrateMemos() {
@@ -273,12 +279,27 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dispatch]);
   return (
     <MemoContext.Provider value={{ memos, dispatch }}>
       {children}
     </MemoContext.Provider>
   );
+}
+
+async function persistNewMemo(memo: MemoRecord) {
+  try {
+    const response = await fetch("/api/memos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(memo),
+    });
+    if (!response.ok && response.status !== 409) {
+      console.error("[MemoProvider] Failed to persist memo", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] Failed to persist memo", error);
+  }
 }
 
 export function useMemos() {
