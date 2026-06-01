@@ -1,0 +1,12 @@
+services:
+  hr-ememo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hr-ememo
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env.local
+        required: false
+    restart: unless-stopped
