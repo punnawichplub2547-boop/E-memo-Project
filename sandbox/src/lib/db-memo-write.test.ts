@@ -5,6 +5,7 @@ import {
   buildMemoWritePayload,
   buildNewMemoReadActionRows,
   buildNewMemoWorkflowAction,
+  buildRejectMemoPayload,
   buildReturnMemoPayload,
 } from "./db-memo-write";
 
@@ -218,5 +219,98 @@ describe("buildReturnMemoPayload", () => {
 
     expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
     expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
+  });
+});
+
+describe("buildRejectMemoPayload", () => {
+  it("produces action_type=reject with memoUpdate.status=rejected", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "General Manager",
+      disposition: "close",
+      rejectReason: "ไม่อนุมัติ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.action_type).toBe("reject");
+    expect(payload.memoUpdate.status).toBe("rejected");
+  });
+
+  it("disposition appears in memoUpdate.reject_disposition and workflowAction.result for close", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "Managing Director",
+      disposition: "close",
+      rejectReason: "งบประมาณไม่เพียงพอ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.reject_disposition).toBe("close");
+    expect(payload.workflowAction.result).toBe("close");
+  });
+
+  it("disposition appears in memoUpdate.reject_disposition and workflowAction.result for revision-allowed", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "General Manager",
+      disposition: "revision-allowed",
+      rejectReason: "ราคาสูงเกินไป กรุณาเสนอใหม่",
+      revisionNo: 1,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.reject_disposition).toBe("revision-allowed");
+    expect(payload.workflowAction.result).toBe("revision-allowed");
+  });
+
+  it("rejectReason appears in memoUpdate.reject_reason and workflowAction.reason", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "Manager / Top Section",
+      disposition: "close",
+      rejectReason: "ข้อมูลไม่ถูกต้อง",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.reject_reason).toBe("ข้อมูลไม่ถูกต้อง");
+    expect(payload.workflowAction.reason).toBe("ข้อมูลไม่ถูกต้อง");
+  });
+
+  it("step_label is the step at rejection and revision_no is preserved", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "Managing Director",
+      disposition: "revision-allowed",
+      rejectReason: "ต้องการข้อมูลเพิ่ม",
+      revisionNo: 2,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.step_label).toBe("Managing Director");
+    expect(payload.workflowAction.revision_no).toBe(2);
+  });
+
+  it("updatedAt is converted to UTC MySQL DATETIME for both memoUpdate and workflowAction", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "General Manager",
+      disposition: "close",
+      rejectReason: "ไม่อนุมัติ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
+    expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("actor_name and metadata_json are always null", () => {
+    const payload = buildRejectMemoPayload({
+      stepLabel: "General Manager",
+      disposition: "close",
+      rejectReason: "ไม่อนุมัติ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.metadata_json).toBeNull();
   });
 });

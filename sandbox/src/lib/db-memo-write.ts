@@ -140,6 +140,55 @@ export function buildReturnMemoPayload(body: ReturnMemoBody): ReturnMemoPayload 
   };
 }
 
+export type RejectMemoBody = {
+  stepLabel: string;
+  disposition: "close" | "revision-allowed";
+  rejectReason: string;
+  revisionNo: number;
+  updatedAt: string;
+};
+
+export type RejectMemoPayload = {
+  memoUpdate: {
+    status: "rejected";
+    reject_disposition: "close" | "revision-allowed";
+    reject_reason: string;
+    updated_at: string;
+  };
+  workflowAction: {
+    revision_no: number;
+    action_type: "reject";
+    step_label: string;
+    actor_name: null;
+    result: "close" | "revision-allowed";
+    reason: string;
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+export function buildRejectMemoPayload(body: RejectMemoBody): RejectMemoPayload {
+  const updatedAtUtc = toMysqlUtcDateTime(body.updatedAt);
+  return {
+    memoUpdate: {
+      status: "rejected",
+      reject_disposition: body.disposition,
+      reject_reason: body.rejectReason,
+      updated_at: updatedAtUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: "reject",
+      step_label: body.stepLabel,
+      actor_name: null,
+      result: body.disposition,
+      reason: body.rejectReason,
+      acted_at: updatedAtUtc,
+      metadata_json: null,
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;

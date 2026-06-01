@@ -6,7 +6,7 @@ import {
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
-import type { AdvanceStepBody, ReturnMemoBody } from "./db-memo-write";
+import type { AdvanceStepBody, RejectMemoBody, ReturnMemoBody } from "./db-memo-write";
 
 type Action =
   | { type: "HYDRATE_MEMOS"; memos: MemoRecord[] }
@@ -275,6 +275,15 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
         void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, action.updatedAt);
       }
+    } else if (action.type === "REJECT_MEMO") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        void persistRejectMemo(action.id, prevMemo, nextMemo, action.disposition, action.reason, action.updatedAt);
+      }
     } else {
       reducerDispatch(action);
       if (action.type === "ADD_MEMO") {
@@ -360,6 +369,35 @@ async function persistReturnMemo(
     }
   } catch (error) {
     console.error("[MemoProvider] RETURN_MEMO persist failed", error);
+  }
+}
+
+async function persistRejectMemo(
+  memoId: string,
+  prev: MemoRecord,
+  next: MemoRecord,
+  disposition: "close" | "revision-allowed",
+  rejectReason: string,
+  updatedAt?: string,
+) {
+  const body: RejectMemoBody = {
+    stepLabel: prev.currentStep,
+    disposition,
+    rejectReason,
+    revisionNo: next.revisionNo ?? 0,
+    updatedAt: updatedAt ?? next.updatedAt,
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] REJECT_MEMO persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] REJECT_MEMO persist failed", error);
   }
 }
 
