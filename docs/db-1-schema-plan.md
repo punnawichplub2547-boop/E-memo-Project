@@ -592,11 +592,20 @@ DESCRIBE workflow_step_actions;
 
 ### Step 2 — Seed migration
 
-Write and run a migration script (TypeScript or SQL) that for each `seedMemos` entry:
+Run the seed script:
+
+```bash
+cd sandbox
+npm.cmd run db:seed
+```
+
+The script processes each `seedMemos` entry:
 
 1. Parses `createdAt` and `updatedAt` as Bangkok local time, converts to UTC.
 2. Inserts one `memos` row with all fields mapped per §5.
 3. Inserts one `workflow_step_actions` row with `action_type = 'submit'`, `acted_at = created_at`.
+
+For DB-1 prototype use, the script clears the four DB-1 tables before inserting the seed rows. Do not use this reset behavior once DB-2 write persistence starts storing user-created data.
 
 Verify:
 

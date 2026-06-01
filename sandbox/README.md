@@ -75,6 +75,14 @@ docker compose up -d --build
 
 This deletes the MySQL Docker volume, so use it only for disposable prototype data.
 
+Seed the DB-1 tables from the current `seedMemos` prototype data:
+
+```bash
+npm.cmd run db:seed
+```
+
+The seed script inserts 8 memos and one `submit` workflow action per memo. It is idempotent for prototype use: it clears the four DB-1 tables before re-inserting the seed data.
+
 ## Current Scope
 
 - Dashboard for memo volume, pending approvals, approval cycle time, and approval queue.

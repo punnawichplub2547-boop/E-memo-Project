@@ -52,6 +52,14 @@ docker compose up -d --build
 
 This deletes the local MySQL volume. Use it only for disposable prototype data.
 
+Seed the DB-1 tables from the current prototype `seedMemos` data:
+
+```bash
+npm.cmd run db:seed
+```
+
+The seed script inserts eight memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data until DB-2 write persistence exists.
+
 ## Recommended Server Checks
 
 Make sure Docker starts on boot:
