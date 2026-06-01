@@ -19,6 +19,7 @@ import {
 } from "@/lib/approval";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { formatTimestamp } from "@/lib/format-timestamp";
+import { generateMemoId } from "@/lib/memo-id";
 import {
   IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles,
 } from "@/components/icons";
@@ -464,7 +465,7 @@ function CreatePageContent() {
     }
 
     // Normal new-memo path
-    const id = `EM-${now.getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
+    const id = generateMemoId(now);
     const createdTimestamp = formatTimestamp(now);
     dispatch({
       type: "ADD_MEMO",
