@@ -282,6 +282,116 @@ export function buildSkipAllReadsPayload(body: SkipAllReadsBody): SkipAllReadsPa
   };
 }
 
+export type ResubmitMemoBody = {
+  oldRevisionNo: number;
+  source: "return" | "rejection-allowed";
+  returnReason: string | null;
+  rejectReason: string | null;
+  revisionNote: string | null;
+  oldSubmittedAt: string;
+  snapshotJson: string;
+  nextCurrentStep: string;
+  readRecipients: string[];
+  updatedAt: string;
+};
+
+export type ResubmitMemoReadActionRow = {
+  revision_no: number;
+  recipient_name: string;
+  status: "pending";
+  acted_at: null;
+  skip_reason: null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResubmitMemoPayload = {
+  memoRevision: {
+    revision_no: number;
+    source: string;
+    return_reason: string | null;
+    reject_reason: string | null;
+    revision_note: string | null;
+    submitted_at: string;
+    snapshot_json: string;
+    revision_impact: null;
+    created_at: string;
+  };
+  memoUpdate: {
+    status: "pending";
+    current_step: string;
+    workflow_state: "Issued";
+    revision_no: number;
+    revision_note: string | null;
+    revision_submitted_at: string;
+    updated_at: string;
+    return_reason: null;
+    reject_reason: null;
+    reject_disposition: null;
+  };
+  newReadActions: ResubmitMemoReadActionRow[];
+  workflowAction: {
+    revision_no: number;
+    action_type: "resubmit";
+    step_label: null;
+    actor_name: null;
+    result: "quick";
+    reason: string | null;
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPayload {
+  const oldSubmittedAtUtc = toMysqlUtcDateTime(body.oldSubmittedAt);
+  const updatedAtUtc = toMysqlUtcDateTime(body.updatedAt);
+  const newRevisionNo = body.oldRevisionNo + 1;
+  return {
+    memoRevision: {
+      revision_no: body.oldRevisionNo,
+      source: body.source,
+      return_reason: body.returnReason,
+      reject_reason: body.rejectReason,
+      revision_note: body.revisionNote,
+      submitted_at: oldSubmittedAtUtc,
+      snapshot_json: body.snapshotJson,
+      revision_impact: null,
+      created_at: updatedAtUtc,
+    },
+    memoUpdate: {
+      status: "pending",
+      current_step: body.nextCurrentStep,
+      workflow_state: "Issued",
+      revision_no: newRevisionNo,
+      revision_note: body.revisionNote,
+      revision_submitted_at: updatedAtUtc,
+      updated_at: updatedAtUtc,
+      return_reason: null,
+      reject_reason: null,
+      reject_disposition: null,
+    },
+    newReadActions: body.readRecipients.map((recipient) => ({
+      revision_no: newRevisionNo,
+      recipient_name: recipient,
+      status: "pending" as const,
+      acted_at: null,
+      skip_reason: null,
+      created_at: updatedAtUtc,
+      updated_at: updatedAtUtc,
+    })),
+    workflowAction: {
+      revision_no: newRevisionNo,
+      action_type: "resubmit",
+      step_label: null,
+      actor_name: null,
+      result: "quick",
+      reason: body.revisionNote,
+      acted_at: updatedAtUtc,
+      metadata_json: null,
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;

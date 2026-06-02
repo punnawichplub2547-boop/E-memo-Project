@@ -10,6 +10,7 @@ import type {
   AdvanceStepBody,
   MarkReadBody,
   RejectMemoBody,
+  ResubmitMemoBody,
   ReturnMemoBody,
   SkipAllReadsBody,
 } from "./db-memo-write";
@@ -58,17 +59,12 @@ type Action =
       updatedAt?: string;
     };
 
-// Shared snapshot + revision builder — used by both RESUBMIT_MEMO and SUBMIT_REVISION.
-// Captures the memo's current content as a frozen snapshot, then builds the revision record
-// that will be appended to revisions[]. The submittedAt fallback chain:
-//   revisionSubmittedAt (set on previous resubmit) → createdAt → updatedAt
-function buildMemoRevision(
-  m: MemoRecord,
-  source: RevisionSource,
-  revisionNote: string | undefined
-): { revision: MemoRevision; currentRevNo: number } {
-  const currentRevNo = m.revisionNo ?? 0;
-  const snapshot: MemoSnapshot = {
+// Content-only snapshot of a memo — used by revision archiving and DB persistence.
+// Includes submitted content and routing fields only. Excludes all workflow execution
+// fields (status, currentStep, workflowState, returnReason, rejectReason, etc.) so the
+// snapshot stays a faithful record of what was submitted, not how it was processed.
+export function buildMemoSnapshot(m: MemoRecord): MemoSnapshot {
+  return {
     title: m.title,
     category: m.category,
     department: m.department,
@@ -95,6 +91,17 @@ function buildMemoRevision(
     routeOverrideReason: m.routeOverrideReason,
     notifyMD: m.notifyMD,
   };
+}
+
+// Shared revision builder — used by both RESUBMIT_MEMO and SUBMIT_REVISION.
+// Appends to revisions[]. The submittedAt fallback chain:
+//   revisionSubmittedAt (set on previous resubmit) → createdAt → updatedAt
+function buildMemoRevision(
+  m: MemoRecord,
+  source: RevisionSource,
+  revisionNote: string | undefined
+): { revision: MemoRevision; currentRevNo: number } {
+  const currentRevNo = m.revisionNo ?? 0;
   const revision: MemoRevision = {
     revisionNo: currentRevNo,
     source,
@@ -102,7 +109,7 @@ function buildMemoRevision(
     rejectReason: m.rejectReason,
     revisionNote,
     submittedAt: m.revisionSubmittedAt ?? m.createdAt ?? m.updatedAt,
-    snapshot,
+    snapshot: buildMemoSnapshot(m),
   };
   return { revision, currentRevNo };
 }
@@ -290,6 +297,15 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
         void persistRejectMemo(action.id, prevMemo, nextMemo, action.disposition, action.reason, action.updatedAt);
       }
+    } else if (action.type === "RESUBMIT_MEMO") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        void persistResubmitMemo(action.id, prevMemo, nextMemo, action.revisionNote, action.updatedAt);
+      }
     } else if (action.type === "MARK_READ") {
       const prevState = memos;
       const nextState = memoReducer(prevState, action);
@@ -401,6 +417,39 @@ async function persistReturnMemo(
     }
   } catch (error) {
     console.error("[MemoProvider] RETURN_MEMO persist failed", error);
+  }
+}
+
+async function persistResubmitMemo(
+  memoId: string,
+  prev: MemoRecord,
+  next: MemoRecord,
+  revisionNote: string | undefined,
+  updatedAt?: string,
+) {
+  const body: ResubmitMemoBody = {
+    oldRevisionNo: prev.revisionNo ?? 0,
+    source: prev.status === "returned" ? "return" : "rejection-allowed",
+    returnReason: prev.returnReason ?? null,
+    rejectReason: prev.rejectReason ?? null,
+    revisionNote: revisionNote ?? null,
+    oldSubmittedAt: prev.revisionSubmittedAt ?? prev.createdAt,
+    snapshotJson: JSON.stringify(buildMemoSnapshot(prev)),
+    nextCurrentStep: next.currentStep,
+    readRecipients: prev.readActions?.map((ra) => ra.recipient) ?? [],
+    updatedAt: updatedAt ?? next.updatedAt,
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/resubmit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] RESUBMIT_MEMO persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] RESUBMIT_MEMO persist failed", error);
   }
 }
 

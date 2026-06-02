@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memoReducer } from "./memo-store";
+import { buildMemoSnapshot, memoReducer } from "./memo-store";
 import { seedMemos, type MemoRecord } from "./approval";
 
 describe("memoReducer — RETURN_MEMO", () => {
@@ -605,5 +605,85 @@ describe("memoReducer — SUBMIT_REVISION", () => {
     const other: MemoRecord = { ...seedMemos[1] };
     const result = memoReducer([revBase, other], basePayload);
     expect(result.find((m) => m.id === other.id)).toEqual(other);
+  });
+});
+
+describe("buildMemoSnapshot", () => {
+  const richMemo: MemoRecord = {
+    id: "EM-2026-SNAP",
+    title: "Snapshot Test Memo",
+    requester: "ผู้ทดสอบ",
+    department: "IT",
+    category: "general-purchase",
+    amount: 15000,
+    status: "returned",
+    currentStep: "General Manager",
+    workflowState: "Checked",
+    cycleHours: 4,
+    createdAt: "01 Jun 2026 10:00",
+    updatedAt: "02 Jun 2026 14:00",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    readRecipients: ["ACC/FIN", "HR&GA"],
+    returnReason: "ต้องแก้ไขงบประมาณ",
+    rejectReason: undefined,
+    description: "รายละเอียดคำขอ",
+    budgetStatus: "in-budget",
+    routeMode: "recommended",
+    notifyMD: false,
+    revisionNo: 1,
+  };
+
+  it("includes submitted content fields: title, amount, category, selectedRoute, readRecipients", () => {
+    const snap = buildMemoSnapshot(richMemo);
+
+    expect(snap.title).toBe("Snapshot Test Memo");
+    expect(snap.amount).toBe(15000);
+    expect(snap.category).toBe("general-purchase");
+    expect(snap.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
+    expect(snap.readRecipients).toEqual(["ACC/FIN", "HR&GA"]);
+  });
+
+  it("includes routing and budget fields when present", () => {
+    const snap = buildMemoSnapshot(richMemo);
+
+    expect(snap.department).toBe("IT");
+    expect(snap.description).toBe("รายละเอียดคำขอ");
+    expect(snap.budgetStatus).toBe("in-budget");
+    expect(snap.routeMode).toBe("recommended");
+    expect(snap.notifyMD).toBe(false);
+  });
+
+  it("does not include workflow execution fields: status, currentStep, workflowState", () => {
+    const snap = buildMemoSnapshot(richMemo) as Record<string, unknown>;
+
+    expect("status" in snap).toBe(false);
+    expect("currentStep" in snap).toBe(false);
+    expect("workflowState" in snap).toBe(false);
+  });
+
+  it("does not include return/reject reason fields or identity/timing fields", () => {
+    const snap = buildMemoSnapshot(richMemo) as Record<string, unknown>;
+
+    expect("returnReason" in snap).toBe(false);
+    expect("rejectReason" in snap).toBe(false);
+    expect("id" in snap).toBe(false);
+    expect("requester" in snap).toBe(false);
+    expect("updatedAt" in snap).toBe(false);
+    expect("createdAt" in snap).toBe(false);
+    expect("revisionNo" in snap).toBe(false);
+    expect("cycleHours" in snap).toBe(false);
+  });
+
+  it("snapshot built from prevMemo is unchanged by RESUBMIT_MEMO applying to same memo", () => {
+    const returnedMemo: MemoRecord = { ...richMemo };
+    const snapBefore = buildMemoSnapshot(returnedMemo);
+    const nextState = memoReducer([returnedMemo], { type: "RESUBMIT_MEMO", id: returnedMemo.id, updatedAt: "03 Jun 2026 09:00" });
+    const snapAfter = buildMemoSnapshot(returnedMemo);
+
+    // Snapshot is derived from prevMemo; reducer mutation on nextState does not affect it
+    expect(snapBefore).toEqual(snapAfter);
+    // nextState clears returnReason from the live record, but our snapshot never had it
+    expect(nextState[0].returnReason).toBeUndefined();
+    expect("returnReason" in snapBefore).toBe(false);
   });
 });

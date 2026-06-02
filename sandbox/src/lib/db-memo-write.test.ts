@@ -7,8 +7,10 @@ import {
   buildNewMemoWorkflowAction,
   buildMarkReadPayload,
   buildRejectMemoPayload,
+  buildResubmitMemoPayload,
   buildReturnMemoPayload,
   buildSkipAllReadsPayload,
+  type ResubmitMemoBody,
 } from "./db-memo-write";
 
 describe("DB memo write helpers", () => {
@@ -372,5 +374,146 @@ describe("buildSkipAllReadsPayload", () => {
     expect(payload.workflowAction.result).toBeNull();
     expect(payload.workflowAction.reason).toBe("เร่งด่วน");
     expect(payload.workflowAction.metadata_json).toBe(JSON.stringify({ recipients: ["ACC/FIN", "HR&GA"] }));
+  });
+});
+
+describe("buildResubmitMemoPayload", () => {
+  const baseBody: ResubmitMemoBody = {
+    oldRevisionNo: 0,
+    source: "return",
+    returnReason: "เอกสารไม่ครบ",
+    rejectReason: null,
+    revisionNote: "แนบใบเสนอราคาแล้ว",
+    oldSubmittedAt: "01 Jun 2026 14:30",
+    snapshotJson: JSON.stringify({ title: "Test Memo", amount: 12000, category: "general-purchase", selectedRoute: ["Manager / Top Section"], readRecipients: ["ACC/FIN"] }),
+    nextCurrentStep: "Manager / Top Section",
+    readRecipients: ["ACC/FIN", "HR&GA"],
+    updatedAt: "02 Jun 2026 09:00",
+  };
+
+  it("memoRevision.revision_no is old; memoUpdate, workflowAction, and newReadActions use new (old + 1)", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.memoRevision.revision_no).toBe(0);
+    expect(payload.memoUpdate.revision_no).toBe(1);
+    expect(payload.workflowAction.revision_no).toBe(1);
+    expect(payload.newReadActions[0].revision_no).toBe(1);
+  });
+
+  it("revision_no arithmetic holds for any oldRevisionNo", () => {
+    const payload = buildResubmitMemoPayload({ ...baseBody, oldRevisionNo: 2 });
+
+    expect(payload.memoRevision.revision_no).toBe(2);
+    expect(payload.memoUpdate.revision_no).toBe(3);
+    expect(payload.workflowAction.revision_no).toBe(3);
+  });
+
+  it("source return → memoRevision.source is return with returnReason preserved", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.memoRevision.source).toBe("return");
+    expect(payload.memoRevision.return_reason).toBe("เอกสารไม่ครบ");
+    expect(payload.memoRevision.reject_reason).toBeNull();
+  });
+
+  it("source rejection-allowed → memoRevision.source is rejection-allowed with rejectReason preserved", () => {
+    const rejBody: ResubmitMemoBody = {
+      ...baseBody,
+      source: "rejection-allowed",
+      returnReason: null,
+      rejectReason: "ราคาเกินวงเงิน",
+    };
+    const payload = buildResubmitMemoPayload(rejBody);
+
+    expect(payload.memoRevision.source).toBe("rejection-allowed");
+    expect(payload.memoRevision.reject_reason).toBe("ราคาเกินวงเงิน");
+    expect(payload.memoRevision.return_reason).toBeNull();
+  });
+
+  it("snapshotJson is passed through verbatim to memoRevision.snapshot_json", () => {
+    const snap = JSON.stringify({ title: "My Memo", amount: 9500, category: "raw-material", selectedRoute: ["Managing Director"], readRecipients: ["IT", "HR&GA"] });
+    const payload = buildResubmitMemoPayload({ ...baseBody, snapshotJson: snap });
+
+    expect(payload.memoRevision.snapshot_json).toBe(snap);
+    const parsed = JSON.parse(payload.memoRevision.snapshot_json) as Record<string, unknown>;
+    expect(parsed.title).toBe("My Memo");
+    expect(parsed.amount).toBe(9500);
+    expect(parsed.category).toBe("raw-material");
+    expect(parsed.selectedRoute).toEqual(["Managing Director"]);
+    expect(parsed.readRecipients).toEqual(["IT", "HR&GA"]);
+  });
+
+  it("memoUpdate clears return_reason, reject_reason, reject_disposition and sets pending/Issued", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.memoUpdate.status).toBe("pending");
+    expect(payload.memoUpdate.workflow_state).toBe("Issued");
+    expect(payload.memoUpdate.return_reason).toBeNull();
+    expect(payload.memoUpdate.reject_reason).toBeNull();
+    expect(payload.memoUpdate.reject_disposition).toBeNull();
+  });
+
+  it("memoUpdate.current_step matches body.nextCurrentStep", () => {
+    const payload = buildResubmitMemoPayload({ ...baseBody, nextCurrentStep: "General Manager" });
+
+    expect(payload.memoUpdate.current_step).toBe("General Manager");
+  });
+
+  it("newReadActions has one pending entry per recipient with null acted_at and skip_reason", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.newReadActions).toHaveLength(2);
+    expect(payload.newReadActions[0]).toEqual({
+      revision_no: 1,
+      recipient_name: "ACC/FIN",
+      status: "pending",
+      acted_at: null,
+      skip_reason: null,
+      created_at: "2026-06-02 02:00:00",
+      updated_at: "2026-06-02 02:00:00",
+    });
+    expect(payload.newReadActions[1].recipient_name).toBe("HR&GA");
+  });
+
+  it("newReadActions is empty when readRecipients is empty", () => {
+    const payload = buildResubmitMemoPayload({ ...baseBody, readRecipients: [] });
+
+    expect(payload.newReadActions).toHaveLength(0);
+  });
+
+  it("workflowAction is action_type=resubmit result=quick with null step_label, actor_name, metadata_json", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.workflowAction.action_type).toBe("resubmit");
+    expect(payload.workflowAction.result).toBe("quick");
+    expect(payload.workflowAction.step_label).toBeNull();
+    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.metadata_json).toBeNull();
+  });
+
+  it("workflowAction.reason mirrors body.revisionNote (null when omitted)", () => {
+    const withNote = buildResubmitMemoPayload(baseBody);
+    const noNote = buildResubmitMemoPayload({ ...baseBody, revisionNote: null });
+
+    expect(withNote.workflowAction.reason).toBe("แนบใบเสนอราคาแล้ว");
+    expect(noNote.workflowAction.reason).toBeNull();
+  });
+
+  it("oldSubmittedAt is converted to UTC in memoRevision.submitted_at", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.memoRevision.submitted_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("updatedAt is converted to UTC in memoUpdate, workflowAction, newReadActions, and memoRevision.created_at", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+    const utc = "2026-06-02 02:00:00";
+
+    expect(payload.memoRevision.created_at).toBe(utc);
+    expect(payload.memoUpdate.updated_at).toBe(utc);
+    expect(payload.memoUpdate.revision_submitted_at).toBe(utc);
+    expect(payload.workflowAction.acted_at).toBe(utc);
+    expect(payload.newReadActions[0].created_at).toBe(utc);
+    expect(payload.newReadActions[0].updated_at).toBe(utc);
   });
 });
