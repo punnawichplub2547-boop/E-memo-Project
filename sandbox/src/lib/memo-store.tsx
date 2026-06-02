@@ -6,7 +6,13 @@ import {
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
-import type { AdvanceStepBody, RejectMemoBody, ReturnMemoBody } from "./db-memo-write";
+import type {
+  AdvanceStepBody,
+  MarkReadBody,
+  RejectMemoBody,
+  ReturnMemoBody,
+  SkipAllReadsBody,
+} from "./db-memo-write";
 
 type Action =
   | { type: "HYDRATE_MEMOS"; memos: MemoRecord[] }
@@ -284,6 +290,32 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
         void persistRejectMemo(action.id, prevMemo, nextMemo, action.disposition, action.reason, action.updatedAt);
       }
+    } else if (action.type === "MARK_READ") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      const nextReadAction = nextMemo?.readActions?.find((ra) => ra.recipient === action.recipient);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo && nextReadAction?.status === "read") {
+        void persistMarkRead(action.id, nextMemo, action.recipient, action.actedAt ?? nextReadAction.actedAt ?? nextMemo.updatedAt);
+      }
+    } else if (action.type === "SKIP_ALL_READS") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        const skippedRecipients = prevMemo.readActions
+          ?.filter((ra) => ra.status === "pending")
+          .map((ra) => ra.recipient) ?? [];
+        if (skippedRecipients.length === 0) return;
+        const actedAt = action.actedAt ??
+          nextMemo.readActions?.find((ra) => ra.status === "skipped" && skippedRecipients.includes(ra.recipient))?.actedAt ??
+          nextMemo.updatedAt;
+        void persistSkipAllReads(action.id, nextMemo, skippedRecipients, action.skipReason, actedAt);
+      }
     } else {
       reducerDispatch(action);
       if (action.type === "ADD_MEMO") {
@@ -398,6 +430,58 @@ async function persistRejectMemo(
     }
   } catch (error) {
     console.error("[MemoProvider] REJECT_MEMO persist failed", error);
+  }
+}
+
+async function persistMarkRead(
+  memoId: string,
+  next: MemoRecord,
+  recipient: string,
+  actedAt: string,
+) {
+  const body: MarkReadBody = {
+    recipient,
+    revisionNo: next.revisionNo ?? 0,
+    actedAt,
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] MARK_READ persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] MARK_READ persist failed", error);
+  }
+}
+
+async function persistSkipAllReads(
+  memoId: string,
+  next: MemoRecord,
+  recipients: string[],
+  skipReason: string,
+  actedAt: string,
+) {
+  const body: SkipAllReadsBody = {
+    recipients,
+    skipReason,
+    revisionNo: next.revisionNo ?? 0,
+    actedAt,
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/skip-reads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] SKIP_ALL_READS persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] SKIP_ALL_READS persist failed", error);
   }
 }
 

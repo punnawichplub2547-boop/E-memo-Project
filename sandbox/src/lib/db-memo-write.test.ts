@@ -5,8 +5,10 @@ import {
   buildMemoWritePayload,
   buildNewMemoReadActionRows,
   buildNewMemoWorkflowAction,
+  buildMarkReadPayload,
   buildRejectMemoPayload,
   buildReturnMemoPayload,
+  buildSkipAllReadsPayload,
 } from "./db-memo-write";
 
 describe("DB memo write helpers", () => {
@@ -312,5 +314,63 @@ describe("buildRejectMemoPayload", () => {
 
     expect(payload.workflowAction.actor_name).toBeNull();
     expect(payload.workflowAction.metadata_json).toBeNull();
+  });
+});
+
+describe("buildMarkReadPayload", () => {
+  it("marks one recipient as read and converts actedAt to UTC", () => {
+    const payload = buildMarkReadPayload({
+      recipient: "ACC/FIN",
+      revisionNo: 0,
+      actedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.readActionUpdate.status).toBe("read");
+    expect(payload.readActionUpdate.acted_at).toBe("2026-06-01 07:30:00");
+    expect(payload.readActionUpdate.updated_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("creates a read workflow action with recipient metadata", () => {
+    const payload = buildMarkReadPayload({
+      recipient: "HR&GA",
+      revisionNo: 2,
+      actedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.revision_no).toBe(2);
+    expect(payload.workflowAction.action_type).toBe("read");
+    expect(payload.workflowAction.reason).toBeNull();
+    expect(payload.workflowAction.metadata_json).toBe(JSON.stringify({ recipient: "HR&GA" }));
+  });
+});
+
+describe("buildSkipAllReadsPayload", () => {
+  it("marks pending recipients as skipped with reason and UTC timestamps", () => {
+    const payload = buildSkipAllReadsPayload({
+      recipients: ["ACC/FIN", "HR&GA"],
+      skipReason: "MD requested urgent approval",
+      revisionNo: 0,
+      actedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.readActionUpdate.status).toBe("skipped");
+    expect(payload.readActionUpdate.skip_reason).toBe("MD requested urgent approval");
+    expect(payload.readActionUpdate.acted_at).toBe("2026-06-01 07:30:00");
+    expect(payload.readActionUpdate.updated_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("creates a skip_read workflow action with skip reason and recipients metadata", () => {
+    const payload = buildSkipAllReadsPayload({
+      recipients: ["ACC/FIN", "HR&GA"],
+      skipReason: "เร่งด่วน",
+      revisionNo: 1,
+      actedAt: "01 Jun 2026 14:30",
+    });
+
+    expect(payload.workflowAction.revision_no).toBe(1);
+    expect(payload.workflowAction.action_type).toBe("skip_read");
+    expect(payload.workflowAction.result).toBeNull();
+    expect(payload.workflowAction.reason).toBe("เร่งด่วน");
+    expect(payload.workflowAction.metadata_json).toBe(JSON.stringify({ recipients: ["ACC/FIN", "HR&GA"] }));
   });
 });

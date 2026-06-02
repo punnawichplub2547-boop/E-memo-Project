@@ -1,6 +1,6 @@
 # DB-1 Schema Plan — HR&GA E-Memo Online
 
-**Status:** DB-1 implemented; DB-2 started with ADD_MEMO, ADVANCE_STEP, RETURN_MEMO, and REJECT_MEMO write persistence
+**Status:** DB-1 implemented; DB-2 started with ADD_MEMO, ADVANCE_STEP, RETURN_MEMO, REJECT_MEMO, MARK_READ, and SKIP_ALL_READS write persistence
 **Date:** 2026-06-01  
 **Target database:** MySQL 8.x  
 **Phase:** DB-1 (schema creation, seed data, read path only)  
@@ -24,7 +24,7 @@ DB-1 is the first persistence layer for the HR&GA E-Memo prototype. Its scope is
 - Normalization of `requestItems` or `priceComparisons` into their own tables
 - Real cycle time computation
 
-Write persistence is DB-2. The first DB-2 slices persist newly created memos from `ADD_MEMO`, approval advancement from `ADVANCE_STEP`, return from `RETURN_MEMO`, and rejection from `REJECT_MEMO`; read and revision mutations still update memory only. `MemoProvider` hydrates its initial state from `GET /api/memos` when available. The SA's Phase 2 roadmap is the governing design reference.
+Write persistence is DB-2. The first DB-2 slices persist newly created memos from `ADD_MEMO`, approval advancement from `ADVANCE_STEP`, return from `RETURN_MEMO`, rejection from `REJECT_MEMO`, and read acknowledgements from `MARK_READ` / `SKIP_ALL_READS`; revision mutations still update memory only. `MemoProvider` hydrates its initial state from `GET /api/memos` when available. The SA's Phase 2 roadmap is the governing design reference.
 
 ---
 

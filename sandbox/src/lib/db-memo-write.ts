@@ -189,6 +189,99 @@ export function buildRejectMemoPayload(body: RejectMemoBody): RejectMemoPayload 
   };
 }
 
+export type MarkReadBody = {
+  recipient: string;
+  revisionNo: number;
+  actedAt: string;
+};
+
+export type MarkReadPayload = {
+  readActionUpdate: {
+    status: "read";
+    acted_at: string;
+    updated_at: string;
+  };
+  workflowAction: {
+    revision_no: number;
+    action_type: "read";
+    step_label: null;
+    actor_name: null;
+    result: null;
+    reason: null;
+    acted_at: string;
+    metadata_json: string;
+  };
+};
+
+export function buildMarkReadPayload(body: MarkReadBody): MarkReadPayload {
+  const actedAtUtc = toMysqlUtcDateTime(body.actedAt);
+  return {
+    readActionUpdate: {
+      status: "read",
+      acted_at: actedAtUtc,
+      updated_at: actedAtUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: "read",
+      step_label: null,
+      actor_name: null,
+      result: null,
+      reason: null,
+      acted_at: actedAtUtc,
+      metadata_json: JSON.stringify({ recipient: body.recipient }),
+    },
+  };
+}
+
+export type SkipAllReadsBody = {
+  recipients: string[];
+  skipReason: string;
+  revisionNo: number;
+  actedAt: string;
+};
+
+export type SkipAllReadsPayload = {
+  readActionUpdate: {
+    status: "skipped";
+    skip_reason: string;
+    acted_at: string;
+    updated_at: string;
+  };
+  workflowAction: {
+    revision_no: number;
+    action_type: "skip_read";
+    step_label: null;
+    actor_name: null;
+    result: null;
+    reason: string;
+    acted_at: string;
+    metadata_json: string;
+  };
+};
+
+export function buildSkipAllReadsPayload(body: SkipAllReadsBody): SkipAllReadsPayload {
+  const actedAtUtc = toMysqlUtcDateTime(body.actedAt);
+  return {
+    readActionUpdate: {
+      status: "skipped",
+      skip_reason: body.skipReason,
+      acted_at: actedAtUtc,
+      updated_at: actedAtUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: "skip_read",
+      step_label: null,
+      actor_name: null,
+      result: null,
+      reason: body.skipReason,
+      acted_at: actedAtUtc,
+      metadata_json: JSON.stringify({ recipients: body.recipients }),
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;
