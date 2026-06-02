@@ -10,8 +10,11 @@ import {
   buildResubmitMemoPayload,
   buildReturnMemoPayload,
   buildSkipAllReadsPayload,
+  buildSubmitRevisionPayload,
   type ResubmitMemoBody,
+  type SubmitRevisionBody,
 } from "./db-memo-write";
+import { memoToDbSeedRow } from "./db-seed";
 
 describe("DB memo write helpers", () => {
   const readActions: ReadAction[] = [
@@ -515,5 +518,193 @@ describe("buildResubmitMemoPayload", () => {
     expect(payload.workflowAction.acted_at).toBe(utc);
     expect(payload.newReadActions[0].created_at).toBe(utc);
     expect(payload.newReadActions[0].updated_at).toBe(utc);
+  });
+});
+
+describe("buildSubmitRevisionPayload", () => {
+  const prevMemo: MemoRecord = {
+    id: "EM-20260601-143022-4F7",
+    title: "Old Memo Title",
+    requester: "อำภา หิงคำ",
+    department: "HR&GA",
+    category: "general-purchase",
+    amount: 5000,
+    status: "returned",
+    currentStep: "Manager / Top Section",
+    workflowState: "Issued",
+    cycleHours: 0,
+    revisionNo: 1,
+    revisionSubmittedAt: "01 Jun 2026 14:30",
+    returnReason: "เอกสารไม่ครบ",
+    createdAt: "01 Jun 2026 09:00",
+    updatedAt: "01 Jun 2026 14:30",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    readRecipients: ["ACC/FIN"],
+  };
+
+  const nextMemo: MemoRecord = {
+    ...prevMemo,
+    title: "New Revised Title",
+    amount: 15000,
+    category: "raw-material" as const,
+    status: "pending" as const,
+    workflowState: "Issued" as const,
+    revisionNo: 2,
+    returnReason: undefined,
+    rejectReason: undefined,
+    rejectDisposition: undefined,
+    updatedAt: "02 Jun 2026 09:00",
+    revisionSubmittedAt: "02 Jun 2026 09:00",
+    readActions: [{ recipient: "ACC/FIN", status: "pending" as const }],
+  };
+
+  const baseNextMemoRow = memoToDbSeedRow(nextMemo);
+  const baseSnapshotJson = JSON.stringify({
+    title: "Old Memo Title",
+    amount: 5000,
+    category: "general-purchase",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    readRecipients: ["ACC/FIN"],
+  });
+
+  const baseBody: SubmitRevisionBody = {
+    oldRevisionNo: 1,
+    source: "return",
+    returnReason: "เอกสารไม่ครบ",
+    rejectReason: null,
+    revisionNote: null,
+    oldSubmittedAt: "01 Jun 2026 14:30",
+    snapshotJson: baseSnapshotJson,
+    nextMemoRow: baseNextMemoRow,
+    readRecipients: ["ACC/FIN"],
+  };
+
+  it("memoRevision uses oldRevisionNo; memoUpdate, workflowAction, newReadActions use new (old+1)", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.memoRevision.revision_no).toBe(1);
+    expect(payload.memoUpdate.revision_no).toBe(2);
+    expect(payload.workflowAction.revision_no).toBe(2);
+    expect(payload.newReadActions[0].revision_no).toBe(2);
+  });
+
+  it("revision_no arithmetic holds for any oldRevisionNo", () => {
+    const payload = buildSubmitRevisionPayload({ ...baseBody, oldRevisionNo: 3 });
+
+    expect(payload.memoRevision.revision_no).toBe(3);
+    expect(payload.memoUpdate.revision_no).toBe(4);
+    expect(payload.workflowAction.revision_no).toBe(4);
+  });
+
+  it("overrides nextMemoRow.revision_no to oldRevisionNo+1 even when nextMemoRow has wrong value", () => {
+    const wrongRow = { ...baseNextMemoRow, revision_no: 99 };
+    const payload = buildSubmitRevisionPayload({ ...baseBody, nextMemoRow: wrongRow });
+
+    expect(payload.memoUpdate.revision_no).toBe(2);
+    expect(payload.workflowAction.revision_no).toBe(2);
+    expect(payload.newReadActions[0].revision_no).toBe(2);
+  });
+
+  it("snapshot_json contains OLD title and amount; memoUpdate contains NEW title and amount", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    const snap = JSON.parse(payload.memoRevision.snapshot_json) as Record<string, unknown>;
+    expect(snap.title).toBe("Old Memo Title");
+    expect(snap.amount).toBe(5000);
+    expect(payload.memoUpdate.title).toBe("New Revised Title");
+    expect(payload.memoUpdate.amount).toBe(15000);
+  });
+
+  it("source return → returnReason preserved, rejectReason null in memoRevision", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.memoRevision.source).toBe("return");
+    expect(payload.memoRevision.return_reason).toBe("เอกสารไม่ครบ");
+    expect(payload.memoRevision.reject_reason).toBeNull();
+  });
+
+  it("source rejection-allowed → rejectReason preserved, returnReason null in memoRevision", () => {
+    const payload = buildSubmitRevisionPayload({
+      ...baseBody,
+      source: "rejection-allowed",
+      returnReason: null,
+      rejectReason: "ราคาเกินวงเงิน",
+    });
+
+    expect(payload.memoRevision.source).toBe("rejection-allowed");
+    expect(payload.memoRevision.reject_reason).toBe("ราคาเกินวงเงิน");
+    expect(payload.memoRevision.return_reason).toBeNull();
+  });
+
+  it("snapshotJson is passed through verbatim to memoRevision.snapshot_json", () => {
+    const custom = JSON.stringify({ title: "Custom", amount: 999 });
+    const payload = buildSubmitRevisionPayload({ ...baseBody, snapshotJson: custom });
+
+    expect(payload.memoRevision.snapshot_json).toBe(custom);
+  });
+
+  it("memoUpdate carries pending/Issued status and null return/reject fields from nextMemoRow", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.memoUpdate.status).toBe("pending");
+    expect(payload.memoUpdate.workflow_state).toBe("Issued");
+    expect(payload.memoUpdate.return_reason).toBeNull();
+    expect(payload.memoUpdate.reject_reason).toBeNull();
+    expect(payload.memoUpdate.reject_disposition).toBeNull();
+  });
+
+  it("newReadActions has one pending entry per recipient with new revision_no and null timestamps", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.newReadActions).toHaveLength(1);
+    expect(payload.newReadActions[0]).toMatchObject({
+      revision_no: 2,
+      recipient_name: "ACC/FIN",
+      status: "pending",
+      acted_at: null,
+      skip_reason: null,
+    });
+  });
+
+  it("newReadActions is empty when readRecipients is empty", () => {
+    const payload = buildSubmitRevisionPayload({ ...baseBody, readRecipients: [] });
+
+    expect(payload.newReadActions).toHaveLength(0);
+  });
+
+  it("workflowAction is action_type=resubmit result=edit-and-resubmit with null step_label, actor_name, metadata_json", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.workflowAction.action_type).toBe("resubmit");
+    expect(payload.workflowAction.result).toBe("edit-and-resubmit");
+    expect(payload.workflowAction.step_label).toBeNull();
+    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.metadata_json).toBeNull();
+  });
+
+  it("workflowAction.reason and memoRevision.revision_note mirror body.revisionNote", () => {
+    const withNote = buildSubmitRevisionPayload({ ...baseBody, revisionNote: "แก้ไขราคา" });
+    const noNote = buildSubmitRevisionPayload(baseBody);
+
+    expect(withNote.workflowAction.reason).toBe("แก้ไขราคา");
+    expect(withNote.memoRevision.revision_note).toBe("แก้ไขราคา");
+    expect(noNote.workflowAction.reason).toBeNull();
+    expect(noNote.memoRevision.revision_note).toBeNull();
+  });
+
+  it("oldSubmittedAt is converted to UTC in memoRevision.submitted_at", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+
+    expect(payload.memoRevision.submitted_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("memoRevision.created_at, workflowAction.acted_at, and newReadActions timestamps equal nextMemoRow.updated_at verbatim (no re-conversion)", () => {
+    const payload = buildSubmitRevisionPayload(baseBody);
+    const expected = baseNextMemoRow.updated_at;
+
+    expect(payload.memoRevision.created_at).toBe(expected);
+    expect(payload.workflowAction.acted_at).toBe(expected);
+    expect(payload.newReadActions[0].created_at).toBe(expected);
+    expect(payload.newReadActions[0].updated_at).toBe(expected);
   });
 });

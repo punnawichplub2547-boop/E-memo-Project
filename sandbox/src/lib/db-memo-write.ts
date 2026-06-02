@@ -392,6 +392,93 @@ export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPa
   };
 }
 
+export type SubmitRevisionBody = {
+  oldRevisionNo: number;
+  source: "return" | "rejection-allowed";
+  returnReason: string | null;
+  rejectReason: string | null;
+  revisionNote: string | null;
+  // Bangkok display-format ("DD Mon YYYY HH:MM") — toMysqlUtcDateTime is applied internally
+  oldSubmittedAt: string;
+  // Pre-serialized JSON string from buildMemoSnapshot(prevMemo). Caller must use prevMemo,
+  // not nextMemo — this is the old content snapshot, not the new form submission.
+  snapshotJson: string;
+  // From memoToDbSeedRow(nextMemo): timestamps (updated_at, revision_submitted_at) are
+  // already UTC ("YYYY-MM-DD HH:MM:SS"). Do NOT call toMysqlUtcDateTime on any field inside.
+  nextMemoRow: MemoSeedRow;
+  readRecipients: string[];
+};
+
+export type SubmitRevisionPayload = {
+  memoRevision: {
+    revision_no: number;
+    source: string;
+    return_reason: string | null;
+    reject_reason: string | null;
+    revision_note: string | null;
+    submitted_at: string;
+    snapshot_json: string;
+    revision_impact: null;
+    created_at: string;
+  };
+  // nextMemoRow with revision_no forced to oldRevisionNo+1 regardless of nextMemoRow.revision_no.
+  // Identity fields (memo_no, requester_name, created_at) are present but must NOT be
+  // included in the DB UPDATE — they are immutable after INSERT.
+  memoUpdate: MemoSeedRow;
+  newReadActions: ResubmitMemoReadActionRow[];
+  workflowAction: {
+    revision_no: number;
+    action_type: "resubmit";
+    step_label: null;
+    actor_name: null;
+    result: "edit-and-resubmit";
+    reason: string | null;
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevisionPayload {
+  const oldSubmittedAtUtc = toMysqlUtcDateTime(body.oldSubmittedAt);
+  // nextMemoRow.updated_at is already UTC from memoToDbSeedRow — pass through verbatim.
+  const updatedAtUtc = body.nextMemoRow.updated_at;
+  // Force newRevisionNo from body.oldRevisionNo to prevent drift if nextMemoRow has a stale value.
+  const newRevisionNo = body.oldRevisionNo + 1;
+  return {
+    memoRevision: {
+      revision_no: body.oldRevisionNo,
+      source: body.source,
+      return_reason: body.returnReason,
+      reject_reason: body.rejectReason,
+      revision_note: body.revisionNote,
+      submitted_at: oldSubmittedAtUtc,
+      snapshot_json: body.snapshotJson,
+      revision_impact: null,
+      created_at: updatedAtUtc,
+    },
+    memoUpdate: { ...body.nextMemoRow, revision_no: newRevisionNo },
+    newReadActions: body.readRecipients.map((recipient) => ({
+      revision_no: newRevisionNo,
+      recipient_name: recipient,
+      status: "pending" as const,
+      acted_at: null,
+      skip_reason: null,
+      created_at: updatedAtUtc,
+      updated_at: updatedAtUtc,
+    })),
+    workflowAction: {
+      revision_no: newRevisionNo,
+      action_type: "resubmit",
+      step_label: null,
+      actor_name: null,
+      result: "edit-and-resubmit",
+      reason: body.revisionNote,
+      acted_at: updatedAtUtc,
+      metadata_json: null,
+    },
+  };
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;

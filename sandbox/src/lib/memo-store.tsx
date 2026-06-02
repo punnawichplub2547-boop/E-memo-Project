@@ -6,6 +6,7 @@ import {
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
+import { memoToDbSeedRow } from "./db-seed";
 import type {
   AdvanceStepBody,
   MarkReadBody,
@@ -13,6 +14,7 @@ import type {
   ResubmitMemoBody,
   ReturnMemoBody,
   SkipAllReadsBody,
+  SubmitRevisionBody,
 } from "./db-memo-write";
 
 type Action =
@@ -306,6 +308,15 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
         void persistResubmitMemo(action.id, prevMemo, nextMemo, action.revisionNote, action.updatedAt);
       }
+    } else if (action.type === "SUBMIT_REVISION") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        void persistSubmitRevisionMemo(action.id, prevMemo, nextMemo, action.revisionNote);
+      }
     } else if (action.type === "MARK_READ") {
       const prevState = memos;
       const nextState = memoReducer(prevState, action);
@@ -450,6 +461,42 @@ async function persistResubmitMemo(
     }
   } catch (error) {
     console.error("[MemoProvider] RESUBMIT_MEMO persist failed", error);
+  }
+}
+
+async function persistSubmitRevisionMemo(
+  memoId: string,
+  prev: MemoRecord,
+  next: MemoRecord,
+  revisionNote: string | undefined,
+) {
+  const body: SubmitRevisionBody = {
+    oldRevisionNo: prev.revisionNo ?? 0,
+    source: prev.status === "returned" ? "return" : "rejection-allowed",
+    returnReason: prev.returnReason ?? null,
+    rejectReason: prev.rejectReason ?? null,
+    revisionNote: revisionNote ?? null,
+    // prev used here: old submitted-at timestamp for the revision archive entry
+    oldSubmittedAt: prev.revisionSubmittedAt ?? prev.createdAt,
+    // prev used here: snapshot of OLD content — must NOT use next
+    snapshotJson: JSON.stringify(buildMemoSnapshot(prev)),
+    // next used here: full updated live row with new form content already applied
+    nextMemoRow: memoToDbSeedRow(next),
+    readRecipients: next.readActions?.map((ra) => ra.recipient) ??
+                    next.readRecipients ??
+                    [],
+  };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/submit-revision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] SUBMIT_REVISION persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] SUBMIT_REVISION persist failed", error);
   }
 }
 

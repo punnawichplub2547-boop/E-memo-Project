@@ -1,6 +1,6 @@
 # DB-1 Schema Plan — HR&GA E-Memo Online
 
-**Status:** DB-1 implemented; DB-2 started with ADD_MEMO, ADVANCE_STEP, RETURN_MEMO, REJECT_MEMO, MARK_READ, SKIP_ALL_READS, and RESUBMIT_MEMO write persistence
+**Status:** DB-1 implemented; DB-2 complete with ADD_MEMO, ADVANCE_STEP, RETURN_MEMO, REJECT_MEMO, MARK_READ, SKIP_ALL_READS, RESUBMIT_MEMO, and SUBMIT_REVISION write persistence
 **Date:** 2026-06-01  
 **Target database:** MySQL 8.x  
 **Phase:** DB-1 (schema creation, seed data, read path only)  
@@ -16,7 +16,7 @@ DB-1 is the first persistence layer for the HR&GA E-Memo prototype. Its scope is
 - Insert the eight seed memos from `seedMemos` in `approval.ts`
 - Expose a read-path API that returns `MemoRecord`-shaped JSON to the existing frontend without requiring any frontend code changes
 
-**DB-1 does NOT include:**
+**Original DB-1 scope did NOT include:**
 
 - Write persistence for any workflow mutation: `ADD_MEMO`, `ADVANCE_STEP`, `RETURN_MEMO`, `REJECT_MEMO`, `MARK_READ`, `SKIP_ALL_READS`, `RESUBMIT_MEMO`, `SUBMIT_REVISION`
 - Authentication or real user records
@@ -24,7 +24,7 @@ DB-1 is the first persistence layer for the HR&GA E-Memo prototype. Its scope is
 - Normalization of `requestItems` or `priceComparisons` into their own tables
 - Real cycle time computation
 
-Write persistence is DB-2. The first DB-2 slices persist newly created memos from `ADD_MEMO`, approval advancement from `ADVANCE_STEP`, return from `RETURN_MEMO`, rejection from `REJECT_MEMO`, read acknowledgements from `MARK_READ` / `SKIP_ALL_READS`, and quick resubmit from `RESUBMIT_MEMO`; `SUBMIT_REVISION` still updates memory only. `MemoProvider` hydrates its initial state from `GET /api/memos` when available. The SA's Phase 2 roadmap is the governing design reference.
+Write persistence was added in DB-2. All eight reducer write actions are now persisted: newly created memos (`ADD_MEMO`), approval advancement (`ADVANCE_STEP`), return-for-revision (`RETURN_MEMO`), rejection (`REJECT_MEMO`), read acknowledgements (`MARK_READ` / `SKIP_ALL_READS`), quick resubmit (`RESUBMIT_MEMO`), and edit-and-resubmit (`SUBMIT_REVISION`). `MemoProvider` hydrates its initial state from `GET /api/memos` when available. The SA's Phase 2 roadmap is the governing design reference.
 
 ---
 
@@ -510,10 +510,10 @@ The mapping below covers every `MemoRecord` field. Fields whose destination is `
 
 ## 7. What Is Deferred
 
-**Deferred to DB-2 (write path):**
+**Implemented in DB-2 (write path):**
 
 - All write endpoints for workflow mutations listed in §1
-- Populating `workflow_step_actions` from live user actions; only seed `submit` rows in DB-1
+- Populating `workflow_step_actions` from live user actions
 - The `read_actions` resubmit reset logic using `revision_no`
 
 **Deferred to Phase 3 (workflow engine):**

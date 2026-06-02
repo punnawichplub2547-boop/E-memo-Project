@@ -14,7 +14,7 @@ cd Hrproject/sandbox
 docker compose up -d --build
 ```
 
-The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. New memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, and quick resubmit are persisted to DB; edit-and-resubmit (`SUBMIT_REVISION`) still remains in-memory prototype state.
+The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. All write actions are persisted to DB: new memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, quick resubmit, and edit-and-resubmit.
 
 ## Keep It Running
 
@@ -58,7 +58,7 @@ Seed the DB-1 tables from the current prototype `seedMemos` data:
 npm.cmd run db:seed
 ```
 
-The seed script inserts eight memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data until DB-2 write persistence exists.
+The seed script inserts eight memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data or intentional local resets.
 
 ## Recommended Server Checks
 
@@ -89,8 +89,7 @@ docker compose up -d --build
 
 ## Notes
 
-- New memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, and quick resubmit are persisted to DB.
-- Edit-and-resubmit (`SUBMIT_REVISION`) is still prototype in-memory state.
-- MySQL backs the DB-1 read path through `GET /api/memos`; write persistence starts in DB-2.
+- All eight DB-2 write actions are persisted to DB: new memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, quick resubmit, and edit-and-resubmit.
+- MySQL backs the DB-1 read path through `GET /api/memos`; DB-2 adds write persistence for the reducer actions.
 - If port `3000` is already used on the server, change the left side of `3000:3000` in `compose.yaml`.
 - If port `3307` is already used on the server, set `MYSQL_HOST_PORT` to another free host port. The container-side port stays `3306`.
