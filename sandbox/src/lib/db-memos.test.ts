@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializeMemoRecord, toBangkokDisplayTimestamp } from "./db-memos";
+import { serializeMemoRecord, serializeWorkflowAction, toBangkokDisplayTimestamp, type WorkflowActionDbRow } from "./db-memos";
 
 describe("DB memo serializer", () => {
   it("maps memo_no to MemoRecord.id instead of exposing the DB primary key", () => {
@@ -197,5 +197,86 @@ describe("DB memo serializer", () => {
         },
       },
     ]);
+  });
+});
+
+describe("serializeWorkflowAction", () => {
+  const baseRow: WorkflowActionDbRow = {
+    revision_no: 0,
+    action_type: "submit",
+    step_label: null,
+    actor_name: null,
+    result: null,
+    reason: null,
+    acted_at: "2026-06-01 07:30:00",
+    metadata_json: null,
+  };
+
+  it("converts acted_at UTC datetime string to Bangkok display format", () => {
+    const action = serializeWorkflowAction("EM-001", baseRow);
+
+    expect(action.actedAt).toBe("01 Jun 2026 14:30");
+  });
+
+  it("converts acted_at Date object to Bangkok display format", () => {
+    const date = new Date("2026-06-01T07:30:00Z");
+    const action = serializeWorkflowAction("EM-001", { ...baseRow, acted_at: date });
+
+    expect(action.actedAt).toBe("01 Jun 2026 14:30");
+  });
+
+  it("passes memoNo through to the output field", () => {
+    const action = serializeWorkflowAction("EM-20260601-143022-4F7", baseRow);
+
+    expect(action.memoNo).toBe("EM-20260601-143022-4F7");
+  });
+
+  it("maps snake_case DB fields to camelCase output and preserves non-null string values", () => {
+    const action = serializeWorkflowAction("EM-001", {
+      ...baseRow,
+      revision_no: 2,
+      action_type: "approve",
+      step_label: "General Manager",
+      actor_name: "สมชาย ใจดี",
+      result: "final",
+      reason: "เอกสารครบถ้วน",
+    });
+
+    expect(action.revisionNo).toBe(2);
+    expect(action.actionType).toBe("approve");
+    expect(action.stepLabel).toBe("General Manager");
+    expect(action.actorName).toBe("สมชาย ใจดี");
+    expect(action.result).toBe("final");
+    expect(action.reason).toBe("เอกสารครบถ้วน");
+  });
+
+  it("parses metadata_json string to a plain object in output.metadata", () => {
+    const action = serializeWorkflowAction("EM-001", {
+      ...baseRow,
+      action_type: "read",
+      metadata_json: JSON.stringify({ recipient: "ACC/FIN" }),
+    });
+
+    expect(action.metadata).toEqual({ recipient: "ACC/FIN" });
+  });
+
+  it("passes through already-parsed metadata_json object (mysql2 JSON column auto-parse case)", () => {
+    const action = serializeWorkflowAction("EM-001", {
+      ...baseRow,
+      action_type: "skip_read",
+      metadata_json: { recipients: ["ACC/FIN", "HR&GA"] },
+    });
+
+    expect(action.metadata).toEqual({ recipients: ["ACC/FIN", "HR&GA"] });
+  });
+
+  it("returns null for metadata and all optional string fields when DB row has nulls", () => {
+    const action = serializeWorkflowAction("EM-001", baseRow);
+
+    expect(action.metadata).toBeNull();
+    expect(action.stepLabel).toBeNull();
+    expect(action.actorName).toBeNull();
+    expect(action.result).toBeNull();
+    expect(action.reason).toBeNull();
   });
 });

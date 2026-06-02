@@ -172,6 +172,53 @@ function serializeMemoRevisions(rows: MemoRevisionDbRow[]): MemoRevision[] | und
   }));
 }
 
+export type WorkflowActionDbRow = {
+  revision_no: number;
+  action_type: string;
+  step_label: string | null;
+  actor_name: string | null;
+  result: string | null;
+  reason: string | null;
+  acted_at: DbDate;
+  // mysql2 may return JSON columns as a pre-parsed object or as a string
+  metadata_json: DbJsonObject | null;
+};
+
+export type WorkflowAction = {
+  memoNo: string;
+  revisionNo: number;
+  actionType: string;
+  stepLabel: string | null;
+  actorName: string | null;
+  result: string | null;
+  reason: string | null;
+  actedAt: string;
+  metadata: Record<string, unknown> | null;
+};
+
+export function serializeWorkflowAction(
+  memoNo: string,
+  row: WorkflowActionDbRow,
+): WorkflowAction {
+  return {
+    memoNo,
+    revisionNo: row.revision_no,
+    actionType: row.action_type,
+    stepLabel: row.step_label ?? null,
+    actorName: row.actor_name ?? null,
+    result: row.result ?? null,
+    reason: row.reason ?? null,
+    actedAt: toBangkokDisplayTimestamp(row.acted_at),
+    metadata: parseWorkflowMetadata(row.metadata_json),
+  };
+}
+
+function parseWorkflowMetadata(value: DbJsonObject | null): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === "string") return JSON.parse(value) as Record<string, unknown>;
+  return value as Record<string, unknown>;
+}
+
 function parseJsonArray<T>(value: DbJson): T[] | undefined {
   if (!value) return undefined;
   if (Array.isArray(value)) return value as T[];

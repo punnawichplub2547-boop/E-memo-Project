@@ -7,6 +7,7 @@ import {
   IconPrinter, IconX, IconReturn, IconPen,
 } from "@/components/icons";
 import { DrawerFooter } from "./drawer-footer";
+import { AuditLogSection } from "./audit-log-section";
 
 const routeSummary = (memo: MemoRecord) =>
   memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
@@ -578,6 +579,11 @@ export function DrawerPanel({
             </div>
           </section>
         )}
+
+        {/* Audit Log — append-only DB events from workflow_step_actions.
+            Distinct from the Approval Route section above, which shows current workflow state.
+            Collapsed by default; fetches lazily on first expand. */}
+        <AuditLogSection memoId={memo.id} />
       </div>
 
       <DrawerFooter
