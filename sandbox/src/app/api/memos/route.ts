@@ -9,11 +9,15 @@ import {
   buildNewMemoWorkflowAction,
 } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
-import { serializeMemoRecord, type MemoDbRow, type ReadActionDbRow } from "@/lib/db-memos";
+import { serializeMemoRecord, type MemoDbRow, type MemoRevisionDbRow, type ReadActionDbRow } from "@/lib/db-memos";
 
 export const dynamic = "force-dynamic";
 
 type ReadActionRowWithMemo = ReadActionDbRow & {
+  memo_id: number;
+};
+
+type MemoRevisionRowWithMemo = MemoRevisionDbRow & {
   memo_id: number;
 };
 
@@ -29,6 +33,12 @@ export async function GET() {
        JOIN memos m ON ra.memo_id = m.id AND ra.revision_no = m.revision_no
        ORDER BY ra.id ASC`
     );
+    const [revisionRows] = await pool.query<QueryRows<MemoRevisionRowWithMemo>>(
+      `SELECT memo_id, revision_no, source, return_reason, reject_reason,
+              revision_note, submitted_at, snapshot_json
+       FROM memo_revisions
+       ORDER BY memo_id ASC, revision_no ASC, id ASC`
+    );
 
     const readsByMemoId = new Map<number, ReadActionDbRow[]>();
     for (const row of readRows) {
@@ -37,8 +47,19 @@ export async function GET() {
       readsByMemoId.set(row.memo_id, rows);
     }
 
+    const revisionsByMemoId = new Map<number, MemoRevisionDbRow[]>();
+    for (const row of revisionRows) {
+      const rows = revisionsByMemoId.get(row.memo_id) ?? [];
+      rows.push(row);
+      revisionsByMemoId.set(row.memo_id, rows);
+    }
+
     return NextResponse.json(
-      memoRows.map((row) => serializeMemoRecord(row, readsByMemoId.get(row.id) ?? []))
+      memoRows.map((row) => serializeMemoRecord(
+        row,
+        readsByMemoId.get(row.id) ?? [],
+        revisionsByMemoId.get(row.id) ?? [],
+      ))
     );
   } catch (error) {
     console.error("[GET /api/memos]", error);

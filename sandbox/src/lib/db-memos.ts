@@ -4,6 +4,8 @@ import type {
   ApprovalRouteMode,
   BudgetStatus,
   MemoRecord,
+  MemoRevision,
+  MemoSnapshot,
   MemoStatus,
   PriceComparison,
   ReadAction,
@@ -15,6 +17,7 @@ import type {
 type DbDate = string | Date;
 type DbBoolean = boolean | 0 | 1;
 type DbJson = string | unknown[] | null;
+type DbJsonObject = string | Record<string, unknown>;
 type DbNumber = string | number | null;
 
 export type MemoDbRow = {
@@ -67,7 +70,21 @@ export type ReadActionDbRow = {
   skip_reason: string | null;
 };
 
-export function serializeMemoRecord(row: MemoDbRow, readActions: ReadActionDbRow[]): MemoRecord {
+export type MemoRevisionDbRow = {
+  revision_no: number;
+  source: string;
+  return_reason: string | null;
+  reject_reason: string | null;
+  revision_note: string | null;
+  submitted_at: DbDate;
+  snapshot_json: DbJsonObject;
+};
+
+export function serializeMemoRecord(
+  row: MemoDbRow,
+  readActions: ReadActionDbRow[],
+  revisions: MemoRevisionDbRow[] = [],
+): MemoRecord {
   return {
     id: row.memo_no,
     title: row.title,
@@ -107,6 +124,7 @@ export function serializeMemoRecord(row: MemoDbRow, readActions: ReadActionDbRow
     requestItems: parseJsonArray<RequestItem>(row.request_items_json),
     readRecipients: parseJsonArray<string>(row.read_recipients_json),
     readActions: serializeReadActions(readActions),
+    revisions: serializeMemoRevisions(revisions),
     createdAt: toBangkokDisplayTimestamp(row.created_at),
     updatedAt: toBangkokDisplayTimestamp(row.updated_at),
   };
@@ -141,11 +159,29 @@ function serializeReadActions(rows: ReadActionDbRow[]): ReadAction[] | undefined
   }));
 }
 
+function serializeMemoRevisions(rows: MemoRevisionDbRow[]): MemoRevision[] | undefined {
+  if (rows.length === 0) return undefined;
+  return rows.map((row) => ({
+    revisionNo: row.revision_no,
+    source: row.source as MemoRevision["source"],
+    returnReason: optional(row.return_reason),
+    rejectReason: optional(row.reject_reason),
+    revisionNote: optional(row.revision_note),
+    submittedAt: toBangkokDisplayTimestamp(row.submitted_at),
+    snapshot: parseJsonObject<MemoSnapshot>(row.snapshot_json),
+  }));
+}
+
 function parseJsonArray<T>(value: DbJson): T[] | undefined {
   if (!value) return undefined;
   if (Array.isArray(value)) return value as T[];
   const parsed = JSON.parse(value);
   return Array.isArray(parsed) && parsed.length > 0 ? parsed as T[] : undefined;
+}
+
+function parseJsonObject<T>(value: DbJsonObject): T {
+  if (typeof value === "string") return JSON.parse(value) as T;
+  return value as T;
 }
 
 function toNumber(value: DbNumber): number | undefined {

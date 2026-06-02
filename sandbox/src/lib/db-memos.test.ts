@@ -118,4 +118,84 @@ describe("DB memo serializer", () => {
   it("formats UTC DATETIME values as Bangkok display timestamps", () => {
     expect(toBangkokDisplayTimestamp("2026-05-17 10:00:00")).toBe("17 May 2026 17:00");
   });
+
+  it("decodes memo revision rows into MemoRecord.revisions", () => {
+    const memo = serializeMemoRecord({
+      id: 7,
+      memo_no: "EM-2026-REV",
+      title: "Current memo",
+      requester_name: "Requester",
+      department_name: "HR&GA",
+      category: "general-purchase",
+      amount: 15000,
+      budget_status: null,
+      account_code: null,
+      budget_plan: null,
+      budget_used: null,
+      description: null,
+      status: "pending",
+      workflow_state: "Issued",
+      current_step: "Manager / Top Section",
+      cycle_hours: 0,
+      recommended_final_approver: null,
+      recommended_route_json: null,
+      selected_route_json: null,
+      route_mode: null,
+      route_override_reason: null,
+      notify_md: 0,
+      is_price_adjustment: 0,
+      follows_production_plan: 0,
+      is_dead_stock: 0,
+      dept_monthly_over_budget_total: null,
+      return_reason: null,
+      reject_reason: null,
+      reject_disposition: null,
+      revision_no: 1,
+      revision_submitted_at: "2026-06-02 03:10:00",
+      revision_note: "Quick resubmit",
+      price_comparisons_json: null,
+      selected_vendor_id: null,
+      selected_vendor_reason: null,
+      price_adjustment_reason: null,
+      request_items_json: null,
+      read_recipients_json: null,
+      created_at: "2026-06-02 03:00:00",
+      updated_at: "2026-06-02 03:10:00",
+    }, [], [
+      {
+        revision_no: 0,
+        source: "return",
+        return_reason: "Please add quotation",
+        reject_reason: null,
+        revision_note: "Quick resubmit",
+        submitted_at: "2026-06-02 03:00:00",
+        snapshot_json: JSON.stringify({
+          title: "Original memo",
+          category: "general-purchase",
+          department: "HR&GA",
+          amount: 15000,
+          selectedRoute: ["Manager / Top Section"],
+          readRecipients: ["ACC/FIN"],
+        }),
+      },
+    ]);
+
+    expect(memo.revisions).toEqual([
+      {
+        revisionNo: 0,
+        source: "return",
+        returnReason: "Please add quotation",
+        revisionNote: "Quick resubmit",
+        submittedAt: "02 Jun 2026 10:00",
+        snapshot: {
+          title: "Original memo",
+          category: "general-purchase",
+          department: "HR&GA",
+          amount: 15000,
+          selectedRoute: ["Manager / Top Section"],
+          readRecipients: ["ACC/FIN"],
+        },
+      },
+    ]);
+  });
 });
