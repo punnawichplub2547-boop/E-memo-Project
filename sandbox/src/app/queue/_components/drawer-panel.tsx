@@ -515,8 +515,12 @@ export function DrawerPanel({
             {(memo.selectedRoute ?? [memo.currentStep]).map((step, i, arr) => {
               const currentIdx = arr.indexOf(memo.currentStep);
               const isApproved = memo.status === "approved";
-              const isDone = isApproved || i < currentIdx;
-              const isCurrent = !isApproved && i === currentIdx;
+              // Guard: if currentStep is absent from the route (state drift or a
+              // seed memo whose selectedRoute is inconsistent), treat the first
+              // step as current instead of silently marking every step "pending".
+              const effectiveIdx = currentIdx !== -1 ? currentIdx : 0;
+              const isDone = isApproved || i < effectiveIdx;
+              const isCurrent = !isApproved && i === effectiveIdx;
               const isMdStep = step === "Managing Director";
               return (
                 <div
