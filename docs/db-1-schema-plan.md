@@ -566,7 +566,7 @@ All eight seed memos:
 
 ### workflow_step_actions for seeds
 
-Insert one row per seed memo: `action_type = 'submit'`, `acted_at = created_at` (UTC), `actor_name = NULL`, `step_label = NULL`. This gives the history page a baseline "Requester submitted" event for each seed memo. No check, read, or approve rows are inserted — the seeds' intermediate states are prototype artifacts not granular enough to reconstruct.
+Insert one row per seed memo: `action_type = 'submit'`, `acted_at = created_at` (UTC), `actor_name = requester_name`, `step_label = NULL`. This gives the audit path a baseline "Requester submitted" event for each seed memo. No check, read, or approve rows are inserted — the seeds' intermediate states are prototype artifacts not granular enough to reconstruct.
 
 ---
 
@@ -662,7 +662,7 @@ Verify by loading `/queue` and confirming:
 
 **revision_impact is always NULL.** The column exists as a placeholder. No application logic reads it in DB-1 or DB-2. It will not cause errors.
 
-**actor_name is always the mock user "อำภา หิงคำ".** All seed `workflow_step_actions` rows and all DB-2 write rows carry this name until Phase 5 replaces it with `actor_user_id`. Correct for an auditable single-user prototype.
+**actor_name is prototype identity only.** Seed `workflow_step_actions` rows use each seed memo's `requester_name`; DB-2 live write rows use the mock logged-in user "อำภา หิงคำ" until Phase 5 replaces this with `actor_user_id`. Correct for an auditable single-user prototype, but not production identity.
 
 **MySQL vs SQLite.** The SA targets MySQL 8, and the schema above is written for MySQL 8. Docker Compose now includes a MySQL 8 service for DB-1 schema validation. If SQLite is chosen later for faster prototype iteration, treat it as a temporary adapter: SQLite stores JSON as text with JSON functions rather than MySQL's native JSON column behavior, so schema and migration SQL must be adjusted deliberately.
 

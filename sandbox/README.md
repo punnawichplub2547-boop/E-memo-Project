@@ -81,7 +81,7 @@ Seed the DB-1 tables from the current `seedMemos` prototype data:
 npm.cmd run db:seed
 ```
 
-The seed script inserts 8 memos and one `submit` workflow action per memo. It is idempotent for prototype use: it clears the four DB-1 tables before re-inserting the seed data.
+The seed script inserts 8 mock/demo memos and one `submit` workflow action per memo. It is idempotent for prototype use: it clears the four DB-1 tables before re-inserting the seed data. Do not run `db:seed` against any environment that already contains real trial/user data.
 
 ## Current Scope
 
