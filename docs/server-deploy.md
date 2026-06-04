@@ -60,6 +60,14 @@ npm.cmd run db:seed
 
 The seed script inserts eight mock/demo memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data or intentional local resets. For a real-user trial, start with an empty DB or a separate sanitized seed process instead of running `db:seed`.
 
+`db:seed` now refuses to run against non-local database URLs unless the reset is explicitly confirmed. When the server target is intentionally disposable demo data, run:
+
+```powershell
+$env:CONFIRM_DB_SEED="YES"
+npm.cmd run db:seed
+Remove-Item Env:\CONFIRM_DB_SEED
+```
+
 ## Recommended Server Checks
 
 Make sure Docker starts on boot:

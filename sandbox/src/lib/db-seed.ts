@@ -70,6 +70,18 @@ const MONTHS: Record<string, number> = {
   Dec: 11,
 };
 
+export function assertSeedAllowed(databaseUrl: string, confirmation: string | undefined): void {
+  const { hostname } = new URL(databaseUrl);
+  const isLocal = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  if (isLocal || confirmation === "YES") return;
+
+  throw new Error(
+    `Refusing to seed non-local database "${hostname}". ` +
+      "db:seed clears prototype tables before inserting mock/demo data. " +
+      "Set CONFIRM_DB_SEED=YES only when this reset is intentional."
+  );
+}
+
 export function toMysqlUtcDateTime(displayTimestamp: string): string {
   const match = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{4}) (\d{2}):(\d{2})$/.exec(displayTimestamp);
   if (!match) {

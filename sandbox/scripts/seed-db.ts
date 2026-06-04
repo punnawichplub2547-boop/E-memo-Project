@@ -1,12 +1,13 @@
 import mysql from "mysql2/promise";
 import { seedMemos } from "../src/lib/approval";
-import { buildSeedWorkflowAction, memoToDbSeedRow, type MemoSeedRow } from "../src/lib/db-seed";
+import { assertSeedAllowed, buildSeedWorkflowAction, memoToDbSeedRow, type MemoSeedRow } from "../src/lib/db-seed";
 
 const DEFAULT_DATABASE_URL = "mysql://hr_ememo:hr_ememo_dev_password@127.0.0.1:3307/hr_ememo";
 type SqlValue = string | number | boolean | null;
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
+  assertSeedAllowed(databaseUrl, process.env.CONFIRM_DB_SEED);
   const connection = await mysql.createConnection(databaseUrl);
 
   try {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedMemos } from "./approval";
-import { buildSeedWorkflowAction, memoToDbSeedRow, toMysqlUtcDateTime } from "./db-seed";
+import { assertSeedAllowed, buildSeedWorkflowAction, memoToDbSeedRow, toMysqlUtcDateTime } from "./db-seed";
 
 describe("DB seed helpers", () => {
   it("converts Bangkok display timestamps to UTC MySQL DATETIME strings", () => {
@@ -46,5 +46,23 @@ describe("DB seed helpers", () => {
     expect(action.acted_at).toBe(row.created_at);
     expect(action.actor_name).toBe(seedMemos[0].requester);
     expect(action.step_label).toBeNull();
+  });
+
+  it("allows seeding the default local MySQL URL without an explicit confirmation", () => {
+    expect(() =>
+      assertSeedAllowed("mysql://hr_ememo:password@127.0.0.1:3307/hr_ememo", undefined)
+    ).not.toThrow();
+  });
+
+  it("blocks seeding a non-local MySQL URL unless explicitly confirmed", () => {
+    expect(() =>
+      assertSeedAllowed("mysql://hr_ememo:password@hr-ememo-db:3306/hr_ememo", undefined)
+    ).toThrow(/Refusing to seed non-local database/);
+  });
+
+  it("allows seeding a non-local MySQL URL when explicitly confirmed", () => {
+    expect(() =>
+      assertSeedAllowed("mysql://hr_ememo:password@hr-ememo-db:3306/hr_ememo", "YES")
+    ).not.toThrow();
   });
 });

@@ -83,6 +83,14 @@ npm.cmd run db:seed
 
 The seed script inserts 8 mock/demo memos and one `submit` workflow action per memo. It is idempotent for prototype use: it clears the four DB-1 tables before re-inserting the seed data. Do not run `db:seed` against any environment that already contains real trial/user data.
 
+`db:seed` runs without extra confirmation only for local database URLs (`127.0.0.1`, `localhost`, or `::1`). If `DATABASE_URL` points to a non-local host such as a Compose service on a server, the script exits unless the destructive reset is explicitly confirmed:
+
+```powershell
+$env:CONFIRM_DB_SEED="YES"
+npm.cmd run db:seed
+Remove-Item Env:\CONFIRM_DB_SEED
+```
+
 ## Current Scope
 
 - Dashboard for memo volume, pending approvals, approval cycle time, and approval queue.
