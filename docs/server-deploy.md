@@ -4,7 +4,7 @@ This project can be deployed on a Linux server with plain Docker Engine. Docker 
 
 ## Recommended Runtime
 
-Use `docker compose` with the included [compose.yaml](/D:/Hrproject/sandbox/compose.yaml) because it keeps the run command stable and supports restart policy cleanly.
+Use `docker compose` with the included [compose.yaml](/D:/Hrproject/sandbox/compose.yaml) because it keeps the run command stable and supports restart policy cleanly. `compose.yaml` is the canonical Compose file; remove any stale `docker-compose.yml` copy on the server so Docker Compose does not warn about multiple config files.
 
 ## First Deploy
 

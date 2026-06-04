@@ -44,7 +44,9 @@ For a server that should keep the app running continuously, use Docker Compose:
 docker compose up -d --build
 ```
 
-This project ships with `compose.yaml` using:
+This project intentionally ships with a single Compose file: `compose.yaml`. Older local copies may still have `docker-compose.yml`; remove it if present so Docker Compose does not warn about multiple config files.
+
+`compose.yaml` uses:
 
 - `restart: unless-stopped`
 - fixed container name: `hr-ememo-sandbox`
