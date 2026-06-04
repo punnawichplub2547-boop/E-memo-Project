@@ -205,7 +205,9 @@ function CreatePageContent() {
   };
   const handleSelectVendor = (id: string) => {
     setPriceComparisons(prev => prev.map(row => ({ ...row, isSelected: row.id === id })));
-    setSelectedVendorReason("");
+    // Only wipe the override reason when the selected vendor actually changes.
+    const currentSelected = priceComparisons.find(r => r.isSelected);
+    if (currentSelected?.id !== id) setSelectedVendorReason("");
   };
 
   useEffect(() => {
@@ -859,9 +861,25 @@ function CreatePageContent() {
 }
 
 // Suspense wrapper required for useSearchParams() in Next.js App Router.
+// When a revise= param is present we wait for DB hydration to settle before
+// mounting the form, so the lazy useState initializers always see the real memo
+// data rather than the seed-only snapshot that exists on a hard reload.
 function CreatePageWithParams() {
   const searchParams = useSearchParams();
   const reviseId = searchParams.get("revise") ?? null;
+  const { hydrated } = useMemos();
+
+  if (reviseId && !hydrated) {
+    return (
+      <div className="em-art">
+        <Sidebar />
+        <div className="em-work" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: 14, color: "var(--muted)" }}>กำลังโหลดข้อมูล...</span>
+        </div>
+      </div>
+    );
+  }
+
   return <CreatePageContent key={reviseId ?? "new"} />;
 }
 

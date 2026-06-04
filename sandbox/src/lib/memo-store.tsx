@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useReducer } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import {
   seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalCategory, BudgetStatus,
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
@@ -265,12 +265,15 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
 interface MemoContextValue {
   memos: MemoRecord[];
   dispatch: React.Dispatch<Action>;
+  /** True once the initial DB hydration fetch has settled (success or network failure). */
+  hydrated: boolean;
 }
 
 const MemoContext = createContext<MemoContextValue | null>(null);
 
 export function MemoProvider({ children }: { children: React.ReactNode }) {
   const [memos, reducerDispatch] = useReducer(memoReducer, seedMemos);
+  const [hydrated, setHydrated] = useState(false);
   const dispatch = useCallback<React.Dispatch<Action>>((action) => {
     if (action.type === "ADVANCE_STEP") {
       const prevState = memos;
@@ -362,6 +365,8 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {
         // Keep seedMemos as the prototype fallback when DB-1 is unavailable.
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
     }
     void hydrateMemos();
@@ -370,7 +375,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
   return (
-    <MemoContext.Provider value={{ memos, dispatch }}>
+    <MemoContext.Provider value={{ memos, dispatch, hydrated }}>
       {children}
     </MemoContext.Provider>
   );

@@ -42,13 +42,20 @@ export default function HistoryPage() {
   const returnedCount = memos.filter(m => m.status === "returned").length;
   const mdCount = memos.filter(m => m.currentStep === "Managing Director").length;
 
-  // Group by date label (simplified — group by updatedAt date)
+  // Group by date label. Use a Map keyed by date so non-consecutive same-date
+  // memos (e.g. an old memo whose updatedAt jumps to today after approval) land
+  // in the correct bucket rather than always the last one.
   const groups: { date: string; items: typeof memos }[] = [];
-  const seen = new Set<string>();
+  const groupByDate = new Map<string, { date: string; items: typeof memos }>();
   filtered.forEach(m => {
     const d = m.updatedAt.split(" ").slice(0, 3).join(" ");
-    if (!seen.has(d)) { seen.add(d); groups.push({ date: d, items: [] }); }
-    groups[groups.length - 1].items.push(m);
+    let group = groupByDate.get(d);
+    if (!group) {
+      group = { date: d, items: [] };
+      groups.push(group);
+      groupByDate.set(d, group);
+    }
+    group.items.push(m);
   });
 
   const managerCount = memos.filter(m => m.currentStep === "Manager / Top Section").length;
