@@ -9,7 +9,7 @@ export type NewMemoWorkflowActionRow = {
   revision_no: number;
   action_type: "submit" | "save_draft";
   step_label: null;
-  actor_name: null;
+  actor_name: string | null;
   result: null;
   reason: null;
   acted_at: string;
@@ -37,7 +37,7 @@ export function buildNewMemoWorkflowAction(row: MemoSeedRow): NewMemoWorkflowAct
     revision_no: row.revision_no,
     action_type: row.status === "draft" ? "save_draft" : "submit",
     step_label: null,
-    actor_name: null,
+    actor_name: row.requester_name,
     result: null,
     reason: null,
     acted_at: row.created_at,
@@ -52,6 +52,7 @@ export type AdvanceStepBody = {
   nextWorkflowState: string;
   revisionNo: number;
   updatedAt: string;
+  actorName: string | null;
 };
 
 export type AdvanceStepPayload = {
@@ -65,7 +66,7 @@ export type AdvanceStepPayload = {
     revision_no: number;
     action_type: "check" | "approve";
     step_label: string;
-    actor_name: null;
+    actor_name: string | null;
     result: "intermediate" | "final";
     acted_at: string;
     metadata_json: null;
@@ -86,7 +87,7 @@ export function buildAdvanceStepPayload(body: AdvanceStepBody): AdvanceStepPaylo
       revision_no: body.revisionNo,
       action_type: isFinal ? "approve" : "check",
       step_label: body.stepLabel,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: isFinal ? "final" : "intermediate",
       acted_at: updatedAtUtc,
       metadata_json: null,
@@ -99,6 +100,7 @@ export type ReturnMemoBody = {
   returnReason: string;
   revisionNo: number;
   updatedAt: string;
+  actorName: string | null;
 };
 
 export type ReturnMemoPayload = {
@@ -111,7 +113,7 @@ export type ReturnMemoPayload = {
     revision_no: number;
     action_type: "return_for_revision";
     step_label: string;
-    actor_name: null;
+    actor_name: string | null;
     result: null;
     reason: string;
     acted_at: string;
@@ -131,7 +133,7 @@ export function buildReturnMemoPayload(body: ReturnMemoBody): ReturnMemoPayload 
       revision_no: body.revisionNo,
       action_type: "return_for_revision",
       step_label: body.stepLabel,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: null,
       reason: body.returnReason,
       acted_at: updatedAtUtc,
@@ -146,6 +148,7 @@ export type RejectMemoBody = {
   rejectReason: string;
   revisionNo: number;
   updatedAt: string;
+  actorName: string | null;
 };
 
 export type RejectMemoPayload = {
@@ -159,7 +162,7 @@ export type RejectMemoPayload = {
     revision_no: number;
     action_type: "reject";
     step_label: string;
-    actor_name: null;
+    actor_name: string | null;
     result: "close" | "revision-allowed";
     reason: string;
     acted_at: string;
@@ -180,7 +183,7 @@ export function buildRejectMemoPayload(body: RejectMemoBody): RejectMemoPayload 
       revision_no: body.revisionNo,
       action_type: "reject",
       step_label: body.stepLabel,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: body.disposition,
       reason: body.rejectReason,
       acted_at: updatedAtUtc,
@@ -193,6 +196,7 @@ export type MarkReadBody = {
   recipient: string;
   revisionNo: number;
   actedAt: string;
+  actorName: string | null;
 };
 
 export type MarkReadPayload = {
@@ -205,7 +209,7 @@ export type MarkReadPayload = {
     revision_no: number;
     action_type: "read";
     step_label: null;
-    actor_name: null;
+    actor_name: string | null;
     result: null;
     reason: null;
     acted_at: string;
@@ -225,7 +229,7 @@ export function buildMarkReadPayload(body: MarkReadBody): MarkReadPayload {
       revision_no: body.revisionNo,
       action_type: "read",
       step_label: null,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: null,
       reason: null,
       acted_at: actedAtUtc,
@@ -239,6 +243,7 @@ export type SkipAllReadsBody = {
   skipReason: string;
   revisionNo: number;
   actedAt: string;
+  actorName: string | null;
 };
 
 export type SkipAllReadsPayload = {
@@ -252,7 +257,7 @@ export type SkipAllReadsPayload = {
     revision_no: number;
     action_type: "skip_read";
     step_label: null;
-    actor_name: null;
+    actor_name: string | null;
     result: null;
     reason: string;
     acted_at: string;
@@ -273,7 +278,7 @@ export function buildSkipAllReadsPayload(body: SkipAllReadsBody): SkipAllReadsPa
       revision_no: body.revisionNo,
       action_type: "skip_read",
       step_label: null,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: null,
       reason: body.skipReason,
       acted_at: actedAtUtc,
@@ -293,6 +298,7 @@ export type ResubmitMemoBody = {
   nextCurrentStep: string;
   readRecipients: string[];
   updatedAt: string;
+  actorName: string | null;
 };
 
 export type ResubmitMemoReadActionRow = {
@@ -334,7 +340,7 @@ export type ResubmitMemoPayload = {
     revision_no: number;
     action_type: "resubmit";
     step_label: null;
-    actor_name: null;
+    actor_name: string | null;
     result: "quick";
     reason: string | null;
     acted_at: string;
@@ -383,7 +389,7 @@ export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPa
       revision_no: newRevisionNo,
       action_type: "resubmit",
       step_label: null,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: "quick",
       reason: body.revisionNote,
       acted_at: updatedAtUtc,
@@ -407,6 +413,7 @@ export type SubmitRevisionBody = {
   // already UTC ("YYYY-MM-DD HH:MM:SS"). Do NOT call toMysqlUtcDateTime on any field inside.
   nextMemoRow: MemoSeedRow;
   readRecipients: string[];
+  actorName: string | null;
 };
 
 export type SubmitRevisionPayload = {
@@ -430,7 +437,7 @@ export type SubmitRevisionPayload = {
     revision_no: number;
     action_type: "resubmit";
     step_label: null;
-    actor_name: null;
+    actor_name: string | null;
     result: "edit-and-resubmit";
     reason: string | null;
     acted_at: string;
@@ -470,7 +477,7 @@ export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevi
       revision_no: newRevisionNo,
       action_type: "resubmit",
       step_label: null,
-      actor_name: null,
+      actor_name: body.actorName ?? null,
       result: "edit-and-resubmit",
       reason: body.revisionNote,
       acted_at: updatedAtUtc,

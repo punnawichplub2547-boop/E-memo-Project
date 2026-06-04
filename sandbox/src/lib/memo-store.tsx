@@ -7,6 +7,7 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import { memoToDbSeedRow } from "./db-seed";
+import { PROTOTYPE_ACTOR_NAME } from "./prototype-user";
 import type {
   AdvanceStepBody,
   MarkReadBody,
@@ -394,6 +395,7 @@ async function persistAdvanceStep(
     nextWorkflowState: next.workflowState ?? "Checked",
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/advance`, {
@@ -421,6 +423,7 @@ async function persistReturnMemo(
     returnReason,
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/return`, {
@@ -454,6 +457,7 @@ async function persistResubmitMemo(
     nextCurrentStep: next.currentStep,
     readRecipients: prev.readActions?.map((ra) => ra.recipient) ?? [],
     updatedAt: updatedAt ?? next.updatedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/resubmit`, {
@@ -490,6 +494,7 @@ async function persistSubmitRevisionMemo(
     readRecipients: next.readActions?.map((ra) => ra.recipient) ??
                     next.readRecipients ??
                     [],
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/submit-revision`, {
@@ -519,6 +524,7 @@ async function persistRejectMemo(
     rejectReason,
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/reject`, {
@@ -544,6 +550,7 @@ async function persistMarkRead(
     recipient,
     revisionNo: next.revisionNo ?? 0,
     actedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/read`, {
@@ -571,6 +578,7 @@ async function persistSkipAllReads(
     skipReason,
     revisionNo: next.revisionNo ?? 0,
     actedAt,
+    actorName: PROTOTYPE_ACTOR_NAME,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/skip-reads`, {

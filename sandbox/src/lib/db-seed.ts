@@ -48,7 +48,7 @@ export type SeedWorkflowActionRow = {
   revision_no: number;
   action_type: "submit";
   step_label: null;
-  actor_name: null;
+  actor_name: string | null;
   result: null;
   reason: null;
   acted_at: string;
@@ -147,7 +147,7 @@ export function buildSeedWorkflowAction(row: MemoSeedRow): SeedWorkflowActionRow
     revision_no: row.revision_no,
     action_type: "submit",
     step_label: null,
-    actor_name: null,
+    actor_name: row.requester_name,
     result: null,
     reason: null,
     acted_at: row.created_at,

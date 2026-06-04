@@ -44,7 +44,7 @@ describe("DB seed helpers", () => {
     expect(action.action_type).toBe("submit");
     expect(action.revision_no).toBe(0);
     expect(action.acted_at).toBe(row.created_at);
-    expect(action.actor_name).toBeNull();
+    expect(action.actor_name).toBe(seedMemos[0].requester);
     expect(action.step_label).toBeNull();
   });
 });

@@ -16,6 +16,8 @@ import {
 } from "./db-memo-write";
 import { memoToDbSeedRow } from "./db-seed";
 
+const ACTOR = "อำภา หิงคำ";
+
 describe("DB memo write helpers", () => {
   const readActions: ReadAction[] = [
     { recipient: "ACC/FIN", status: "pending" },
@@ -25,7 +27,7 @@ describe("DB memo write helpers", () => {
   const memo: MemoRecord = {
     id: "EM-20260601-143022-4F7",
     title: "New memo",
-    requester: "อำภา หิงคำ",
+    requester: ACTOR,
     department: "HR&GA",
     category: "general-purchase",
     amount: 12000,
@@ -56,6 +58,7 @@ describe("DB memo write helpers", () => {
     expect(action.revision_no).toBe(0);
     expect(action.acted_at).toBe("2026-06-01 07:30:00");
     expect(action.step_label).toBeNull();
+    expect(action.actor_name).toBe(ACTOR);
   });
 
   it("builds save_draft workflow action for draft memos", () => {
@@ -63,6 +66,7 @@ describe("DB memo write helpers", () => {
     const action = buildNewMemoWorkflowAction(buildMemoWritePayload(draft).row);
 
     expect(action.action_type).toBe("save_draft");
+    expect(action.actor_name).toBe(ACTOR);
   });
 
   it("builds read action rows for the memo current revision", () => {
@@ -88,6 +92,7 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Checked",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.action_type).toBe("check");
@@ -105,6 +110,7 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Approved",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.action_type).toBe("approve");
@@ -122,6 +128,7 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Checked",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
     const final = buildAdvanceStepPayload({
       stepLabel: "Managing Director",
@@ -130,6 +137,7 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Approved",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(intermediate.workflowAction.step_label).toBe("Manager / Top Section");
@@ -144,6 +152,7 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Approved",
       revisionNo: 2,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.revision_no).toBe(2);
@@ -157,13 +166,14 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Checked",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
     expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
   });
 
-  it("actor_name and metadata_json are always null", () => {
+  it("actor_name reflects actorName from body; metadata_json is always null", () => {
     const payload = buildAdvanceStepPayload({
       stepLabel: "Manager / Top Section",
       nextCurrentStep: "General Manager",
@@ -171,10 +181,25 @@ describe("buildAdvanceStepPayload", () => {
       nextWorkflowState: "Checked",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
+    });
+
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
+    expect(payload.workflowAction.metadata_json).toBeNull();
+  });
+
+  it("actor_name is null when actorName body field is null", () => {
+    const payload = buildAdvanceStepPayload({
+      stepLabel: "Manager / Top Section",
+      nextCurrentStep: "General Manager",
+      nextStatus: "pending",
+      nextWorkflowState: "Checked",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+      actorName: null,
     });
 
     expect(payload.workflowAction.actor_name).toBeNull();
-    expect(payload.workflowAction.metadata_json).toBeNull();
   });
 });
 
@@ -185,6 +210,7 @@ describe("buildReturnMemoPayload", () => {
       returnReason: "เอกสารไม่ครบ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.action_type).toBe("return_for_revision");
@@ -198,6 +224,7 @@ describe("buildReturnMemoPayload", () => {
       returnReason: "ต้องแนบใบเสนอราคาเพิ่มเติม",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.return_reason).toBe("ต้องแนบใบเสนอราคาเพิ่มเติม");
@@ -210,6 +237,7 @@ describe("buildReturnMemoPayload", () => {
       returnReason: "ราคาสูงเกินงบ",
       revisionNo: 2,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.step_label).toBe("Managing Director");
@@ -222,10 +250,23 @@ describe("buildReturnMemoPayload", () => {
       returnReason: "ข้อมูลไม่ครบ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
     expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
+  });
+
+  it("actor_name reflects actorName from body", () => {
+    const payload = buildReturnMemoPayload({
+      stepLabel: "General Manager",
+      returnReason: "เอกสารไม่ครบ",
+      revisionNo: 0,
+      updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
+    });
+
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
   });
 });
 
@@ -237,6 +278,7 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "ไม่อนุมัติ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.action_type).toBe("reject");
@@ -250,6 +292,7 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "งบประมาณไม่เพียงพอ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.reject_disposition).toBe("close");
@@ -263,6 +306,7 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "ราคาสูงเกินไป กรุณาเสนอใหม่",
       revisionNo: 1,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.reject_disposition).toBe("revision-allowed");
@@ -276,6 +320,7 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "ข้อมูลไม่ถูกต้อง",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.reject_reason).toBe("ข้อมูลไม่ถูกต้อง");
@@ -289,6 +334,7 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "ต้องการข้อมูลเพิ่ม",
       revisionNo: 2,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.step_label).toBe("Managing Director");
@@ -302,22 +348,24 @@ describe("buildRejectMemoPayload", () => {
       rejectReason: "ไม่อนุมัติ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.memoUpdate.updated_at).toBe("2026-06-01 07:30:00");
     expect(payload.workflowAction.acted_at).toBe("2026-06-01 07:30:00");
   });
 
-  it("actor_name and metadata_json are always null", () => {
+  it("actor_name reflects actorName from body; metadata_json is always null", () => {
     const payload = buildRejectMemoPayload({
       stepLabel: "General Manager",
       disposition: "close",
       rejectReason: "ไม่อนุมัติ",
       revisionNo: 0,
       updatedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
-    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
     expect(payload.workflowAction.metadata_json).toBeNull();
   });
 });
@@ -328,6 +376,7 @@ describe("buildMarkReadPayload", () => {
       recipient: "ACC/FIN",
       revisionNo: 0,
       actedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.readActionUpdate.status).toBe("read");
@@ -335,15 +384,17 @@ describe("buildMarkReadPayload", () => {
     expect(payload.readActionUpdate.updated_at).toBe("2026-06-01 07:30:00");
   });
 
-  it("creates a read workflow action with recipient metadata", () => {
+  it("creates a read workflow action with recipient metadata and actor_name from body", () => {
     const payload = buildMarkReadPayload({
       recipient: "HR&GA",
       revisionNo: 2,
       actedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.revision_no).toBe(2);
     expect(payload.workflowAction.action_type).toBe("read");
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
     expect(payload.workflowAction.reason).toBeNull();
     expect(payload.workflowAction.metadata_json).toBe(JSON.stringify({ recipient: "HR&GA" }));
   });
@@ -356,6 +407,7 @@ describe("buildSkipAllReadsPayload", () => {
       skipReason: "MD requested urgent approval",
       revisionNo: 0,
       actedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.readActionUpdate.status).toBe("skipped");
@@ -364,16 +416,18 @@ describe("buildSkipAllReadsPayload", () => {
     expect(payload.readActionUpdate.updated_at).toBe("2026-06-01 07:30:00");
   });
 
-  it("creates a skip_read workflow action with skip reason and recipients metadata", () => {
+  it("creates a skip_read workflow action with skip reason, recipients metadata, and actor_name from body", () => {
     const payload = buildSkipAllReadsPayload({
       recipients: ["ACC/FIN", "HR&GA"],
       skipReason: "เร่งด่วน",
       revisionNo: 1,
       actedAt: "01 Jun 2026 14:30",
+      actorName: ACTOR,
     });
 
     expect(payload.workflowAction.revision_no).toBe(1);
     expect(payload.workflowAction.action_type).toBe("skip_read");
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
     expect(payload.workflowAction.result).toBeNull();
     expect(payload.workflowAction.reason).toBe("เร่งด่วน");
     expect(payload.workflowAction.metadata_json).toBe(JSON.stringify({ recipients: ["ACC/FIN", "HR&GA"] }));
@@ -392,6 +446,7 @@ describe("buildResubmitMemoPayload", () => {
     nextCurrentStep: "Manager / Top Section",
     readRecipients: ["ACC/FIN", "HR&GA"],
     updatedAt: "02 Jun 2026 09:00",
+    actorName: ACTOR,
   };
 
   it("memoRevision.revision_no is old; memoUpdate, workflowAction, and newReadActions use new (old + 1)", () => {
@@ -484,13 +539,13 @@ describe("buildResubmitMemoPayload", () => {
     expect(payload.newReadActions).toHaveLength(0);
   });
 
-  it("workflowAction is action_type=resubmit result=quick with null step_label, actor_name, metadata_json", () => {
+  it("workflowAction is action_type=resubmit result=quick with null step_label and metadata_json; actor_name from body", () => {
     const payload = buildResubmitMemoPayload(baseBody);
 
     expect(payload.workflowAction.action_type).toBe("resubmit");
     expect(payload.workflowAction.result).toBe("quick");
     expect(payload.workflowAction.step_label).toBeNull();
-    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
     expect(payload.workflowAction.metadata_json).toBeNull();
   });
 
@@ -525,7 +580,7 @@ describe("buildSubmitRevisionPayload", () => {
   const prevMemo: MemoRecord = {
     id: "EM-20260601-143022-4F7",
     title: "Old Memo Title",
-    requester: "อำภา หิงคำ",
+    requester: ACTOR,
     department: "HR&GA",
     category: "general-purchase",
     amount: 5000,
@@ -577,6 +632,7 @@ describe("buildSubmitRevisionPayload", () => {
     snapshotJson: baseSnapshotJson,
     nextMemoRow: baseNextMemoRow,
     readRecipients: ["ACC/FIN"],
+    actorName: ACTOR,
   };
 
   it("memoRevision uses oldRevisionNo; memoUpdate, workflowAction, newReadActions use new (old+1)", () => {
@@ -672,13 +728,13 @@ describe("buildSubmitRevisionPayload", () => {
     expect(payload.newReadActions).toHaveLength(0);
   });
 
-  it("workflowAction is action_type=resubmit result=edit-and-resubmit with null step_label, actor_name, metadata_json", () => {
+  it("workflowAction is action_type=resubmit result=edit-and-resubmit with null step_label and metadata_json; actor_name from body", () => {
     const payload = buildSubmitRevisionPayload(baseBody);
 
     expect(payload.workflowAction.action_type).toBe("resubmit");
     expect(payload.workflowAction.result).toBe("edit-and-resubmit");
     expect(payload.workflowAction.step_label).toBeNull();
-    expect(payload.workflowAction.actor_name).toBeNull();
+    expect(payload.workflowAction.actor_name).toBe(ACTOR);
     expect(payload.workflowAction.metadata_json).toBeNull();
   });
 
