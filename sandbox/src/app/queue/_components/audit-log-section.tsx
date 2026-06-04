@@ -29,40 +29,53 @@ function ActionTypeBadge({ type }: { type: string }) {
   );
 }
 
-export function AuditLogSection({ memoId }: { memoId: string }) {
+export function AuditLogSection({ memoId, refreshKey = "" }: { memoId: string; refreshKey?: string }) {
   const [open, setOpen] = useState(false);
   const [actions, setActions] = useState<WorkflowAction[] | null>(null);
   const [loading, setLoading] = useState(false);
-  // Tracks which memoId the current actions[] belong to; null = not yet fetched
-  const [fetchedForId, setFetchedForId] = useState<string | null>(null);
+  // Tracks which memo + refresh signal the current actions[] belong to; null = not yet fetched
+  const [fetchedForKey, setFetchedForKey] = useState<string | null>(null);
 
   // Derive loading state and stale-data check in render — no setState at effect body level
-  const isLoaded = fetchedForId === memoId && !loading;
+  const requestKey = `${memoId}:${refreshKey}`;
+  const isLoaded = fetchedForKey === requestKey && !loading;
 
   // Lazy fetch: only when open AND data is not yet loaded for current memoId.
   // All setState calls live inside doFetch() (async), not at the synchronous effect body level,
   // to satisfy the react-hooks/set-state-in-effect rule.
   useEffect(() => {
-    if (!open || fetchedForId === memoId) return;
+    if (!open || fetchedForKey === requestKey) return;
     let cancelled = false;
     async function doFetch() {
       setLoading(true);
       try {
-        const resp = await fetch(`/api/memos/${encodeURIComponent(memoId)}/workflow-actions`);
-        if (cancelled) return;
-        setActions(resp.ok ? (await resp.json()) as WorkflowAction[] : []);
+        const delays = fetchedForKey === null ? [0] : [350, 1200];
+        for (const delay of delays) {
+          if (delay > 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, delay));
+          }
+          if (cancelled) return;
+          const resp = await fetch(`/api/memos/${encodeURIComponent(memoId)}/workflow-actions`);
+          if (cancelled) return;
+          setActions(resp.ok ? (await resp.json()) as WorkflowAction[] : []);
+        }
       } catch {
         if (!cancelled) setActions([]);
       } finally {
         if (!cancelled) {
-          setFetchedForId(memoId);
+          setFetchedForKey(requestKey);
           setLoading(false);
         }
       }
     }
+    // Refetches triggered by MARK_READ / SKIP_ALL_READS can race the fire-and-forget
+    // persistence call, so refreshes retry once after a short backoff. First expand
+    // still fetches immediately.
     void doFetch();
-    return () => { cancelled = true; };
-  }, [open, memoId, fetchedForId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, memoId, requestKey, fetchedForKey]);
 
   return (
     <section>

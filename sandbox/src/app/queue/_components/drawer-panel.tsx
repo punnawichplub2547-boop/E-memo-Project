@@ -36,6 +36,15 @@ export function DrawerPanel({
   const isMd = memo.currentStep === "Managing Director";
   const createdAt = memo.createdAt ?? memo.updatedAt;
   const readStepOffset = memo.readActions?.length ?? 0;
+  const auditRefreshKey = [
+    memo.updatedAt,
+    memo.status,
+    memo.currentStep,
+    memo.revisionNo ?? 0,
+    memo.readActions
+      ?.map((ra) => `${ra.recipient}:${ra.status}:${ra.actedAt ?? ""}:${ra.skipReason ?? ""}`)
+      .join("|") ?? "",
+  ].join("::");
 
   const wrapperStyle = inline
     ? {
@@ -587,7 +596,7 @@ export function DrawerPanel({
         {/* Audit Log — append-only DB events from workflow_step_actions.
             Distinct from the Approval Route section above, which shows current workflow state.
             Collapsed by default; fetches lazily on first expand. */}
-        <AuditLogSection memoId={memo.id} />
+        <AuditLogSection memoId={memo.id} refreshKey={auditRefreshKey} />
       </div>
 
       <DrawerFooter
