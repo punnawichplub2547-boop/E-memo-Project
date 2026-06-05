@@ -30,7 +30,13 @@ function loadUsers(): PrototypeUser[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as PrototypeUser[];
-      if (Array.isArray(parsed) && parsed.length > 0) return ensureAdminUser(parsed);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const safeUsers = ensureAdminUser(parsed);
+        if (!hasAdmin(parsed)) {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUsers));
+        }
+        return safeUsers;
+      }
     }
   } catch {}
   return [...PROTOTYPE_USERS];
