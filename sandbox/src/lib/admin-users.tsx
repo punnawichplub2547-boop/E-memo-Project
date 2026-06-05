@@ -9,12 +9,18 @@ function hasAdmin(users: PrototypeUser[]): boolean {
   return users.some(isPrototypeAdmin);
 }
 
-function ensureAdminUser(users: PrototypeUser[]): PrototypeUser[] {
-  if (hasAdmin(users)) return users;
-  return [
-    DEFAULT_PROTOTYPE_USER,
-    ...users.filter((user) => user.id !== DEFAULT_PROTOTYPE_USER.id),
-  ];
+function ensureAdminUser(users: PrototypeUser[]): { users: PrototypeUser[]; changed: boolean } {
+  const defaultAdmin = users.find((user) => user.id === DEFAULT_PROTOTYPE_USER.id);
+  if (defaultAdmin && isPrototypeAdmin(defaultAdmin) && hasAdmin(users)) {
+    return { users, changed: false };
+  }
+  return {
+    users: [
+      DEFAULT_PROTOTYPE_USER,
+      ...users.filter((user) => user.id !== DEFAULT_PROTOTYPE_USER.id),
+    ],
+    changed: true,
+  };
 }
 
 function isLastAdminEdit(prev: PrototypeUser[], id: string, nextUser: PrototypeUser): boolean {
@@ -31,8 +37,8 @@ function loadUsers(): PrototypeUser[] {
     if (raw) {
       const parsed = JSON.parse(raw) as PrototypeUser[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const safeUsers = ensureAdminUser(parsed);
-        if (!hasAdmin(parsed)) {
+        const { users: safeUsers, changed } = ensureAdminUser(parsed);
+        if (changed) {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeUsers));
         }
         return safeUsers;
@@ -57,7 +63,7 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
   const [users, setUsers] = useState<PrototypeUser[]>(loadUsers);
 
   const save = (next: PrototypeUser[]) => {
-    const safeNext = ensureAdminUser(next);
+    const { users: safeNext } = ensureAdminUser(next);
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeNext)); } catch {}
     return safeNext;
   };
