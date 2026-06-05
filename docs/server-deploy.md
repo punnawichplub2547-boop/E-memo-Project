@@ -14,7 +14,7 @@ cd Hrproject/sandbox
 docker compose up -d --build
 ```
 
-The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. All write actions are persisted to DB: new memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, quick resubmit, and edit-and-resubmit.
+The app will be available on port `3000`. Docker Compose also starts a MySQL 8 container. The app loads initial memo data from `GET /api/memos` when the DB is available. If the DB is reachable but empty, the app stays empty for real-user trial mode and does not fall back to demo seeds. All write actions are persisted to DB: new memo creation, approval advancement, return-for-revision, rejection, read acknowledgement actions, quick resubmit, and edit-and-resubmit.
 
 ## Keep It Running
 
@@ -58,7 +58,7 @@ Seed the DB-1 tables from the current prototype `seedMemos` data:
 npm.cmd run db:seed
 ```
 
-The seed script inserts eight mock/demo memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data or intentional local resets. For a real-user trial, start with an empty DB or a separate sanitized seed process instead of running `db:seed`.
+The seed script inserts eight mock/demo memos and one `submit` workflow action per memo. It clears the four DB-1 tables first, so use it only for disposable prototype data or intentional local resets. For a real-user trial, start with an empty DB or a separate sanitized seed process instead of running `db:seed`; an empty `GET /api/memos` response is expected and supported.
 
 `db:seed` now refuses to run against non-local database URLs unless the reset is explicitly confirmed. When the server target is intentionally disposable demo data, run:
 

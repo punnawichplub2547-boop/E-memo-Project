@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { buildMemoSnapshot, memoReducer } from "./memo-store";
 import { seedMemos, type MemoRecord } from "./approval";
 
+describe("memoReducer — HYDRATE_MEMOS", () => {
+  it("accepts an empty DB result instead of falling back to seed memos", () => {
+    const next = memoReducer(seedMemos, { type: "HYDRATE_MEMOS", memos: [] });
+    expect(next).toEqual([]);
+  });
+
+  it("replaces the current prototype state with the DB result", () => {
+    const dbMemo = { ...seedMemos[0], id: "EM-DB-ONLY" };
+    const next = memoReducer(seedMemos, { type: "HYDRATE_MEMOS", memos: [dbMemo] });
+    expect(next).toEqual([dbMemo]);
+  });
+});
+
 describe("memoReducer — RETURN_MEMO", () => {
   const state = seedMemos.slice(0, 2);
   const target = state[0];

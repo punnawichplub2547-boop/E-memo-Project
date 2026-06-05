@@ -85,7 +85,7 @@ Expected:
 - HTTP `200`
 - JSON array response
 - demo mode: includes `EM-2026-001` through `EM-2026-008`
-- real-user trial mode: empty array is acceptable
+- real-user trial mode: empty array is acceptable and should render an empty workspace, not demo seed data
 
 ## 5. Browser Smoke
 
@@ -98,6 +98,7 @@ http://<server-ip-or-domain>:3000
 Check:
 
 - dashboard loads
+- real-user trial mode: dashboard says there are no memos in the Trial DB and offers to create the first memo
 - queue page loads
 - create page loads
 - history page loads

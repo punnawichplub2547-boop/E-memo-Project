@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import { getDashboardMetrics } from "@/lib/approval";
+import { usePrototypeUser } from "@/lib/prototype-user-context";
 import {
   IconDownload, IconPlus, IconRoute, IconCrown,
   IconSparkles, IconFileText, IconClock, IconCheckCircle, IconRefresh,
@@ -15,7 +16,9 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { memos } = useMemos();
+  const { user } = usePrototypeUser();
   const metrics = getDashboardMetrics(memos);
+  const hasMemos = memos.length > 0;
   const [today, setToday] = useState<Date | null>(null);
   useEffect(() => {
     const id = window.setTimeout(() => setToday(new Date()), 0);
@@ -49,7 +52,7 @@ export default function DashboardPage() {
               <div style={{ position: "relative", padding: "28px 28px 26px", display: "flex", flexDirection: "column", gap: 20, minHeight: 200, justifyContent: "space-between" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#93C5FD", fontWeight: 600 }}>{todayLabel}</div>
-                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 }}>สวัสดีตอนเช้า, อำภา</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 }}>สวัสดีตอนเช้า, {user.name}</div>
                   <div style={{ fontSize: 13.5, color: "rgba(219,234,254,0.78)", lineHeight: 1.55 }}>
                     มีเอกสาร <strong style={{ color: "#fff" }}>{metrics.pending} ฉบับ</strong> รอการอนุมัติ{mdPendingCount > 0 && <> และ <strong style={{ color: "#E6C76B" }}>{mdPendingCount} ฉบับ</strong> ระดับ MD</>}
                   </div>
@@ -67,14 +70,22 @@ export default function DashboardPage() {
               <div className="em-eyebrow" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <IconSparkles size={13} /> AI Insight
               </div>
-              <div style={{ fontSize: 13.5, color: "var(--ink)", lineHeight: 1.55 }}>
-                Cycle time ลดลง <strong style={{ color: "#047857" }}>18%</strong> จากสัปดาห์ที่แล้ว — เอกสารระดับ GM ใช้เวลาเฉลี่ย <strong>14 ชั่วโมง</strong>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <span className="em-tier mgr">Manager 9h</span>
-                <span className="em-tier gm">GM 14h</span>
-                <span className="em-tier md">MD 22h</span>
-              </div>
+              {hasMemos ? (
+                <>
+                  <div style={{ fontSize: 13.5, color: "var(--ink)", lineHeight: 1.55 }}>
+                    Cycle time ลดลง <strong style={{ color: "#047857" }}>18%</strong> จากสัปดาห์ที่แล้ว — เอกสารระดับ GM ใช้เวลาเฉลี่ย <strong>14 ชั่วโมง</strong>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <span className="em-tier mgr">Manager 9h</span>
+                    <span className="em-tier gm">GM 14h</span>
+                    <span className="em-tier md">MD 22h</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>
+                  Empty DB Trial Mode พร้อมใช้งาน — ยังไม่มี memo ในฐานข้อมูลจริง สร้างเอกสารฉบับแรกเพื่อเริ่มเก็บสถิติ workflow
+                </div>
+              )}
             </div>
           </div>
 
@@ -87,7 +98,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Workflow + Activity */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: hasMemos ? "1fr 380px" : "1fr", gap: 16 }}>
+            {hasMemos ? (
+            <>
             <div className="em-card">
               <div className="em-card-head">
                 <div>
@@ -125,6 +138,21 @@ export default function DashboardPage() {
                 <FeedItem icon={<IconSlash size={14} />} tone="rose" text={<><strong>K. Pichet</strong> rejected <span className="em-id">EM-2026-006</span></>} time="5h ago" />
               </div>
             </div>
+            </>
+            ) : (
+              <div className="em-card" style={{ padding: 32, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 14, display: "grid", placeItems: "center", color: "var(--primary)", background: "var(--primary-soft)", border: "1px solid rgba(37,99,235,0.16)" }}>
+                  <IconFileText size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", marginBottom: 4 }}>ยังไม่มี memo ใน Trial DB</div>
+                  <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
+                    โหมดนี้ตั้งใจเริ่มจากฐานข้อมูลว่าง เพื่อให้ข้อมูลที่เห็นเป็นข้อมูลที่ผู้ทดลองสร้างจริงเท่านั้น
+                  </div>
+                </div>
+                <Link href="/create" className="em-btn primary"><IconPlus size={15} /> Create first memo</Link>
+              </div>
+            )}
           </div>
 
           {/* Queue preview */}
@@ -146,6 +174,13 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
+                {memos.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "38px 20px", color: "var(--muted)", fontSize: 13 }}>
+                      ยังไม่มี memo ในฐานข้อมูล — สร้าง memo ใหม่เพื่อเริ่มทดลอง workflow
+                    </td>
+                  </tr>
+                )}
                 {memos.slice(0, 6).map((m) => {
                   const isMd = m.currentStep === "Managing Director";
                   return (

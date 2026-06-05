@@ -103,6 +103,7 @@ Remove-Item Env:\CONFIRM_DB_SEED
 - Search panel for historical memo lookup by keyword, memo number, requester, or category.
 - DB-1 read path is active: `MemoProvider` hydrates initial memos from `GET /api/memos` when MySQL is available.
 - DB-2 complete: all eight write actions are persisted to MySQL — new memo creation (`ADD_MEMO`), approval advancement (`ADVANCE_STEP`), return-for-revision (`RETURN_MEMO`), rejection (`REJECT_MEMO`), read acknowledgement actions (`MARK_READ`, `SKIP_ALL_READS`), quick resubmit (`RESUBMIT_MEMO`), and edit-and-resubmit (`SUBMIT_REVISION`).
+- Empty DB Trial Mode is supported: when `GET /api/memos` returns an empty array, the app shows an intentionally empty workspace instead of falling back to demo seeds.
 - If the DB/API is unavailable, the app falls back to static `seedMemos` so the prototype remains usable.
 - No authentication, email delivery, or production AI integration yet.
 
