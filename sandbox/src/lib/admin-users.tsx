@@ -1,9 +1,28 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useState } from "react";
-import { DEFAULT_PROTOTYPE_USER, PROTOTYPE_USERS, type PrototypeUser } from "./prototype-users";
+import { DEFAULT_PROTOTYPE_USER, PROTOTYPE_USERS, isPrototypeAdmin, type PrototypeUser } from "./prototype-users";
 
 const STORAGE_KEY = "em-admin-users";
+
+function hasAdmin(users: PrototypeUser[]): boolean {
+  return users.some(isPrototypeAdmin);
+}
+
+function ensureAdminUser(users: PrototypeUser[]): PrototypeUser[] {
+  if (hasAdmin(users)) return users;
+  return [
+    DEFAULT_PROTOTYPE_USER,
+    ...users.filter((user) => user.id !== DEFAULT_PROTOTYPE_USER.id),
+  ];
+}
+
+function isLastAdminEdit(prev: PrototypeUser[], id: string, nextUser: PrototypeUser): boolean {
+  const current = prev.find((user) => user.id === id);
+  if (!current || !isPrototypeAdmin(current)) return false;
+  const adminCount = prev.filter(isPrototypeAdmin).length;
+  return adminCount <= 1 && !isPrototypeAdmin(nextUser);
+}
 
 function loadUsers(): PrototypeUser[] {
   if (typeof window === "undefined") return [...PROTOTYPE_USERS];
@@ -11,7 +30,7 @@ function loadUsers(): PrototypeUser[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as PrototypeUser[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return ensureAdminUser(parsed);
     }
   } catch {}
   return [...PROTOTYPE_USERS];
@@ -32,8 +51,9 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
   const [users, setUsers] = useState<PrototypeUser[]>(loadUsers);
 
   const save = (next: PrototypeUser[]) => {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
-    return next;
+    const safeNext = ensureAdminUser(next);
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safeNext)); } catch {}
+    return safeNext;
   };
 
   const addUser = useCallback((user: PrototypeUser) => {
@@ -41,11 +61,22 @@ export function AdminUsersProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const updateUser = useCallback((id: string, patch: Partial<Omit<PrototypeUser, "id">>) => {
-    setUsers(prev => save(prev.map(u => u.id === id ? { ...u, ...patch } : u)));
+    setUsers(prev => save(prev.map((u) => {
+      if (u.id !== id) return u;
+      const nextUser = { ...u, ...patch };
+      if (!isLastAdminEdit(prev, id, nextUser)) return nextUser;
+      return { ...nextUser, roles: Array.from(new Set([...nextUser.roles, "admin"])) };
+    })));
   }, []);
 
   const deleteUser = useCallback((id: string) => {
-    setUsers(prev => save(prev.filter(u => u.id !== id)));
+    setUsers(prev => {
+      const target = prev.find((user) => user.id === id);
+      if (target && isPrototypeAdmin(target) && prev.filter(isPrototypeAdmin).length <= 1) {
+        return save(prev);
+      }
+      return save(prev.filter(u => u.id !== id));
+    });
   }, []);
 
   const resetToDefaults = useCallback(() => {

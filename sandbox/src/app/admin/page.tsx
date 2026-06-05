@@ -63,6 +63,7 @@ export default function AdminPage() {
   const { user } = usePrototypeUser();
   const { users, addUser, updateUser, deleteUser, resetToDefaults } = useAdminUsers();
   const { allMemos, dispatch } = useMemos();
+  const adminCount = users.filter(isPrototypeAdmin).length;
   const [tab, setTab] = useState<Tab>("users");
   const stampNow = () => formatTimestamp(new Date());
 
@@ -263,8 +264,14 @@ export default function AdminPage() {
                             <div style={{ display: "flex", gap: 6 }}>
                               <button className="em-btn" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => startEdit(u)}><IconPen size={12} /> Edit</button>
                               <button className="em-btn" style={{ padding: "4px 10px", fontSize: 12, color: "#EF4444" }}
-                                disabled={u.id === user.id}
-                                title={u.id === user.id ? "Cannot delete yourself" : "Delete user"}
+                                disabled={u.id === user.id || (isPrototypeAdmin(u) && adminCount <= 1)}
+                                title={
+                                  u.id === user.id
+                                    ? "Cannot delete yourself"
+                                    : isPrototypeAdmin(u) && adminCount <= 1
+                                      ? "Cannot delete the last admin"
+                                      : "Delete user"
+                                }
                                 onClick={() => { if (u.id !== user.id) deleteUser(u.id); }}
                               ><IconTrash size={12} /></button>
                             </div>
