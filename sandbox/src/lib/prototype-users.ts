@@ -31,7 +31,7 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
   {
     id: "requester",
     name: "Project Intern",
-    department: "HR&GA IT",
+    department: "IT",
     roleLabel: "Requester",
     roles: ["requester"],
   },

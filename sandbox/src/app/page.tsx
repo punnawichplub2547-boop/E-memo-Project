@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
-import { getDashboardMetrics } from "@/lib/approval";
+import { getDashboardMetrics, approvalLabels } from "@/lib/approval";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import {
   IconDownload, IconPlus, IconRoute, IconCrown,
@@ -13,6 +13,21 @@ import {
   IconCheck, IconUsers, IconReturn, IconSlash, IconPen,
 } from "@/components/icons";
 import Link from "next/link";
+import type { MemoRecord } from "@/lib/approval";
+
+// Parses "DD Mon YYYY HH:MM" → ms for sorting.
+function parseMemoDate(s: string): number {
+  const t = Date.parse(s);
+  return isNaN(t) ? 0 : t;
+}
+
+function memoActivity(m: MemoRecord) {
+  if (m.status === "approved") return { tone: "emerald", Icon: IconCheckCircle, actor: m.currentStep,  verb: "อนุมัติ" };
+  if (m.status === "rejected") return { tone: "rose",    Icon: IconSlash,       actor: m.currentStep,  verb: "ปฏิเสธ" };
+  if (m.status === "returned") return { tone: "amber",   Icon: IconReturn,      actor: m.currentStep,  verb: "ส่งกลับ" };
+  if (m.status === "pending")  return { tone: "default", Icon: IconArrowRight,  actor: m.requester,    verb: "ส่งคำขอ" };
+  return                              { tone: "default", Icon: IconPen,         actor: m.requester,    verb: "บันทึกร่าง" };
+}
 
 export default function DashboardPage() {
   const { memos } = useMemos();
@@ -26,8 +41,31 @@ export default function DashboardPage() {
   }, []);
   const todayLabel = today
     ? new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(today)
-    : " ";
+    : " ";
   const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
+
+  // Workflow Status: most recently updated pending memo.
+  const activeMemo = [...memos]
+    .filter(m => m.status === "pending")
+    .sort((a, b) => parseMemoDate(b.updatedAt) - parseMemoDate(a.updatedAt))[0] ?? null;
+
+  // Recent Activity: one event per memo, sorted by updatedAt desc, top 5.
+  const recentActivity = [...memos]
+    .sort((a, b) => parseMemoDate(b.updatedAt) - parseMemoDate(a.updatedAt))
+    .slice(0, 5);
+
+  // AI Insight: real per-tier cycle averages.
+  const tierAvg = (pred: (m: MemoRecord) => boolean) => {
+    const sub = memos.filter(pred);
+    return sub.length ? Math.round(sub.reduce((s, m) => s + m.cycleHours, 0) / sub.length) : null;
+  };
+  // Fall back to the current step when a memo has no explicit route so every tier counts
+  // seed/legacy memos consistently (not just Manager).
+  const memoRouteForTierMetrics = (m: MemoRecord) => m.selectedRoute ?? [m.currentStep];
+  const mgrAvg = tierAvg(m => memoRouteForTierMetrics(m).includes("Manager / Top Section"));
+  const gmAvg  = tierAvg(m => memoRouteForTierMetrics(m).includes("General Manager"));
+  const mdAvg  = tierAvg(m => memoRouteForTierMetrics(m).includes("Managing Director"));
+  const overSla = memos.filter(m => m.cycleHours > 24).length;
 
   return (
     <div className="em-art">
@@ -66,6 +104,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* AI Insight — live metrics */}
             <div className="em-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
               <div className="em-eyebrow" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <IconSparkles size={13} /> AI Insight
@@ -73,12 +112,16 @@ export default function DashboardPage() {
               {hasMemos ? (
                 <>
                   <div style={{ fontSize: 13.5, color: "var(--ink)", lineHeight: 1.55 }}>
-                    Cycle time ลดลง <strong style={{ color: "#047857" }}>18%</strong> จากสัปดาห์ที่แล้ว — เอกสารระดับ GM ใช้เวลาเฉลี่ย <strong>14 ชั่วโมง</strong>
+                    Avg. cycle <strong style={{ color: metrics.averageCycleHours > 24 ? "#B45309" : "#047857" }}>{metrics.averageCycleHours}h</strong>
+                    {overSla > 0
+                      ? <> — <strong style={{ color: "#B45309" }}>{overSla} ฉบับ</strong> เกิน SLA 24h</>
+                      : <> — ทุกฉบับอยู่ในเกณฑ์</>
+                    }
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <span className="em-tier mgr">Manager 9h</span>
-                    <span className="em-tier gm">GM 14h</span>
-                    <span className="em-tier md">MD 22h</span>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {mgrAvg !== null && <span className="em-tier mgr">Manager {mgrAvg}h</span>}
+                    {gmAvg  !== null && <span className="em-tier gm">GM {gmAvg}h</span>}
+                    {mdAvg  !== null && <span className="em-tier md">MD {mdAvg}h</span>}
                   </div>
                 </>
               ) : (
@@ -97,48 +140,65 @@ export default function DashboardPage() {
             <MetricCard label="Avg. Cycle" tone="gold" icon={<IconRefresh size={15} />} value={String(metrics.averageCycleHours)} unit="hours" trendDir="down" trendVal="-22%" foot="target < 24h" />
           </div>
 
-          {/* Workflow + Activity */}
+          {/* Workflow Status + Recent Activity */}
           <div style={{ display: "grid", gridTemplateColumns: hasMemos ? "1fr 380px" : "1fr", gap: 16 }}>
             {hasMemos ? (
-            <>
-            <div className="em-card">
-              <div className="em-card-head">
-                <div>
-                  <h3>Workflow Status — EM-2026-008</h3>
-                  <div className="em-sub">ค่าใช้จ่ายอบรมผู้ใช้งานระบบ · 18,000 THB · Project Intern</div>
+              <>
+                {/* Workflow Status — live from most recent pending memo */}
+                <div className="em-card">
+                  {activeMemo ? (
+                    <>
+                      <div className="em-card-head">
+                        <div>
+                          <h3>Workflow Status — {activeMemo.id}</h3>
+                          <div className="em-sub">{activeMemo.title} · ฿{activeMemo.amount.toLocaleString()} · {activeMemo.requester}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <span className="em-pill pending"><span className="dot" />In Review</span>
+                          <Link href="/queue" className="em-btn sm ghost"><IconArrowRight size={13} /> Open</Link>
+                        </div>
+                      </div>
+                      <div className="em-card-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                        <div className="em-flow">
+                          <LiveFlow memo={activeMemo} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="em-card-body" style={{ padding: "24px 20px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                      ไม่มีเอกสารที่รอดำเนินการอยู่ในขณะนี้
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <span className="em-pill pending"><span className="dot" />In Review</span>
-                  <Link href="/queue" className="em-btn sm ghost"><IconArrowRight size={13} /> Open</Link>
-                </div>
-              </div>
-              <div className="em-card-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
-                <div className="em-flow">
-                  <FlowStep n="1" done title="Requester" who="Project Intern · HR&GA IT" detail="Draft submitted with 3 attachments" time="15 May · 09:12" />
-                  <FlowStep n="2" done title="Manager / Top Section" who="K. Wirawan · HR&GA" detail="Reviewed budget code 6201-04 and signed off" time="15 May · 13:40" />
-                  <FlowStep n="3" current title="General Manager" who="K. Suthep · Operations" detail="ตรวจสอบยอดและขั้นตอนการเบิก — ตอบกลับภายใน 4 ชม." time="Now · 16h elapsed" />
-                  <FlowStep n="4" md title="Managing Director" who="K. Pichet · MD Office" detail="ไม่ต้องอนุมัติ (ภายใต้ 50,000 THB และในงบประมาณ)" time="—" skipped />
-                </div>
-              </div>
-            </div>
 
-            <div className="em-card">
-              <div className="em-card-head">
-                <div>
-                  <h3>Recent Activity</h3>
-                  <div className="em-sub">Live updates</div>
+                {/* Recent Activity — live from memos */}
+                <div className="em-card">
+                  <div className="em-card-head">
+                    <div>
+                      <h3>Recent Activity</h3>
+                      <div className="em-sub">เรียงตามวันที่อัปเดตล่าสุด</div>
+                    </div>
+                    <button className="em-btn sm ghost"><IconRefresh size={13} /></button>
+                  </div>
+                  <div className="em-card-body" style={{ paddingTop: 4 }}>
+                    {recentActivity.map(m => {
+                      const { tone, Icon, actor, verb } = memoActivity(m);
+                      return (
+                        <FeedItem
+                          key={m.id}
+                          icon={<Icon size={14} />}
+                          tone={tone}
+                          text={<><strong>{actor}</strong> {verb} <span className="em-id">{m.id}</span> · {approvalLabels[m.category]}</>}
+                          time={m.updatedAt}
+                        />
+                      );
+                    })}
+                    {recentActivity.length === 0 && (
+                      <div style={{ padding: "16px 0", textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}>ยังไม่มีกิจกรรม</div>
+                    )}
+                  </div>
                 </div>
-                <button className="em-btn sm ghost"><IconRefresh size={13} /></button>
-              </div>
-              <div className="em-card-body" style={{ paddingTop: 4 }}>
-                <FeedItem icon={<IconCheckCircle size={14} />} tone="emerald" text={<><strong>K. Suthep</strong> approved <span className="em-id">EM-2026-003</span></>} time="3 min ago" />
-                <FeedItem icon={<IconCrown size={14} />} tone="gold" text={<><strong>K. Pichet (MD)</strong> requested review on <span className="em-id">EM-2026-006</span></>} time="22 min ago" />
-                <FeedItem icon={<IconPen size={14} />} tone="default" text={<><strong>Production</strong> created <span className="em-id">EM-2026-009</span> · 48,200 THB</>} time="1h ago" />
-                <FeedItem icon={<IconReturn size={14} />} tone="amber" text={<><strong>K. Wirawan</strong> returned <span className="em-id">EM-2026-007</span> for budget clarification</>} time="2h ago" />
-                <FeedItem icon={<IconSlash size={14} />} tone="rose" text={<><strong>K. Pichet</strong> rejected <span className="em-id">EM-2026-006</span></>} time="5h ago" />
-              </div>
-            </div>
-            </>
+              </>
             ) : (
               <div className="em-card" style={{ padding: 32, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 14, display: "grid", placeItems: "center", color: "var(--primary)", background: "var(--primary-soft)", border: "1px solid rgba(37,99,235,0.16)" }}>
@@ -216,6 +276,56 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Renders the workflow timeline for a live pending memo.
+function LiveFlow({ memo }: { memo: MemoRecord }) {
+  const route = memo.selectedRoute ?? [memo.currentStep];
+  const steps: string[] = ["Requester", ...route];
+  const currentIdx = steps.indexOf(memo.currentStep);
+
+  return (
+    <>
+      {steps.map((step, i) => {
+        const isDone    = i === 0 || (currentIdx !== -1 && i < currentIdx);
+        const isCurrent = i === currentIdx && memo.status === "pending";
+        const isMd      = step === "Managing Director";
+        const isInRoute = i > 0;
+
+        const who = i === 0
+          ? `${memo.requester} · ${memo.department}`
+          : isDone
+            ? `${step} — อนุมัติแล้ว`
+            : isCurrent
+              ? `${step} — รอการอนุมัติ`
+              : `${step} — ยังไม่ดำเนินการ`;
+
+        const detail = i === 0
+          ? `${approvalLabels[memo.category]} · ฿${memo.amount.toLocaleString()}`
+          : isDone
+            ? "ผ่านการตรวจสอบเรียบร้อย"
+            : isCurrent
+              ? `ตรวจสอบอยู่ · ${memo.cycleHours}h elapsed`
+              : "รอขั้นตอนก่อนหน้าเสร็จสิ้น";
+
+        const time = i === 0 ? memo.createdAt : isDone ? memo.updatedAt : "—";
+
+        return (
+          <FlowStep
+            key={step + i}
+            n={String(i + 1)}
+            done={isDone}
+            current={isCurrent}
+            md={isMd && isInRoute}
+            title={i === 0 ? "Requester" : step}
+            who={who}
+            detail={detail}
+            time={time}
+          />
+        );
+      })}
+    </>
   );
 }
 

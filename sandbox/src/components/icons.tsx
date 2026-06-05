@@ -58,6 +58,10 @@ export const IconCalendar = (p: IconProps) => <Ic {...p}><rect x="3" y="5" width
 export const IconMail = (p: IconProps) => <Ic {...p}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 7 9-7"/></Ic>;
 export const IconPrinter = (p: IconProps) => <Ic {...p}><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></Ic>;
 export const IconDots = (p: IconProps) => <Ic {...p}><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></Ic>;
+export const IconTrash = (p: IconProps) => <Ic {...p}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></Ic>;
+export const IconKey = (p: IconProps) => <Ic {...p}><circle cx="8" cy="15" r="4"/><path d="M12 11l8-8"/><path d="M17 6l2 2"/><path d="M14 9l2 2"/></Ic>;
+export const IconSettings = (p: IconProps) => <Ic {...p}><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></Ic>;
+export const IconUserPlus = (p: IconProps) => <Ic {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></Ic>;
 export const IconSort = (p: IconProps) => <Ic {...p}><path d="M8 7v14M4 17l4 4 4-4"/><path d="M16 17V3M20 7l-4-4-4 4"/></Ic>;
 export const IconDownload = (p: IconProps) => <Ic {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></Ic>;
 export const IconWallet = (p: IconProps) => <Ic {...p}><path d="M21 12V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><circle cx="17.5" cy="13.5" r="1.5"/></Ic>;

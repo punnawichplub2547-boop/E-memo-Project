@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { MemoProvider } from "@/lib/memo-store";
 import { PrototypeUserProvider } from "@/lib/prototype-user-context";
+import { AdminUsersProvider } from "@/lib/admin-users";
 
 export const metadata: Metadata = {
   title: "HR&GA E-Memo",
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body>
-        <PrototypeUserProvider>
-          <MemoProvider>
-            {children}
-          </MemoProvider>
-        </PrototypeUserProvider>
+        <AdminUsersProvider>
+          <PrototypeUserProvider>
+            <MemoProvider>
+              {children}
+            </MemoProvider>
+          </PrototypeUserProvider>
+        </AdminUsersProvider>
       </body>
     </html>
   );

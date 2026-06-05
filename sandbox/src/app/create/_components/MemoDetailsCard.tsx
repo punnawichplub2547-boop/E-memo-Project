@@ -5,6 +5,7 @@ import {
   shouldBlockNonNegativeNumberKey,
 } from "@/lib/number-input";
 import { IconSparkles, IconTag, IconBuilding } from "@/components/icons";
+import { DEPARTMENTS } from "@/lib/departments";
 import { FlagCheckbox } from "./FlagCheckbox";
 
 interface MemoDetailsCardProps {
@@ -146,8 +147,7 @@ export function MemoDetailsCard({
               <IconBuilding size={14} style={{ color: "var(--muted)" }} />
               <select style={{ border: 0, padding: 0, height: 32, background: "transparent", flex: 1, outline: "none", fontSize: 13 }}
                 value={department} onChange={e => onDepartmentChange(e.target.value)}>
-                <option>HR&amp;GA</option><option>Production</option><option>IT</option>
-                <option>Engineering</option><option>GA</option><option>Maintenance</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
           </div>

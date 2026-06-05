@@ -171,6 +171,9 @@ export type MemoRecord = {
   cycleHours: number;
   createdAt: string;
   updatedAt: string;
+  /** Soft-delete marker. Undefined = active; a display timestamp = voided/archived by admin.
+   *  Voided memos are filtered out of all active views but kept in the DB for audit + restore. */
+  deletedAt?: string;
 };
 
 const managerLimit = 10000;
@@ -405,7 +408,7 @@ export const seedMemos: MemoRecord[] = [
     id: "EM-2026-002",
     title: "ซ่อมบำรุงพื้นที่สำนักงาน",
     requester: "Keattisak C.",
-    department: "GA",
+    department: "HR&GA",
     category: "service-contract",
     amount: 32000,
     status: "pending",
@@ -470,7 +473,7 @@ export const seedMemos: MemoRecord[] = [
     id: "EM-2026-007",
     title: "ขอซื้อวัสดุสวัสดิการพนักงาน",
     requester: "HR Team",
-    department: "HR",
+    department: "HR&GA",
     category: "general-purchase",
     amount: 12500,
     status: "approved",
@@ -483,7 +486,7 @@ export const seedMemos: MemoRecord[] = [
     id: "EM-2026-008",
     title: "ขออนุมัติค่าใช้จ่ายอบรมผู้ใช้งาน",
     requester: "Project Intern",
-    department: "HR&GA IT",
+    department: "IT",
     category: "service-contract",
     amount: 18000,
     status: "pending",

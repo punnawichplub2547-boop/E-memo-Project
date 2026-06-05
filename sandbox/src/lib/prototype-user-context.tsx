@@ -1,11 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-  DEFAULT_PROTOTYPE_USER_ID,
-  getPrototypeUserById,
-  type PrototypeUser,
-} from "./prototype-users";
+import { DEFAULT_PROTOTYPE_USER_ID } from "./prototype-users";
+import type { PrototypeUser } from "./prototype-users";
+import { useAdminUsers } from "./admin-users";
 
 const STORAGE_KEY = "hr-ememo-prototype-user";
 
@@ -18,22 +16,23 @@ type PrototypeUserContextValue = {
 const PrototypeUserContext = createContext<PrototypeUserContextValue | null>(null);
 
 export function PrototypeUserProvider({ children }: { children: React.ReactNode }) {
+  const { getUserById } = useAdminUsers();
   const [userId, setUserIdState] = useState(DEFAULT_PROTOTYPE_USER_ID);
 
   useEffect(() => {
     const applyStored = () => {
       try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
-        if (stored) setUserIdState(getPrototypeUserById(stored).id);
+        if (stored) setUserIdState(getUserById(stored).id);
       } catch {
         // Keep default prototype user when localStorage is unavailable.
       }
     };
     applyStored();
-  }, []);
+  }, [getUserById]);
 
   const setUserId = (id: string) => {
-    const nextId = getPrototypeUserById(id).id;
+    const nextId = getUserById(id).id;
     setUserIdState(nextId);
     try {
       window.localStorage.setItem(STORAGE_KEY, nextId);
@@ -43,9 +42,10 @@ export function PrototypeUserProvider({ children }: { children: React.ReactNode 
   };
 
   const value = useMemo<PrototypeUserContextValue>(() => {
-    const user = getPrototypeUserById(userId);
+    const user = getUserById(userId);
     return { user, userId: user.id, setUserId };
-  }, [userId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, getUserById]);
 
   return (
     <PrototypeUserContext.Provider value={value}>

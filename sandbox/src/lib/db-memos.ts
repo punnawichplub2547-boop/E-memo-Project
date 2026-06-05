@@ -61,6 +61,8 @@ export type MemoDbRow = {
   read_recipients_json: DbJson;
   created_at: DbDate;
   updated_at: DbDate;
+  // Optional: absent on legacy DBs that predate the soft-delete migration.
+  deleted_at?: DbDate | null;
 };
 
 export type ReadActionDbRow = {
@@ -127,6 +129,7 @@ export function serializeMemoRecord(
     revisions: serializeMemoRevisions(revisions),
     createdAt: toBangkokDisplayTimestamp(row.created_at),
     updatedAt: toBangkokDisplayTimestamp(row.updated_at),
+    deletedAt: row.deleted_at ? toBangkokDisplayTimestamp(row.deleted_at) : undefined,
   };
 }
 

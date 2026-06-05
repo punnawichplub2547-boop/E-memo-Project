@@ -8,7 +8,7 @@ import {
   IconDownload, IconPlus, IconFileText, IconCheckCircle, IconClock,
   IconReturn, IconCrown, IconCheck, IconSlash, IconPen,
   IconArrowRight, IconArrowUp, IconArrowDown, IconCalendar,
-  IconUsers, IconChevDown,
+  IconUsers, IconChevDown, IconX,
 } from "@/components/icons";
 import { MemoRecord, approvalLabels } from "@/lib/approval";
 import { groupMemosByDate } from "@/lib/group-memos";
@@ -28,10 +28,12 @@ const ACTION_CONFIG: Record<HistoryAction, { icon: React.ReactNode; color: strin
 
 export default function HistoryPage() {
   const { memos } = useMemos();
-  const [tabFilter, setTabFilter] = useState<"all" | "approved" | "rejected" | "returned">("all");
+  const [tabFilter, setTabFilter] = useState<"all" | "approved" | "rejected" | "returned" | "md" | "slow">("all");
 
   const filtered = memos.filter(m => {
     if (tabFilter === "all") return true;
+    if (tabFilter === "md") return m.currentStep === "Managing Director";
+    if (tabFilter === "slow") return m.cycleHours > 24;
     return m.status === tabFilter;
   });
 
@@ -66,11 +68,11 @@ export default function HistoryPage() {
 
           {/* Summary bar */}
           <div className="em-card" style={{ padding: 0, display: "grid", gridTemplateColumns: "repeat(5,1fr)", overflow: "hidden" }}>
-            <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" active={tabFilter === "all"} />
-            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" active={tabFilter === "approved"} />
-            <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconSlash size={16} />} accent="rose" active={tabFilter === "rejected"} />
-            <SummaryBlock label="Avg. cycle" value={`${avgCycle}h`} sub="target < 24h" icon={<IconClock size={16} />} accent="gold" trendDir="down" />
-            <SummaryBlock label="MD-tier" value={String(mdCount)} sub="executive reviews" icon={<IconCrown size={16} />} accent="md" last />
+            <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" active={tabFilter === "all"} onClick={() => setTabFilter("all")} />
+            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" active={tabFilter === "approved"} onClick={() => setTabFilter(tabFilter === "approved" ? "all" : "approved")} />
+            <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconSlash size={16} />} accent="rose" active={tabFilter === "rejected"} onClick={() => setTabFilter(tabFilter === "rejected" ? "all" : "rejected")} />
+            <SummaryBlock label="Avg. cycle" value={`${avgCycle}h`} sub="target < 24h" icon={<IconClock size={16} />} accent="gold" trendDir="down" active={tabFilter === "slow"} onClick={() => setTabFilter(tabFilter === "slow" ? "all" : "slow")} />
+            <SummaryBlock label="MD-tier" value={String(mdCount)} sub="executive reviews" icon={<IconCrown size={16} />} accent="md" last active={tabFilter === "md"} onClick={() => setTabFilter(tabFilter === "md" ? "all" : "md")} />
           </div>
 
           {/* Filter */}
@@ -83,6 +85,13 @@ export default function HistoryPage() {
                 </div>
               ))}
             </div>
+            {(tabFilter === "md" || tabFilter === "slow") && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.35)", fontSize: 12, color: "#7C5E0F", fontWeight: 600 }}>
+                <IconCrown size={12} />
+                {tabFilter === "md" ? "MD-tier memos" : `Over-target cycle (>24h) · ${filtered.length}`}
+                <button onClick={() => setTabFilter("all")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 2, color: "#7C5E0F", display: "flex" }}><IconX size={12} /></button>
+              </div>
+            )}
             <div style={{ flex: 1 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12.5, background: "var(--surface)" }}>
               <IconCalendar size={13} style={{ color: "var(--muted)" }} />
@@ -227,7 +236,7 @@ export default function HistoryPage() {
   );
 }
 
-function SummaryBlock({ label, value, sub, icon, accent, trendDir, last, active }: { label: string; value: string; sub: string; icon: React.ReactNode; accent: string; trendDir?: "up" | "down"; last?: boolean; active?: boolean }) {
+function SummaryBlock({ label, value, sub, icon, accent, trendDir, last, active, onClick }: { label: string; value: string; sub: string; icon: React.ReactNode; accent: string; trendDir?: "up" | "down"; last?: boolean; active?: boolean; onClick?: () => void }) {
   const accents: Record<string, { bar: string; bg: string; fg: string }> = {
     primary: { bar: "var(--primary-grad)", bg: "var(--primary-soft)", fg: "var(--primary)" },
     emerald: { bar: "linear-gradient(90deg,#047857,#10B981)", bg: "var(--emerald-soft)", fg: "var(--emerald)" },
@@ -238,7 +247,7 @@ function SummaryBlock({ label, value, sub, icon, accent, trendDir, last, active 
   };
   const c = accents[accent];
   return (
-    <div className={`em-summary-block ${accent}${active ? " is-active" : ""}`} style={{ borderRight: last ? 0 : "1px solid var(--line)" }}>
+    <div className={`em-summary-block ${accent}${active ? " is-active" : ""}`} onClick={onClick} style={{ borderRight: last ? 0 : "1px solid var(--line)", cursor: onClick ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, background: c.bg, color: c.fg, display: "grid", placeItems: "center" }}>{icon}</div>
         <div className="em-eyebrow" style={{ color: "var(--muted)", letterSpacing: "0.10em" }}>{label}</div>

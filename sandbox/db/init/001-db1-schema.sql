@@ -56,12 +56,17 @@ CREATE TABLE IF NOT EXISTS memos (
   created_at                      DATETIME      NOT NULL,
   updated_at                      DATETIME      NOT NULL,
 
+  -- Soft-delete marker. NULL = active; non-NULL = voided/archived by an admin.
+  -- Rows are never hard-deleted, preserving the workflow_step_actions audit trail.
+  deleted_at                      DATETIME      NULL DEFAULT NULL,
+
   INDEX idx_memos_status          (status),
   INDEX idx_memos_current_step    (current_step),
   INDEX idx_memos_requester       (requester_name),
   INDEX idx_memos_department      (department_name),
   INDEX idx_memos_created_at      (created_at),
-  INDEX idx_memos_id_revision     (id, revision_no)
+  INDEX idx_memos_id_revision     (id, revision_no),
+  INDEX idx_memos_deleted_at      (deleted_at)
 );
 
 CREATE TABLE IF NOT EXISTS memo_revisions (

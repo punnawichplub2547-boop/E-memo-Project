@@ -8,7 +8,8 @@ import {
 } from "./icons";
 import { useMemos } from "@/lib/memo-store";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
-import { getPrototypeUserInitials, PROTOTYPE_USERS } from "@/lib/prototype-users";
+import { getPrototypeUserInitials, isPrototypeAdmin } from "@/lib/prototype-users";
+import { useAdminUsers } from "@/lib/admin-users";
 
 const mainItems = [
   { id: "dashboard", href: "/",        label: "Dashboard",       Icon: IconGauge },
@@ -27,6 +28,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { memos } = useMemos();
   const { user, userId, setUserId } = usePrototypeUser();
+  const { users } = useAdminUsers();
   const pendingCount = memos.filter(m => m.status === "pending").length;
   const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
 
@@ -71,6 +73,16 @@ export function Sidebar() {
             {id === "exec" && mdPendingCount > 0 && <span className="em-nav-badge">{mdPendingCount}</span>}
           </Link>
         ))}
+
+        {isPrototypeAdmin(user) && (
+          <>
+            <div className="em-nav-group-label" style={{ marginTop: 14 }}>System</div>
+            <Link href="/admin" className={`em-nav-item${isActive("/admin") ? " active" : ""}`}>
+              <IconShield size={17} />
+              <span>Admin Panel</span>
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="em-side-footer">
@@ -91,7 +103,7 @@ export function Sidebar() {
               padding: 0,
             }}
           >
-            {PROTOTYPE_USERS.map((option) => (
+            {users.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>

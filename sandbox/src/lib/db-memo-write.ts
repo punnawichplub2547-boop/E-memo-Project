@@ -486,6 +486,60 @@ export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevi
   };
 }
 
+export type SoftDeleteMemoBody = {
+  revisionNo: number;
+  // Bangkok display-format ("DD Mon YYYY HH:MM"); converted to UTC internally.
+  deletedAt: string;
+  actorName: string | null;
+  reason: string | null;
+};
+
+export type SoftDeleteMemoPayload = {
+  // null deleted_at = restore (active); non-null = void.
+  memoUpdate: { deleted_at: string | null; updated_at: string };
+  workflowAction: {
+    revision_no: number;
+    action_type: "void" | "restore";
+    step_label: null;
+    actor_name: string | null;
+    result: null;
+    reason: string | null;
+    acted_at: string;
+    metadata_json: null;
+  };
+};
+
+function buildSoftDeleteLikePayload(
+  body: SoftDeleteMemoBody,
+  mode: "void" | "restore",
+): SoftDeleteMemoPayload {
+  const stampUtc = toMysqlUtcDateTime(body.deletedAt);
+  return {
+    memoUpdate: {
+      deleted_at: mode === "void" ? stampUtc : null,
+      updated_at: stampUtc,
+    },
+    workflowAction: {
+      revision_no: body.revisionNo,
+      action_type: mode,
+      step_label: null,
+      actor_name: body.actorName ?? null,
+      result: null,
+      reason: body.reason,
+      acted_at: stampUtc,
+      metadata_json: null,
+    },
+  };
+}
+
+export function buildSoftDeleteMemoPayload(body: SoftDeleteMemoBody): SoftDeleteMemoPayload {
+  return buildSoftDeleteLikePayload(body, "void");
+}
+
+export function buildRestoreMemoPayload(body: SoftDeleteMemoBody): SoftDeleteMemoPayload {
+  return buildSoftDeleteLikePayload(body, "restore");
+}
+
 export function buildNewMemoReadActionRows(memo: MemoRecord): NewMemoReadActionRow[] {
   if (!memo.readActions || memo.readActions.length === 0) return [];
   const revisionNo = memo.revisionNo ?? 0;

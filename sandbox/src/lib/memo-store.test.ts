@@ -700,3 +700,45 @@ describe("buildMemoSnapshot", () => {
     expect("returnReason" in snapBefore).toBe(false);
   });
 });
+
+describe("memoReducer — DELETE_MEMO (soft-delete)", () => {
+  const state = seedMemos.slice(0, 3);
+  const target = state[1];
+  const ts = "05 Jun 2026 14:30";
+
+  it("soft-deletes by setting deletedAt instead of removing the row", () => {
+    const next = memoReducer(state, { type: "DELETE_MEMO", id: target.id, deletedAt: ts });
+    expect(next.length).toBe(state.length);
+    const voided = next.find(m => m.id === target.id)!;
+    expect(voided.deletedAt).toBe(ts);
+    expect(voided.updatedAt).toBe(ts);
+  });
+
+  it("leaves other memos unchanged and active", () => {
+    const next = memoReducer(state, { type: "DELETE_MEMO", id: target.id, deletedAt: ts });
+    expect(next.find(m => m.id === state[0].id)!.deletedAt).toBeUndefined();
+    expect(next.find(m => m.id === state[2].id)!.deletedAt).toBeUndefined();
+  });
+
+  it("is a no-op for an unknown id", () => {
+    const next = memoReducer(state, { type: "DELETE_MEMO", id: "EM-DOES-NOT-EXIST", deletedAt: ts });
+    expect(next.every(m => !m.deletedAt)).toBe(true);
+  });
+});
+
+describe("memoReducer — RESTORE_MEMO", () => {
+  const voided = { ...seedMemos[0], deletedAt: "05 Jun 2026 14:30" };
+  const state = [voided, seedMemos[1]];
+
+  it("clears deletedAt and stamps updatedAt", () => {
+    const next = memoReducer(state, { type: "RESTORE_MEMO", id: voided.id, updatedAt: "06 Jun 2026 09:00" });
+    const restored = next.find(m => m.id === voided.id)!;
+    expect(restored.deletedAt).toBeUndefined();
+    expect(restored.updatedAt).toBe("06 Jun 2026 09:00");
+  });
+
+  it("leaves other memos unchanged", () => {
+    const next = memoReducer(state, { type: "RESTORE_MEMO", id: voided.id, updatedAt: "06 Jun 2026 09:00" });
+    expect(next.find(m => m.id === seedMemos[1].id)).toEqual(seedMemos[1]);
+  });
+});

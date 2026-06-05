@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState } from "react";
 import {
   seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalCategory, BudgetStatus,
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
@@ -15,6 +15,7 @@ import type {
   ResubmitMemoBody,
   ReturnMemoBody,
   SkipAllReadsBody,
+  SoftDeleteMemoBody,
   SubmitRevisionBody,
 } from "./db-memo-write";
 
@@ -60,7 +61,9 @@ type Action =
       notifyMD?: boolean;
       revisionNote?: string;
       updatedAt?: string;
-    };
+    }
+  | { type: "DELETE_MEMO"; id: string; deletedAt: string }
+  | { type: "RESTORE_MEMO"; id: string; updatedAt: string };
 
 // Content-only snapshot of a memo — used by revision archiving and DB persistence.
 // Includes submitted content and routing fields only. Excludes all workflow execution
@@ -258,13 +261,25 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           ? { ...m, status: "rejected", rejectDisposition: action.disposition, rejectReason: action.reason, updatedAt: action.updatedAt ?? m.updatedAt }
           : m
       );
+    case "DELETE_MEMO":
+      // Soft-delete: mark voided but keep the row so it can be restored and its audit trail survives.
+      return state.map((m) =>
+        m.id === action.id ? { ...m, deletedAt: action.deletedAt, updatedAt: action.deletedAt } : m
+      );
+    case "RESTORE_MEMO":
+      return state.map((m) =>
+        m.id === action.id ? { ...m, deletedAt: undefined, updatedAt: action.updatedAt } : m
+      );
     default:
       return state;
   }
 }
 
 interface MemoContextValue {
+  /** Active memos only (soft-deleted rows filtered out). Use this in all normal views. */
   memos: MemoRecord[];
+  /** Every memo including soft-deleted ones. Use only where deleted rows must be visible (admin). */
+  allMemos: MemoRecord[];
   dispatch: React.Dispatch<Action>;
   /** True once the initial DB hydration fetch has settled (success or network failure). */
   hydrated: boolean;
@@ -349,6 +364,14 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
           nextMemo.updatedAt;
         void persistSkipAllReads(action.id, nextMemo, skippedRecipients, action.skipReason, actedAt, actorName);
       }
+    } else if (action.type === "DELETE_MEMO") {
+      const nextMemo = memos.find((m) => m.id === action.id);
+      reducerDispatch(action);
+      if (nextMemo) void persistSoftDeleteMemo(action.id, nextMemo.revisionNo ?? 0, action.deletedAt, actorName);
+    } else if (action.type === "RESTORE_MEMO") {
+      const nextMemo = memos.find((m) => m.id === action.id);
+      reducerDispatch(action);
+      if (nextMemo) void persistRestoreMemo(action.id, nextMemo.revisionNo ?? 0, action.updatedAt, actorName);
     } else {
       reducerDispatch(action);
       if (action.type === "ADD_MEMO") {
@@ -377,8 +400,11 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
+  // Active list excludes soft-deleted memos. The reducer keeps the full list internally so
+  // dispatch/persist closures still resolve voided rows by id; we filter only at the boundary.
+  const activeMemos = useMemo(() => memos.filter((m) => !m.deletedAt), [memos]);
   return (
-    <MemoContext.Provider value={{ memos, dispatch, hydrated }}>
+    <MemoContext.Provider value={{ memos: activeMemos, allMemos: memos, dispatch, hydrated }}>
       {children}
     </MemoContext.Provider>
   );
@@ -600,6 +626,42 @@ async function persistSkipAllReads(
     }
   } catch (error) {
     console.error("[MemoProvider] SKIP_ALL_READS persist failed", error);
+  }
+}
+
+// Soft-delete (void): sets memos.deleted_at in the DB and appends a "void" audit row.
+// The memo and its full audit trail are preserved; RESTORE_MEMO reverses it.
+// On a legacy DB that predates the deleted_at migration the UPDATE returns 500 — the local
+// reducer already flagged the memo, so the prototype stays usable in seed-fallback mode.
+async function persistSoftDeleteMemo(memoId: string, revisionNo: number, deletedAt: string, actorName: string) {
+  const body: SoftDeleteMemoBody = { revisionNo, deletedAt, actorName, reason: null };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] DELETE_MEMO persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] DELETE_MEMO persist failed", error);
+  }
+}
+
+async function persistRestoreMemo(memoId: string, revisionNo: number, updatedAt: string, actorName: string) {
+  const body: SoftDeleteMemoBody = { revisionNo, deletedAt: updatedAt, actorName, reason: null };
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] RESTORE_MEMO persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] RESTORE_MEMO persist failed", error);
   }
 }
 
