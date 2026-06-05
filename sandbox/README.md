@@ -66,6 +66,8 @@ docker compose restart
 docker compose down
 ```
 
+For a step-by-step post-deploy smoke test, see `../docs/server-smoke-checklist.md`.
+
 If the server reboots, the container will start again automatically as long as the Docker service itself starts on boot.
 
 To reset the local DB-1 prototype database and re-run the schema init file:

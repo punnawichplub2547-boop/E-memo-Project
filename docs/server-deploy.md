@@ -70,6 +70,8 @@ Remove-Item Env:\CONFIRM_DB_SEED
 
 ## Recommended Server Checks
 
+For a full post-deploy verification flow, follow [server-smoke-checklist.md](/D:/Hrproject/docs/server-smoke-checklist.md).
+
 Make sure Docker starts on boot:
 
 ```bash
