@@ -7,7 +7,7 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import { memoToDbSeedRow } from "./db-seed";
-import { PROTOTYPE_ACTOR_NAME } from "./prototype-user";
+import { usePrototypeUser } from "./prototype-user-context";
 import type {
   AdvanceStepBody,
   MarkReadBody,
@@ -275,6 +275,8 @@ const MemoContext = createContext<MemoContextValue | null>(null);
 export function MemoProvider({ children }: { children: React.ReactNode }) {
   const [memos, reducerDispatch] = useReducer(memoReducer, seedMemos);
   const [hydrated, setHydrated] = useState(false);
+  const { user } = usePrototypeUser();
+  const actorName = user.name;
   const dispatch = useCallback<React.Dispatch<Action>>((action) => {
     if (action.type === "ADVANCE_STEP") {
       const prevState = memos;
@@ -283,7 +285,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistAdvanceStep(action.id, prevMemo, nextMemo, action.updatedAt);
+        void persistAdvanceStep(action.id, prevMemo, nextMemo, actorName, action.updatedAt);
       }
     } else if (action.type === "RETURN_MEMO") {
       const prevState = memos;
@@ -292,7 +294,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, action.updatedAt);
+        void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, actorName, action.updatedAt);
       }
     } else if (action.type === "REJECT_MEMO") {
       const prevState = memos;
@@ -301,7 +303,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistRejectMemo(action.id, prevMemo, nextMemo, action.disposition, action.reason, action.updatedAt);
+        void persistRejectMemo(action.id, prevMemo, nextMemo, action.disposition, action.reason, actorName, action.updatedAt);
       }
     } else if (action.type === "RESUBMIT_MEMO") {
       const prevState = memos;
@@ -310,7 +312,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistResubmitMemo(action.id, prevMemo, nextMemo, action.revisionNote, action.updatedAt);
+        void persistResubmitMemo(action.id, prevMemo, nextMemo, action.revisionNote, actorName, action.updatedAt);
       }
     } else if (action.type === "SUBMIT_REVISION") {
       const prevState = memos;
@@ -319,7 +321,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistSubmitRevisionMemo(action.id, prevMemo, nextMemo, action.revisionNote);
+        void persistSubmitRevisionMemo(action.id, prevMemo, nextMemo, action.revisionNote, actorName);
       }
     } else if (action.type === "MARK_READ") {
       const prevState = memos;
@@ -329,7 +331,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const nextMemo = nextState.find((m) => m.id === action.id);
       const nextReadAction = nextMemo?.readActions?.find((ra) => ra.recipient === action.recipient);
       if (prevMemo && nextMemo && prevMemo !== nextMemo && nextReadAction?.status === "read") {
-        void persistMarkRead(action.id, nextMemo, action.recipient, action.actedAt ?? nextReadAction.actedAt ?? nextMemo.updatedAt);
+        void persistMarkRead(action.id, nextMemo, action.recipient, action.actedAt ?? nextReadAction.actedAt ?? nextMemo.updatedAt, actorName);
       }
     } else if (action.type === "SKIP_ALL_READS") {
       const prevState = memos;
@@ -345,7 +347,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
         const actedAt = action.actedAt ??
           nextMemo.readActions?.find((ra) => ra.status === "skipped" && skippedRecipients.includes(ra.recipient))?.actedAt ??
           nextMemo.updatedAt;
-        void persistSkipAllReads(action.id, nextMemo, skippedRecipients, action.skipReason, actedAt);
+        void persistSkipAllReads(action.id, nextMemo, skippedRecipients, action.skipReason, actedAt, actorName);
       }
     } else {
       reducerDispatch(action);
@@ -353,7 +355,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
         void persistNewMemo(action.memo);
       }
     }
-  }, [memos]);
+  }, [memos, actorName]);
   useEffect(() => {
     let cancelled = false;
     async function hydrateMemos() {
@@ -386,6 +388,7 @@ async function persistAdvanceStep(
   memoId: string,
   prev: MemoRecord,
   next: MemoRecord,
+  actorName: string,
   updatedAt?: string,
 ) {
   const body: AdvanceStepBody = {
@@ -395,7 +398,7 @@ async function persistAdvanceStep(
     nextWorkflowState: next.workflowState ?? "Checked",
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/advance`, {
@@ -416,6 +419,7 @@ async function persistReturnMemo(
   prev: MemoRecord,
   next: MemoRecord,
   returnReason: string,
+  actorName: string,
   updatedAt?: string,
 ) {
   const body: ReturnMemoBody = {
@@ -423,7 +427,7 @@ async function persistReturnMemo(
     returnReason,
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/return`, {
@@ -444,6 +448,7 @@ async function persistResubmitMemo(
   prev: MemoRecord,
   next: MemoRecord,
   revisionNote: string | undefined,
+  actorName: string,
   updatedAt?: string,
 ) {
   const body: ResubmitMemoBody = {
@@ -457,7 +462,7 @@ async function persistResubmitMemo(
     nextCurrentStep: next.currentStep,
     readRecipients: prev.readActions?.map((ra) => ra.recipient) ?? [],
     updatedAt: updatedAt ?? next.updatedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/resubmit`, {
@@ -478,6 +483,7 @@ async function persistSubmitRevisionMemo(
   prev: MemoRecord,
   next: MemoRecord,
   revisionNote: string | undefined,
+  actorName: string,
 ) {
   const body: SubmitRevisionBody = {
     oldRevisionNo: prev.revisionNo ?? 0,
@@ -494,7 +500,7 @@ async function persistSubmitRevisionMemo(
     readRecipients: next.readActions?.map((ra) => ra.recipient) ??
                     next.readRecipients ??
                     [],
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/submit-revision`, {
@@ -516,6 +522,7 @@ async function persistRejectMemo(
   next: MemoRecord,
   disposition: "close" | "revision-allowed",
   rejectReason: string,
+  actorName: string,
   updatedAt?: string,
 ) {
   const body: RejectMemoBody = {
@@ -524,7 +531,7 @@ async function persistRejectMemo(
     rejectReason,
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/reject`, {
@@ -545,12 +552,13 @@ async function persistMarkRead(
   next: MemoRecord,
   recipient: string,
   actedAt: string,
+  actorName: string,
 ) {
   const body: MarkReadBody = {
     recipient,
     revisionNo: next.revisionNo ?? 0,
     actedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/read`, {
@@ -572,13 +580,14 @@ async function persistSkipAllReads(
   recipients: string[],
   skipReason: string,
   actedAt: string,
+  actorName: string,
 ) {
   const body: SkipAllReadsBody = {
     recipients,
     skipReason,
     revisionNo: next.revisionNo ?? 0,
     actedAt,
-    actorName: PROTOTYPE_ACTOR_NAME,
+    actorName,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/skip-reads`, {

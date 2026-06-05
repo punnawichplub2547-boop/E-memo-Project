@@ -4,9 +4,16 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MemoRecord } from "@/lib/approval";
 import { IconCheck, IconPen, IconReturn, IconX } from "@/components/icons";
+import {
+  canApproveMemo,
+  canResubmitMemo,
+  canReturnOrRejectMemo,
+  type PrototypeUser,
+} from "@/lib/prototype-users";
 
 export function DrawerFooter({
   memo,
+  currentUser,
   onAction,
   onReject,
   onReturn,
@@ -14,6 +21,7 @@ export function DrawerFooter({
   onSkipAllReads,
 }: {
   memo: MemoRecord;
+  currentUser: PrototypeUser;
   onAction: (id: string, action: "approve") => void;
   onReject: (id: string, disposition: "close" | "revision-allowed", reason: string) => void;
   onReturn: (id: string, reason: string) => void;
@@ -35,6 +43,11 @@ export function DrawerFooter({
   const [skipReason, setSkipReason] = useState("");
 
   const hasPendingReads = memo.readActions?.some(ra => ra.status === "pending") ?? false;
+  const canApprove = canApproveMemo(currentUser, memo);
+  const canWorkflowDecision = canReturnOrRejectMemo(currentUser, memo);
+  const canResubmit = canResubmitMemo(currentUser, memo);
+  const noWorkflowPermissionText = "ไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้";
+  const noResubmitPermissionText = "เฉพาะผู้สร้าง memo หรือ Admin เท่านั้นที่ส่งแก้ไขได้";
 
   // Shared resubmit form — used by both "returned" and "rejected + revision-allowed" paths.
   const resubmitForm = (
@@ -67,6 +80,8 @@ export function DrawerFooter({
           type="button"
           className="em-btn sm primary"
           style={{ flex: 2 }}
+          disabled={!canResubmit}
+          title={canResubmit ? "Confirm resubmit" : noResubmitPermissionText}
           onClick={() => onResubmit(memo.id, revisionNote.trim() || undefined)}
         >
           <IconReturn size={13} /> Confirm Resubmit
@@ -83,6 +98,8 @@ export function DrawerFooter({
         type="button"
         className="em-btn primary"
         style={{ flex: 1 }}
+        disabled={!canResubmit}
+        title={canResubmit ? "Edit and resubmit" : noResubmitPermissionText}
         onClick={() => router.push(`/create?revise=${memo.id}`)}
       >
         <IconPen size={14} /> แก้ไขและส่งใหม่
@@ -91,6 +108,8 @@ export function DrawerFooter({
         type="button"
         className="em-btn"
         style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
+        disabled={!canResubmit}
+        title={canResubmit ? "Quick resubmit" : noResubmitPermissionText}
         onClick={() => { setResubmitMode(true); setRevisionNote(""); }}
       >
         <IconReturn size={14} /> ส่งตรวจใหม่ (ยังไม่แก้ฟอร์ม)
@@ -158,7 +177,8 @@ export function DrawerFooter({
                 type="button"
                 className="em-btn sm danger"
                 style={{ flex: 2 }}
-                disabled={!localRejectReason.trim()}
+                disabled={!localRejectReason.trim() || !canWorkflowDecision}
+                title={canWorkflowDecision ? "Confirm reject" : noWorkflowPermissionText}
                 onClick={() => onReject(memo.id, localRejectDisposition, localRejectReason.trim())}
               >
                 <IconX size={13} /> ยืนยันปฏิเสธ
@@ -191,7 +211,8 @@ export function DrawerFooter({
                 type="button"
                 className="em-btn sm"
                 style={{ flex: 2, background: "var(--amber-soft)", color: "var(--amber)", border: "1px solid rgba(180,83,9,0.30)" }}
-                disabled={!localReturnReason.trim()}
+                disabled={!localReturnReason.trim() || !canWorkflowDecision}
+                title={canWorkflowDecision ? "Confirm return" : noWorkflowPermissionText}
                 onClick={() => onReturn(memo.id, localReturnReason.trim())}
               >
                 <IconReturn size={13} /> Confirm Return
@@ -224,7 +245,8 @@ export function DrawerFooter({
                 type="button"
                 className="em-btn sm primary"
                 style={{ flex: 2 }}
-                disabled={!skipReason.trim()}
+                disabled={!skipReason.trim() || !canWorkflowDecision}
+                title={canWorkflowDecision ? "Skip read recipients" : noWorkflowPermissionText}
                 onClick={() => {
                   onSkipAllReads(memo.id, skipReason.trim());
                   setSkipReadsMode(false);
@@ -259,6 +281,8 @@ export function DrawerFooter({
                   type="button"
                   className="em-btn sm"
                   style={{ flexShrink: 0, fontSize: 11.5, color: "var(--amber)", background: "transparent", border: "1px solid rgba(180,83,9,0.35)" }}
+                  disabled={!canWorkflowDecision}
+                  title={canWorkflowDecision ? "Skip read recipients" : noWorkflowPermissionText}
                   onClick={() => { setSkipReadsMode(true); setSkipReason(""); }}
                 >
                   ข้ามขั้นตอนรับทราบ
@@ -269,20 +293,29 @@ export function DrawerFooter({
               <button
                 className="em-btn danger"
                 style={{ flex: 1 }}
+                disabled={!canWorkflowDecision}
+                title={canWorkflowDecision ? "Reject memo" : noWorkflowPermissionText}
                 onClick={() => { setRejectMode(true); setLocalRejectReason(""); setLocalRejectDisposition("close"); }}
               >
                 <IconX size={14} /> Reject
               </button>
-              <button className="em-btn" style={{ flex: 1 }} onClick={() => { setReturnMode(true); setLocalReturnReason(""); }}>
+              <button
+                className="em-btn"
+                style={{ flex: 1 }}
+                disabled={!canWorkflowDecision}
+                title={canWorkflowDecision ? "Return memo" : noWorkflowPermissionText}
+                onClick={() => { setReturnMode(true); setLocalReturnReason(""); }}
+              >
                 <IconReturn size={14} /> Return
               </button>
               <button
                 className="em-btn primary"
                 style={{ flex: 2 }}
-                disabled={hasPendingReads}
+                disabled={hasPendingReads || !canApprove}
+                title={canApprove ? "Approve memo" : noWorkflowPermissionText}
                 onClick={() => onAction(memo.id, "approve")}
               >
-                <IconCheck size={14} /> {hasPendingReads ? "Approve (รอรับทราบ)" : "Approve"}
+                <IconCheck size={14} /> {hasPendingReads ? "Approve (รอรับทราบ)" : canApprove ? "Approve" : "Approve (ไม่มีสิทธิ์)"}
               </button>
             </div>
           </div>

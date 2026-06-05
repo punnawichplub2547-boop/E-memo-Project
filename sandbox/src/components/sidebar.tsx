@@ -7,6 +7,8 @@ import {
   IconHistory, IconCrown, IconShield,
 } from "./icons";
 import { useMemos } from "@/lib/memo-store";
+import { usePrototypeUser } from "@/lib/prototype-user-context";
+import { getPrototypeUserInitials, PROTOTYPE_USERS } from "@/lib/prototype-users";
 
 const mainItems = [
   { id: "dashboard", href: "/",        label: "Dashboard",       Icon: IconGauge },
@@ -24,6 +26,7 @@ const execItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { memos } = useMemos();
+  const { user, userId, setUserId } = usePrototypeUser();
   const pendingCount = memos.filter(m => m.status === "pending").length;
   const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
 
@@ -71,10 +74,30 @@ export function Sidebar() {
       </nav>
 
       <div className="em-side-footer">
-        <div className="em-avatar">AH</div>
+        <div className="em-avatar">{getPrototypeUserInitials(user)}</div>
         <div style={{ minWidth: 0 }}>
-          <div className="em-side-name">อำภา หิงคำ</div>
-          <div className="em-side-role">HR&amp;GA · Manager</div>
+          <select
+            aria-label="Prototype user"
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+            style={{
+              width: "100%",
+              border: 0,
+              outline: "none",
+              background: "transparent",
+              color: "var(--ink)",
+              fontSize: 12.5,
+              fontWeight: 700,
+              padding: 0,
+            }}
+          >
+            {PROTOTYPE_USERS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+          <div className="em-side-role">{user.department} · {user.roleLabel}</div>
         </div>
       </div>
     </aside>

@@ -8,12 +8,14 @@ import {
 } from "@/components/icons";
 import { DrawerFooter } from "./drawer-footer";
 import { AuditLogSection } from "./audit-log-section";
+import { canMarkReadRecipient, type PrototypeUser } from "@/lib/prototype-users";
 
 const routeSummary = (memo: MemoRecord) =>
   memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
 
 export function DrawerPanel({
   memo,
+  currentUser,
   onClose,
   onAction,
   onReject,
@@ -24,6 +26,7 @@ export function DrawerPanel({
   inline = false,
 }: {
   memo: MemoRecord;
+  currentUser: PrototypeUser;
   onClose: () => void;
   onAction: (id: string, action: "approve") => void;
   onReject: (id: string, disposition: "close" | "revision-allowed", reason: string) => void;
@@ -479,6 +482,7 @@ export function DrawerPanel({
             {memo.readActions && memo.readActions.length > 0 && memo.readActions.map(ra => {
               const isRead = ra.status === "read";
               const isSkipped = ra.status === "skipped";
+              const canMarkRead = canMarkReadRecipient(currentUser, ra.recipient);
               return (
                 <div
                   key={`ra-${ra.recipient}`}
@@ -512,9 +516,11 @@ export function DrawerPanel({
                         type="button"
                         className="em-btn sm"
                         style={{ marginTop: 6, fontSize: 11.5 }}
+                        disabled={!canMarkRead}
+                        title={canMarkRead ? "Mark read" : "ไม่มีสิทธิ์รับทราบแทนผู้รับรายนี้"}
                         onClick={() => onMarkRead(memo.id, ra.recipient)}
                       >
-                        รับทราบ (Prototype)
+                        {canMarkRead ? "รับทราบ (Prototype)" : "รับทราบ (ไม่มีสิทธิ์)"}
                       </button>
                     )}
                   </div>
@@ -601,6 +607,7 @@ export function DrawerPanel({
 
       <DrawerFooter
         memo={memo}
+        currentUser={currentUser}
         onAction={onAction}
         onReject={onReject}
         onReturn={onReturn}

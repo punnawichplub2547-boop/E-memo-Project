@@ -14,6 +14,13 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DrawerPanel } from "./_components/drawer-panel";
+import { usePrototypeUser } from "@/lib/prototype-user-context";
+import {
+  canApproveMemo,
+  canMarkReadRecipient,
+  canResubmitMemo,
+  canReturnOrRejectMemo,
+} from "@/lib/prototype-users";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#047857", "#B45309", "#BE123C", "#0891B2", "#6D28D9"];
 const avatarColor = (s: string) => AVATAR_COLORS[s.charCodeAt(0) % AVATAR_COLORS.length];
@@ -33,6 +40,7 @@ type TabStatus = "all" | "pending" | "approved" | "rejected" | "draft" | "return
 
 function QueuePageContent() {
   const { memos, dispatch } = useMemos();
+  const { user } = usePrototypeUser();
   const searchParams = useSearchParams();
   const tierParam = searchParams.get("tier") ?? "";
   const tierFilter: ApprovalLevel | null = TIER_STEP_MAP[tierParam] ?? null;
@@ -97,6 +105,8 @@ function QueuePageContent() {
   const stampNow = () => formatTimestamp(new Date());
 
   const handleAction = (id: string, action: "approve") => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canApproveMemo(user, memo)) return;
     if (action === "approve") {
       dispatch({ type: "ADVANCE_STEP", id, updatedAt: stampNow() });
     }
@@ -104,25 +114,34 @@ function QueuePageContent() {
   };
 
   const handleReject = (id: string, disposition: "close" | "revision-allowed", reason: string) => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canReturnOrRejectMemo(user, memo)) return;
     dispatch({ type: "REJECT_MEMO", id, disposition, reason, updatedAt: stampNow() });
     setSelected(null);
   };
 
   const handleReturn = (id: string, reason: string) => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canReturnOrRejectMemo(user, memo)) return;
     dispatch({ type: "RETURN_MEMO", id, returnReason: reason, updatedAt: stampNow() });
     setSelected(null);
   };
 
   const handleResubmit = (id: string, revisionNote?: string) => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canResubmitMemo(user, memo)) return;
     dispatch({ type: "RESUBMIT_MEMO", id, revisionNote, updatedAt: stampNow() });
     setSelected(null);
   };
 
   const handleMarkRead = (id: string, recipient: string) => {
+    if (!canMarkReadRecipient(user, recipient)) return;
     dispatch({ type: "MARK_READ", id, recipient, actedAt: stampNow() });
   };
 
   const handleSkipAllReads = (id: string, reason: string) => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canReturnOrRejectMemo(user, memo)) return;
     dispatch({ type: "SKIP_ALL_READS", id, skipReason: reason, actedAt: stampNow() });
   };
 
@@ -545,6 +564,7 @@ function QueuePageContent() {
                   <DrawerPanel
                     key={selectedMemo.id}
                     memo={selectedMemo}
+                    currentUser={user}
                     onClose={() => setSelected(null)}
                     onAction={handleAction}
                     onReject={handleReject}
@@ -564,6 +584,7 @@ function QueuePageContent() {
           <DrawerPanel
             key={selectedMemo.id}
             memo={selectedMemo}
+            currentUser={user}
             onClose={() => setSelected(null)}
             onAction={handleAction}
             onReject={handleReject}

@@ -33,6 +33,8 @@ import { MemoDetailsCard } from "./_components/MemoDetailsCard";
 import { RoutingCard } from "./_components/RoutingCard";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
 import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
+import { usePrototypeUser } from "@/lib/prototype-user-context";
+import { canResubmitMemo } from "@/lib/prototype-users";
 
 // TODO: Promote ordered read/review recipients into sequential workflow steps
 // once queue actions can advance per-reader. For now, the prototype preserves
@@ -48,12 +50,6 @@ function getEffectiveRequestQty(qty: number) {
   return qty > 0 ? qty : 1;
 }
 
-const mockLoggedInUser = {
-  name: "อำภา หิงคำ",
-  department: "HR&GA",
-  role: "Manager"
-};
-
 const ASSISTANT_TABS_ID = "create-assistant-tabs";
 const ASSISTANT_PANEL_ID = "create-assistant-tabpanel";
 
@@ -61,7 +57,13 @@ function CreatePageContent() {
   const searchParams = useSearchParams();
   const reviseId = searchParams.get("revise") ?? null;
   const { memos, dispatch } = useMemos();
+  const { user } = usePrototypeUser();
   const router = useRouter();
+  const issuer = {
+    name: user.name,
+    department: user.department,
+    role: user.roleLabel,
+  };
 
   // Compute revision context before any useState so lazy initializers can reference it.
   // reviseMemo is null when reviseId is absent, not found, or not in a resubmittable state.
@@ -69,7 +71,7 @@ function CreatePageContent() {
   const isRevisionMode = reviseMemo !== null && (
     reviseMemo.status === "returned" ||
     (reviseMemo.status === "rejected" && reviseMemo.rejectDisposition === "revision-allowed")
-  );
+  ) && canResubmitMemo(user, reviseMemo);
 
   // ── Content fields — seed from reviseMemo in revision mode, else use defaults ──
   const [subject, setSubject] = useState(() =>
@@ -79,7 +81,7 @@ function CreatePageContent() {
     isRevisionMode ? (reviseMemo!.category ?? "general-purchase") : "general-purchase"
   );
   const [department, setDepartment] = useState(() =>
-    isRevisionMode ? (reviseMemo!.department ?? mockLoggedInUser.department) : mockLoggedInUser.department
+    isRevisionMode ? (reviseMemo!.department ?? issuer.department) : issuer.department
   );
   const [amount, setAmount] = useState(() =>
     isRevisionMode ? (reviseMemo!.amount ?? 0) : 32000
@@ -472,7 +474,7 @@ function CreatePageContent() {
     dispatch({
       type: "ADD_MEMO",
       memo: {
-        id, title: subject, requester: mockLoggedInUser.name, department, category, amount, status,
+        id, title: subject, requester: user.name, department, category, amount, status,
         currentStep: firstCheckingStep,
         workflowState: "Issued",
         recommendedFinalApprover: recommendation.recommendedFinalApprover,
@@ -611,7 +613,7 @@ function CreatePageContent() {
                 budgetStatus={budgetStatus}
                 clockTimeLabel={clockTimeLabel}
                 clockDateLabel={clockDateLabel}
-                issuer={mockLoggedInUser}
+                issuer={issuer}
                 isAiLoading={isAiLoading}
                 followsProductionPlan={followsProductionPlan}
                 isDeadStockOrSlowMovement={isDeadStockOrSlowMovement}
@@ -789,7 +791,7 @@ function CreatePageContent() {
                       requestItems={requestItems}
                       requestItemsGrandTotal={requestItemsGrandTotal}
                       cleanOverrideReason={cleanOverrideReason}
-                      issuerName={mockLoggedInUser.name}
+                      issuerName={user.name}
                     />
                   </div>
                 </div>
