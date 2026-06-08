@@ -22,6 +22,8 @@ import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
+import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
+import { showErrorToast } from "@/lib/toast";
 import {
   IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles,
 } from "@/components/icons";
@@ -94,7 +96,7 @@ function CreatePageContent() {
   const [description, setDescription] = useState(() =>
     isRevisionMode
       ? (reviseMemo!.description ?? "")
-      : "ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&GA"
+      : "ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&[...]"
   );
   const [isPriceAdjustment, setIsPriceAdjustment] = useState(() =>
     isRevisionMode ? (reviseMemo!.isPriceAdjustment ?? false) : false
@@ -461,9 +463,29 @@ function CreatePageContent() {
   };
 
   const handleSubmit = async (status: "draft" | "pending") => {
-    if (status === "pending" && !canSubmitPending) return;
     if (status === "draft" && isRevisionMode) return; // Save Draft is not available in revision mode
     if (isSubmitting) return;
+
+    // 🔴 VALIDATION: Only validate mandatory fields when sending to approval (pending status)
+    if (status === "pending") {
+      if (!canSubmitPending) return;
+
+      const validation = validateMemoFormForApproval({
+        subject,
+        description,
+        requestItems,
+        priceComparisons,
+      });
+
+      if (!validation.valid) {
+        // Show toast error with all validation errors
+        validation.errors.forEach((error) => {
+          showErrorToast(error, 5000);
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     const now = new Date();
     const stamp = formatTimestamp(now);
@@ -812,7 +834,7 @@ function CreatePageContent() {
                           placeholder="ACC/FIN, QA/QC, Production Manager"
                           onChange={(e) => setReadRecipients(e.target.value)}
                         />
-                        <div className="em-help">คั่นด้วย comma หรือขึ้นบรรทัดใหม่ · ลำดับจะถูกบันทึกตามที่ระบุ</div>
+                        <div className="em-help">คั่นด้วย comma หรือขึ้นบรรทัดใหม่ · ลำดับจะถูกบันทึกตาม[...]</div>
                         {orderedReadRecipients.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                             {orderedReadRecipients.map((r, i) => (
