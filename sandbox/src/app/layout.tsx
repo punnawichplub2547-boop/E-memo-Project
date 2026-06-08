@@ -3,6 +3,7 @@ import "./globals.css";
 import { MemoProvider } from "@/lib/memo-store";
 import { PrototypeUserProvider } from "@/lib/prototype-user-context";
 import { AdminUsersProvider } from "@/lib/admin-users";
+import { ToastContainer } from "@/components/ToastContainer";
 
 export const metadata: Metadata = {
   title: "HR&GA E-Memo",
@@ -24,6 +25,7 @@ export default function RootLayout({
             </MemoProvider>
           </PrototypeUserProvider>
         </AdminUsersProvider>
+        <ToastContainer />
       </body>
     </html>
   );
