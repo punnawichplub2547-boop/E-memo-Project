@@ -742,3 +742,25 @@ describe("memoReducer — RESTORE_MEMO", () => {
     expect(next.find(m => m.id === seedMemos[1].id)).toEqual(seedMemos[1]);
   });
 });
+
+describe("memoReducer — DESTROY_MEMO", () => {
+  const state = seedMemos.slice(0, 3);
+  const target = state[1];
+
+  it("permanently removes the memo from state", () => {
+    const next = memoReducer(state, { type: "DESTROY_MEMO", id: target.id });
+    expect(next).toHaveLength(state.length - 1);
+    expect(next.find(m => m.id === target.id)).toBeUndefined();
+  });
+
+  it("leaves other memos unchanged", () => {
+    const next = memoReducer(state, { type: "DESTROY_MEMO", id: target.id });
+    expect(next.find(m => m.id === state[0].id)).toEqual(state[0]);
+    expect(next.find(m => m.id === state[2].id)).toEqual(state[2]);
+  });
+
+  it("is a no-op for an unknown id", () => {
+    const next = memoReducer(state, { type: "DESTROY_MEMO", id: "EM-DOES-NOT-EXIST" });
+    expect(next).toEqual(state);
+  });
+});

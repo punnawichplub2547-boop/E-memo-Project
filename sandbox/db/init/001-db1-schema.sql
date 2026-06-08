@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS memos (
   updated_at                      DATETIME      NOT NULL,
 
   -- Soft-delete marker. NULL = active; non-NULL = voided/archived by an admin.
-  -- Rows are never hard-deleted, preserving the workflow_step_actions audit trail.
+  -- Hard-delete is only possible via the admin "Delete forever" action (DESTROY_MEMO),
+  -- which also cascades child table rows and removes the on-disk attachment directory.
   deleted_at                      DATETIME      NULL DEFAULT NULL,
 
   INDEX idx_memos_status          (status),

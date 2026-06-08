@@ -63,7 +63,8 @@ type Action =
       updatedAt?: string;
     }
   | { type: "DELETE_MEMO"; id: string; deletedAt: string }
-  | { type: "RESTORE_MEMO"; id: string; updatedAt: string };
+  | { type: "RESTORE_MEMO"; id: string; updatedAt: string }
+  | { type: "DESTROY_MEMO"; id: string };
 
 // Content-only snapshot of a memo — used by revision archiving and DB persistence.
 // Includes submitted content and routing fields only. Excludes all workflow execution
@@ -270,6 +271,8 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
       return state.map((m) =>
         m.id === action.id ? { ...m, deletedAt: undefined, updatedAt: action.updatedAt } : m
       );
+    case "DESTROY_MEMO":
+      return state.filter((m) => m.id !== action.id);
     default:
       return state;
   }
@@ -372,6 +375,10 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const nextMemo = memos.find((m) => m.id === action.id);
       reducerDispatch(action);
       if (nextMemo) void persistRestoreMemo(action.id, nextMemo.revisionNo ?? 0, action.updatedAt, actorName);
+    } else if (action.type === "DESTROY_MEMO") {
+      const targetMemo = memos.find((m) => m.id === action.id);
+      reducerDispatch(action);
+      if (targetMemo) void persistDestroyMemo(action.id);
     } else {
       reducerDispatch(action);
       if (action.type === "ADD_MEMO") {
@@ -662,6 +669,19 @@ async function persistRestoreMemo(memoId: string, revisionNo: number, updatedAt:
     }
   } catch (error) {
     console.error("[MemoProvider] RESTORE_MEMO persist failed", error);
+  }
+}
+
+async function persistDestroyMemo(memoId: string) {
+  try {
+    const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/destroy`, {
+      method: "DELETE",
+    });
+    if (!response.ok && response.status !== 404) {
+      console.error("[MemoProvider] DESTROY_MEMO persist failed", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] DESTROY_MEMO persist failed", error);
   }
 }
 

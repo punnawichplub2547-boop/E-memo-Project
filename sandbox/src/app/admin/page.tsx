@@ -75,6 +75,7 @@ export default function AdminPage() {
 
   // Memos tab state
   const [confirmDeleteMemoId, setConfirmDeleteMemoId] = useState<string | null>(null);
+  const [confirmDestroyMemoId, setConfirmDestroyMemoId] = useState<string | null>(null);
   const [forceStatusId, setForceStatusId] = useState<string | null>(null);
   const [forceStatus, setForceStatus] = useState<MemoStatus>("pending");
 
@@ -300,15 +301,15 @@ export default function AdminPage() {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>All Memos</div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                  {allMemos.length} records ({allMemos.filter(m => m.deletedAt).length} voided) — Delete is reversible soft-delete (saved to DB). <span style={{ color: "var(--amber)" }}>Force status is in-memory only.</span>
+                  {allMemos.length} records ({allMemos.filter(m => m.deletedAt).length} voided) — Void is reversible soft-delete. Delete forever removes the memo from MySQL. <span style={{ color: "var(--amber)" }}>Force status is in-memory only.</span>
                 </div>
               </div>
-              <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <div className="em-card" style={{ padding: 0, overflowX: "auto", overflowY: "hidden" }}>
+                <table style={{ width: "100%", minWidth: 1280, borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
                       {["ID", "Title", "Status", "Dept", "Amount", "Step", "Date", "Actions"].map(h => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", ...(h === "Actions" ? { position: "sticky" as const, right: 0, zIndex: 2, minWidth: 270, background: "var(--surface)" } : {}) }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -344,19 +345,37 @@ export default function AdminPage() {
                         <td style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>฿{m.amount.toLocaleString()}</td>
                         <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.currentStep}</td>
                         <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{isVoided ? `voided ${m.deletedAt}` : m.createdAt}</td>
-                        <td style={{ padding: "10px 14px" }}>
+                        <td style={{ padding: "10px 14px", position: "sticky", right: 0, minWidth: 270, background: isVoided ? "rgba(254,242,242,0.98)" : "var(--surface)", boxShadow: "-10px 0 18px -18px rgba(15,23,42,0.35)" }}>
                           {isVoided ? (
-                            <button className="em-btn" style={{ padding: "4px 10px", fontSize: 12, color: "#047857" }} title="Restore memo" onClick={() => dispatch({ type: "RESTORE_MEMO", id: m.id, updatedAt: stampNow() })}><IconReturn size={12} /> Restore</button>
+                            confirmDestroyMemoId === m.id ? (
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 11.5, color: "#B91C1C", fontWeight: 700 }}>Delete forever?</span>
+                                <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5, color: "#EF4444" }} onClick={() => { dispatch({ type: "DESTROY_MEMO", id: m.id }); setConfirmDestroyMemoId(null); }}><IconCheck size={12} /> Confirm</button>
+                                <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5 }} onClick={() => setConfirmDestroyMemoId(null)}><IconX size={12} /> Cancel</button>
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                <button className="em-btn" style={{ padding: "6px 10px", fontSize: 12, color: "#047857" }} title="Restore memo" onClick={() => dispatch({ type: "RESTORE_MEMO", id: m.id, updatedAt: stampNow() })}><IconReturn size={12} /> Restore</button>
+                                <button className="em-btn" style={{ padding: "6px 10px", fontSize: 12, color: "#B91C1C" }} title="Delete permanently from database" onClick={() => { setConfirmDestroyMemoId(m.id); setConfirmDeleteMemoId(null); setForceStatusId(null); }}><IconTrash size={12} /> Delete forever</button>
+                              </div>
+                            )
                           ) : confirmDeleteMemoId === m.id ? (
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               <span style={{ fontSize: 11.5, color: "#EF4444" }}>Void?</span>
-                              <button className="em-btn" style={{ padding: "4px 8px", fontSize: 11, color: "#EF4444" }} onClick={() => { dispatch({ type: "DELETE_MEMO", id: m.id, deletedAt: stampNow() }); setConfirmDeleteMemoId(null); }}><IconCheck size={11} /></button>
-                              <button className="em-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => setConfirmDeleteMemoId(null)}><IconX size={11} /></button>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5, color: "#EF4444" }} onClick={() => { dispatch({ type: "DELETE_MEMO", id: m.id, deletedAt: stampNow() }); setConfirmDeleteMemoId(null); }}><IconCheck size={12} /> Confirm</button>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5 }} onClick={() => setConfirmDeleteMemoId(null)}><IconX size={12} /> Cancel</button>
+                            </div>
+                          ) : confirmDestroyMemoId === m.id ? (
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 11.5, color: "#B91C1C", fontWeight: 700 }}>Delete forever?</span>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5, color: "#EF4444" }} onClick={() => { dispatch({ type: "DESTROY_MEMO", id: m.id }); setConfirmDestroyMemoId(null); }}><IconCheck size={12} /> Confirm</button>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 11.5 }} onClick={() => setConfirmDestroyMemoId(null)}><IconX size={12} /> Cancel</button>
                             </div>
                           ) : (
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <button className="em-btn" style={{ padding: "4px 10px", fontSize: 12 }} title="Force status" onClick={() => { setForceStatusId(m.id); setForceStatus(m.status); setConfirmDeleteMemoId(null); }}><IconSettings size={12} /></button>
-                              <button className="em-btn" style={{ padding: "4px 10px", fontSize: 12, color: "#EF4444" }} title="Void memo (reversible)" onClick={() => { setConfirmDeleteMemoId(m.id); setForceStatusId(null); }}><IconTrash size={12} /></button>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 12 }} title="Force status" onClick={() => { setForceStatusId(m.id); setForceStatus(m.status); setConfirmDeleteMemoId(null); setConfirmDestroyMemoId(null); }}><IconSettings size={12} /> Force</button>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 12, color: "#D97706" }} title="Void memo (reversible)" onClick={() => { setConfirmDeleteMemoId(m.id); setConfirmDestroyMemoId(null); setForceStatusId(null); }}><IconTrash size={12} /> Void</button>
+                              <button className="em-btn" style={{ padding: "6px 10px", fontSize: 12, color: "#B91C1C" }} title="Delete permanently from database" onClick={() => { setConfirmDestroyMemoId(m.id); setConfirmDeleteMemoId(null); setForceStatusId(null); }}><IconTrash size={12} /> Delete forever</button>
                             </div>
                           )}
                         </td>
