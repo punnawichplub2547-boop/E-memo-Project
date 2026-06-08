@@ -68,6 +68,14 @@ npm.cmd run db:seed
 Remove-Item Env:\CONFIRM_DB_SEED
 ```
 
+## Attachment Storage
+
+Uploaded memo attachments are stored on the local filesystem under `sandbox/storage/attachments/<memoId>/`. The DB only persists attachment metadata (`memos.attachments_json`); the file bytes live on disk. Upload is served by `POST /api/attachments`, and open/download by `GET /api/attachments/<memoId>/<storedName>`.
+
+- Stored binaries are git-ignored; only `storage/attachments/.gitkeep` is tracked.
+- For Docker/server deploy, mount `sandbox/storage/attachments` as a persisted volume so uploaded files survive container rebuilds. Without a volume, attachments are lost on `docker compose up --build`.
+- This is prototype-local storage, not production document management. There is no virus scanning, access control, or cloud backup. Replace it with managed object storage before any real rollout.
+
 ## Recommended Server Checks
 
 For a full post-deploy verification flow, follow [server-smoke-checklist.md](/D:/Hrproject/docs/server-smoke-checklist.md).

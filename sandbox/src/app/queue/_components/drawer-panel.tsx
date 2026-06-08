@@ -445,12 +445,19 @@ export function DrawerPanel({
             </div>
             <div style={{ padding: "10px 12px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)", display: "grid", gap: 6 }}>
               {memo.attachments.map((attachment) => (
-                <div key={attachment.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "var(--ink-2)" }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{attachment.originalName}</span>
-                  <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0, marginLeft: 8 }}>
+                <a
+                  key={attachment.id}
+                  href={`/api/attachments/${encodeURIComponent(memo.id)}/${encodeURIComponent(attachment.storedName)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`เปิดไฟล์ / Open ${attachment.originalName}`}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 12.5, color: "var(--primary)", textDecoration: "none" }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, textDecoration: "underline" }}>{attachment.originalName}</span>
+                  <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0 }}>
                     {formatAttachmentSize(attachment.size)} · {attachment.uploadedAt}
                   </span>
-                </div>
+                </a>
               ))}
             </div>
           </section>

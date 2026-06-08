@@ -35,6 +35,35 @@ export function isAllowedAttachmentFile(name: string, mimeType: string): boolean
   return mimeType === "" || ALLOWED_MIME_TYPES.has(mimeType);
 }
 
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+};
+
+export function inferAttachmentContentType(name: string): string {
+  return EXTENSION_CONTENT_TYPES[getAttachmentExtension(name)] ?? "application/octet-stream";
+}
+
+// Validates a single path segment (memoId or storedName) for safe filesystem use.
+// Rejects empty values, "." / "..", and anything containing a path separator or NUL.
+// Pure string logic — no node:path import — so this stays usable from client bundles.
+export function isSafeAttachmentSegment(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value !== "." &&
+    value !== ".." &&
+    !value.includes("/") &&
+    !value.includes("\\") &&
+    !value.includes("\0")
+  );
+}
+
 export function formatAttachmentSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const kb = bytes / 1024;
