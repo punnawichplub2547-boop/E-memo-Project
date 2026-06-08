@@ -15,6 +15,10 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DATABASE_URL: mysql://${MYSQL_USER:-hr_ememo}:${MYSQL_PASSWORD:-hr_ememo_dev_password}@hr-ememo-db:3306/${MYSQL_DATABASE:-hr_ememo}
+    volumes:
+      # Persist uploaded attachment binaries so they survive container rebuild/recreate.
+      # Runtime cwd is /app, so the app writes to /app/storage/attachments.
+      - hr-ememo-attachments-data:/app/storage/attachments
 
   hr-ememo-db:
     image: mysql:8.4
@@ -40,3 +44,4 @@ services:
 
 volumes:
   hr-ememo-db-data:
+  hr-ememo-attachments-data:

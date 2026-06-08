@@ -54,6 +54,7 @@ This project intentionally ships with a single Compose file: `compose.yaml`. Old
 - MySQL 8 service `hr-ememo-db` for DB-1 schema validation
 - host port `3307` mapped to MySQL container port `3306` by default
 - schema init file mounted from `db/init/001-db1-schema.sql`
+- named volume `hr-ememo-attachments-data` mounted at `/app/storage/attachments` so uploaded attachment files persist across container rebuild/restart (back this up alongside the DB; see `../docs/server-deploy.md`)
 
 Use `env.compose.example` as a template if the server should override the default dev MySQL credentials through a `.env` file.
 
@@ -77,7 +78,7 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-This deletes the MySQL Docker volume, so use it only for disposable prototype data.
+This deletes all Docker volumes for the stack (MySQL data **and** the `hr-ememo-attachments-data` attachment volume), so use it only for disposable prototype data.
 
 Seed the DB-1 tables from the current `seedMemos` prototype data:
 

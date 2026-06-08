@@ -50,7 +50,7 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-This deletes the local MySQL volume. Use it only for disposable prototype data.
+This deletes all local volumes for the stack — both the MySQL volume and the `hr-ememo-attachments-data` attachment volume (uploaded files). Use it only for disposable prototype data.
 
 Seed the DB-1 tables from the current prototype `seedMemos` data:
 
@@ -73,7 +73,9 @@ Remove-Item Env:\CONFIRM_DB_SEED
 Uploaded memo attachments are stored on the local filesystem under `sandbox/storage/attachments/<memoId>/`. The DB only persists attachment metadata (`memos.attachments_json`); the file bytes live on disk. Upload is served by `POST /api/attachments`, and open/download by `GET /api/attachments/<memoId>/<storedName>`.
 
 - Stored binaries are git-ignored; only `storage/attachments/.gitkeep` is tracked.
-- For Docker/server deploy, mount `sandbox/storage/attachments` as a persisted volume so uploaded files survive container rebuilds. Without a volume, attachments are lost on `docker compose up --build`.
+- `compose.yaml` mounts the named volume `hr-ememo-attachments-data` at `/app/storage/attachments` (the app's runtime cwd is `/app`). This keeps uploaded files across `docker compose up --build`, `docker compose restart`, and container recreate. Without this volume, attachments are lost whenever the container is rebuilt.
+- Back up **both** layers together: the DB (attachment metadata in `memos.attachments_json`) **and** the `hr-ememo-attachments-data` volume (the file bytes). They are two halves of one record.
+- Clearing or recreating the attachment volume (for example `docker volume rm hr-ememo-attachments-data`) deletes the file bytes while the DB metadata stays behind, leaving broken download links in the queue drawer. Do not clear this volume unless you also intend to discard the attachments.
 - This is prototype-local storage, not production document management. There is no virus scanning, access control, or cloud backup. Replace it with managed object storage before any real rollout.
 
 ## Recommended Server Checks
