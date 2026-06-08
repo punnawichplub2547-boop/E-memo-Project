@@ -6,6 +6,8 @@ coverage/
 .env*
 .superpowers/
 *.log
+sandbox/storage/attachments/*
+!sandbox/storage/attachments/.gitkeep
 ~$*.xlsx
 .DS_Store
 AGENTS.md

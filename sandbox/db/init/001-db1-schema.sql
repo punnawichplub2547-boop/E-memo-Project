@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS memos (
 
   request_items_json              JSON          NULL,
   read_recipients_json            JSON          NULL,
+  attachments_json                JSON          NULL,
 
   created_at                      DATETIME      NOT NULL,
   updated_at                      DATETIME      NOT NULL,

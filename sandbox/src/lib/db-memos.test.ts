@@ -93,6 +93,7 @@ describe("DB memo serializer", () => {
       price_adjustment_reason: null,
       request_items_json: JSON.stringify([{ id: "1", name: "Paper", unit: "pack", qty: 1, unitPrice: 100 }]),
       read_recipients_json: JSON.stringify(["ACC/FIN"]),
+      attachments_json: JSON.stringify([{ id: "att-1", originalName: "quote.pdf", storedName: "att-1-quote.pdf", size: 2048, mimeType: "application/pdf", uploadedAt: "05 Jun 2026 17:30" }]),
       created_at: "2026-05-14 12:00:00",
       updated_at: "2026-05-15 06:00:00",
     }, [
@@ -109,6 +110,14 @@ describe("DB memo serializer", () => {
     expect(memo.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
     expect(memo.requestItems).toEqual([{ id: "1", name: "Paper", unit: "pack", qty: 1, unitPrice: 100 }]);
     expect(memo.readRecipients).toEqual(["ACC/FIN"]);
+    expect(memo.attachments).toEqual([{
+      id: "att-1",
+      originalName: "quote.pdf",
+      storedName: "att-1-quote.pdf",
+      size: 2048,
+      mimeType: "application/pdf",
+      uploadedAt: "05 Jun 2026 17:30",
+    }]);
     expect(memo.readActions).toEqual([
       { recipient: "ACC/FIN", status: "read", actedAt: "15 May 2026 14:00" },
       { recipient: "HR&GA", status: "skipped", skipReason: "Prototype skip" },

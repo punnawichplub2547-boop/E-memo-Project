@@ -40,6 +40,7 @@ export type MemoSeedRow = {
   price_adjustment_reason: Nullable<string>;
   request_items_json: Nullable<string>;
   read_recipients_json: Nullable<string>;
+  attachments_json: Nullable<string>;
   created_at: string;
   updated_at: string;
 };
@@ -149,6 +150,7 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     price_adjustment_reason: memo.priceAdjustmentReason ?? null,
     request_items_json: stringifyJson(memo.requestItems),
     read_recipients_json: stringifyJson(memo.readRecipients),
+    attachments_json: stringifyJson(memo.attachments),
     created_at: toMysqlUtcDateTime(memo.createdAt),
     updated_at: toMysqlUtcDateTime(memo.updatedAt),
   };

@@ -8,6 +8,7 @@ import type {
   MemoSnapshot,
   MemoStatus,
   PriceComparison,
+  MemoAttachment,
   ReadAction,
   ReadActionStatus,
   RequestItem,
@@ -59,6 +60,7 @@ export type MemoDbRow = {
   price_adjustment_reason: string | null;
   request_items_json: DbJson;
   read_recipients_json: DbJson;
+  attachments_json?: DbJson;
   created_at: DbDate;
   updated_at: DbDate;
   // Optional: absent on legacy DBs that predate the soft-delete migration.
@@ -125,6 +127,7 @@ export function serializeMemoRecord(
     priceAdjustmentReason: optional(row.price_adjustment_reason),
     requestItems: parseJsonArray<RequestItem>(row.request_items_json),
     readRecipients: parseJsonArray<string>(row.read_recipients_json),
+    attachments: parseJsonArray<MemoAttachment>(row.attachments_json ?? null),
     readActions: serializeReadActions(readActions),
     revisions: serializeMemoRevisions(revisions),
     createdAt: toBangkokDisplayTimestamp(row.created_at),

@@ -89,6 +89,15 @@ export type RequestItem = {
   unitPrice: number;
 };
 
+export type MemoAttachment = {
+  id: string;
+  originalName: string;
+  storedName: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: string;
+};
+
 export type RevisionSource = "initial" | "return" | "rejection-allowed";
 
 export type MemoSnapshot = {
@@ -102,6 +111,7 @@ export type MemoSnapshot = {
   budgetPlan?: number;
   budgetUsed?: number;
   requestItems?: RequestItem[];
+  attachments?: MemoAttachment[];
   priceComparisons?: PriceComparison[];
   selectedVendorId?: string;
   selectedVendorReason?: string;
@@ -163,6 +173,7 @@ export type MemoRecord = {
   selectedVendorId?: string;
   selectedVendorReason?: string;
   requestItems?: RequestItem[];
+  attachments?: MemoAttachment[];
   priceAdjustmentReason?: string;
   isPriceAdjustment?: boolean;
   followsProductionPlan?: boolean;

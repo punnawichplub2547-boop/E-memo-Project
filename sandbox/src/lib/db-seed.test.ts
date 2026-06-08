@@ -35,6 +35,23 @@ describe("DB seed helpers", () => {
     expect(row.price_comparisons_json).toBeNull();
     expect(row.selected_route_json).toBeNull();
     expect(row.read_recipients_json).toBeNull();
+    expect(row.attachments_json).toBeNull();
+  });
+
+  it("serializes attachment metadata to JSON when present", () => {
+    const row = memoToDbSeedRow({
+      ...seedMemos[0],
+      attachments: [{
+        id: "att-1",
+        originalName: "quote.pdf",
+        storedName: "att-1-quote.pdf",
+        size: 1024,
+        mimeType: "application/pdf",
+        uploadedAt: "05 Jun 2026 17:30",
+      }],
+    });
+
+    expect(row.attachments_json).toContain("quote.pdf");
   });
 
   it("builds one submit workflow action per seed memo", () => {

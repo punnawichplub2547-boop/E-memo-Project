@@ -9,6 +9,7 @@ import {
 import { DrawerFooter } from "./drawer-footer";
 import { AuditLogSection } from "./audit-log-section";
 import { canMarkReadRecipient, type PrototypeUser } from "@/lib/prototype-users";
+import { formatAttachmentSize } from "@/lib/attachments";
 
 const routeSummary = (memo: MemoRecord) =>
   memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
@@ -434,26 +435,26 @@ export function DrawerPanel({
           </section>
         )}
 
-        {/* 9. Attachments — prototype */}
-        <section>
-          <div className="em-eyebrow" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-            <span>เอกสารแนบ / Attachments</span>
-            <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--amber)", background: "var(--amber-soft)", padding: "1px 6px", borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase" }}>Prototype</span>
-          </div>
-          <div style={{ padding: "10px 12px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)", display: "grid", gap: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "var(--ink-2)" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>ใบเสนอราคา-3-บริษัท.pdf</span>
-              <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0, marginLeft: 8 }}>412 KB · mock</span>
+        {memo.attachments && memo.attachments.length > 0 && (
+          <section>
+            <div className="em-eyebrow" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>Attachments</span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--primary)", background: "var(--primary-soft)", padding: "1px 6px", borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                {memo.attachments.length} file{memo.attachments.length === 1 ? "" : "s"}
+              </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "var(--ink-2)" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>รายการอุปกรณ์-Q2-2026.xlsx</span>
-              <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0, marginLeft: 8 }}>86 KB · mock</span>
+            <div style={{ padding: "10px 12px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)", display: "grid", gap: 6 }}>
+              {memo.attachments.map((attachment) => (
+                <div key={attachment.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "var(--ink-2)" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{attachment.originalName}</span>
+                  <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0, marginLeft: 8 }}>
+                    {formatAttachmentSize(attachment.size)} · {attachment.uploadedAt}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: 11.5, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>
-              Prototype — ยังไม่บันทึกไฟล์จริง
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <hr className="em-divider" />
 

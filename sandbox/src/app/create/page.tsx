@@ -13,10 +13,12 @@ import {
   BudgetStatus,
   computePriceRowTotals,
   getApprovalRecommendation,
+  MemoAttachment,
   PriceComparison,
   ReadAction,
   RequestItem,
 } from "@/lib/approval";
+import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
@@ -150,11 +152,29 @@ function CreatePageContent() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // ── Assistant panel state — extracted to hook for localStorage persistence ──
   const { assistantExpanded, assistantTab, assistantHydrated, setAssistantExpanded, setAssistantTab } =
     useCreateMemoAssistant();
+
+  const addAttachmentFiles = (files: File[]) => {
+    setAttachmentError(null);
+    const invalid = files.find((file) => file.size > MAX_ATTACHMENT_BYTES || !isAllowedAttachmentFile(file.name, file.type));
+    if (invalid) {
+      setAttachmentError(`${invalid.name} is not allowed or exceeds 10 MB.`);
+      return;
+    }
+    setAttachmentFiles((prev) => [...prev, ...files]);
+  };
+
+  const removeAttachmentFile = (index: number) => {
+    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentError(null);
+  };
 
   const addRequestItem = () => {
     setRequestItems(prev => [...prev, {
@@ -422,12 +442,33 @@ function CreatePageContent() {
     }
   };
 
-  const handleSubmit = (status: "draft" | "pending") => {
+  const uploadSelectedAttachments = async (memoId: string): Promise<MemoAttachment[] | undefined> => {
+    if (attachmentFiles.length === 0) return undefined;
+    const formData = new FormData();
+    formData.append("memoId", memoId);
+    for (const file of attachmentFiles) formData.append("files", file);
+
+    const response = await fetch("/api/attachments", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Unable to upload attachments" }));
+      throw new Error(String(body.error ?? "Unable to upload attachments"));
+    }
+    const body = await response.json() as { attachments: MemoAttachment[] };
+    return body.attachments.length > 0 ? body.attachments : undefined;
+  };
+
+  const handleSubmit = async (status: "draft" | "pending") => {
     if (status === "pending" && !canSubmitPending) return;
     if (status === "draft" && isRevisionMode) return; // Save Draft is not available in revision mode
+    if (isSubmitting) return;
 
     const now = new Date();
     const stamp = formatTimestamp(now);
+    setIsSubmitting(true);
+    setAttachmentError(null);
 
     if (isRevisionMode) {
       // Dispatch SUBMIT_REVISION — applies new content to the existing memo and increments revision.
@@ -471,6 +512,14 @@ function CreatePageContent() {
     // Normal new-memo path
     const id = generateMemoId(now);
     const createdTimestamp = formatTimestamp(now);
+    let attachments: MemoAttachment[] | undefined;
+    try {
+      attachments = await uploadSelectedAttachments(id);
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : "Unable to upload attachments");
+      setIsSubmitting(false);
+      return;
+    }
     dispatch({
       type: "ADD_MEMO",
       memo: {
@@ -496,6 +545,7 @@ function CreatePageContent() {
         selectedVendorId: selectedVendor?.id,
         selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
         requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
+        attachments,
         priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
         isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
         followsProductionPlan: effectiveFollowsProductionPlan || undefined,
@@ -518,11 +568,11 @@ function CreatePageContent() {
           title={isRevisionMode ? "แก้ไขและส่งใหม่" : "สร้าง E-Memo"}
           actions={<>
             {!isRevisionMode && (
-              <button className="em-btn" onClick={() => handleSubmit("draft")}>
+              <button className="em-btn" disabled={isSubmitting} onClick={() => handleSubmit("draft")}>
                 <IconFileText size={15} /> Save Draft
               </button>
             )}
-            <button className="em-btn primary" disabled={!canSubmitPending} onClick={() => handleSubmit("pending")}>
+            <button className="em-btn primary" disabled={!canSubmitPending || isSubmitting} onClick={() => handleSubmit("pending")}>
               <IconMail size={15} />
               {isRevisionMode
                 ? `ส่งแก้ไข (Rev.${(reviseMemo!.revisionNo ?? 0) + 1})`
@@ -827,8 +877,21 @@ function CreatePageContent() {
                 budgetRemaining={budgetRemaining}
               />
 
-              {/* Attachments card */}
-              <AttachmentsCard />
+              {isRevisionMode ? (
+                <section className="em-card" style={{ display: "grid", gap: 8, alignContent: "start" }}>
+                  <div className="em-eyebrow">Attachments</div>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 }}>
+                    Existing attachments stay with this memo. Attachment changes during revision are deferred for the prototype.
+                  </div>
+                </section>
+              ) : (
+                <AttachmentsCard
+                  files={attachmentFiles}
+                  error={attachmentError}
+                  onFilesAdded={addAttachmentFiles}
+                  onRemoveFile={removeAttachmentFile}
+                />
+              )}
 
             </div>
 

@@ -31,6 +31,7 @@ async function main() {
           revision_no, revision_submitted_at, revision_note,
           price_comparisons_json, selected_vendor_id, selected_vendor_reason, price_adjustment_reason,
           request_items_json, read_recipients_json,
+          attachments_json,
           created_at, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?,
@@ -42,7 +43,7 @@ async function main() {
           ?, ?, ?,
           ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?,
+          ?, ?, ?,
           ?, ?
         )`,
         memoSeedParams(memoRow)
@@ -117,6 +118,7 @@ function memoSeedParams(row: MemoSeedRow): SqlValue[] {
     row.price_adjustment_reason,
     row.request_items_json,
     row.read_recipients_json,
+    row.attachments_json,
     row.created_at,
     row.updated_at,
   ];
