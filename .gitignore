@@ -8,6 +8,7 @@ coverage/
 *.log
 sandbox/storage/attachments/*
 !sandbox/storage/attachments/.gitkeep
+sandbox/verify-shots/
 ~$*.xlsx
 .DS_Store
 AGENTS.md
