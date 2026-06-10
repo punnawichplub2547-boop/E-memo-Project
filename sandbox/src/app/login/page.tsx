@@ -214,7 +214,7 @@ export default function LoginPage() {
                 ระบบบันทึกข้อความภายใน
               </div>
               <div style={{ fontSize: 12, color: "rgba(147,197,253,0.4)", letterSpacing: "0.06em", fontWeight: 500, textTransform: "uppercase" }}>
-                Complete Auto Rubber · HR&amp;GA
+                Complete Auto Rubber Manufacturing Co.,Ltd.
               </div>
             </div>
 

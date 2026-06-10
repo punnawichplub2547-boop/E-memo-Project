@@ -391,13 +391,18 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
     async function hydrateMemos() {
       try {
         const response = await fetch("/api/memos", { cache: "no-store" });
-        if (!response.ok) return;
+        if (response.status === 401 || response.status === 403) {
+          // Auth failure — must not expose seed/demo data to unauthorized sessions.
+          if (!cancelled) reducerDispatch({ type: "HYDRATE_MEMOS", memos: [] });
+          return;
+        }
+        if (!response.ok) return; // 5xx / unexpected — keep seedMemos for dev/DB-unavailable fallback
         const dbMemos = await response.json() as MemoRecord[];
         if (!cancelled && Array.isArray(dbMemos)) {
           reducerDispatch({ type: "HYDRATE_MEMOS", memos: dbMemos });
         }
       } catch {
-        // Keep seedMemos as the prototype fallback when DB-1 is unavailable.
+        // Network error or DB unavailable — keep seedMemos as prototype fallback.
       } finally {
         if (!cancelled) setHydrated(true);
       }

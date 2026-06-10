@@ -40,7 +40,7 @@ export function BudgetCard({
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10 }}>
           <NumberField label="งบประมาณแผน" value={budgetPlan} onChange={setBudgetPlan} />
-          <NumberField label="งบที่ใช้ไป" value={budgetUsed} onChange={setBudgetUsed} />
+          <NumberField label="งบที่ใช้ไปเพิ่มเติม" value={budgetUsed} onChange={setBudgetUsed} />
           <div className="em-field" style={{ gridColumn: "1 / -1" }}>
             <label className="em-label">งบคงเหลือหลังรายการนี้</label>
             <div className="em-input-prefix" style={{ background: "var(--surface-soft)", borderColor: "var(--primary-soft)" }}>

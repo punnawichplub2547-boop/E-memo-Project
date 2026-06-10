@@ -79,7 +79,7 @@ function CreatePageContent() {
 
   // ── Content fields — seed from reviseMemo in revision mode, else use defaults ──
   const [subject, setSubject] = useState(() =>
-    isRevisionMode ? (reviseMemo!.title ?? "") : "ขออนุมัติซื้ออุปกรณ์สำนักงาน Q2/2026"
+    isRevisionMode ? (reviseMemo!.title ?? "") : ""
   );
   const [category, setCategory] = useState<ApprovalCategory>(() =>
     isRevisionMode ? (reviseMemo!.category ?? "general-purchase") : "general-purchase"
@@ -88,15 +88,13 @@ function CreatePageContent() {
     isRevisionMode ? (reviseMemo!.department ?? issuer.department) : issuer.department
   );
   const [amount, setAmount] = useState(() =>
-    isRevisionMode ? (reviseMemo!.amount ?? 0) : 32000
+    isRevisionMode ? (reviseMemo!.amount ?? 0) : 0
   );
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus>(() =>
     isRevisionMode ? (reviseMemo!.budgetStatus ?? "in-budget") : "in-budget"
   );
   const [description, setDescription] = useState(() =>
-    isRevisionMode
-      ? (reviseMemo!.description ?? "")
-      : "ขออนุมัติซื้ออุปกรณ์สำนักงานสำหรับสนับสนุนการดำเนินงานของแผนก HR&[...]"
+    isRevisionMode ? (reviseMemo!.description ?? "") : ""
   );
   const [isPriceAdjustment, setIsPriceAdjustment] = useState(() =>
     isRevisionMode ? (reviseMemo!.isPriceAdjustment ?? false) : false
@@ -111,16 +109,16 @@ function CreatePageContent() {
     isRevisionMode ? (reviseMemo!.departmentMonthlyOverBudgetTotal ?? 0) : 0
   );
   const [readRecipients, setReadRecipients] = useState(() =>
-    isRevisionMode ? (reviseMemo!.readRecipients?.join(", ") ?? "") : "HR&GA, ACC/FIN"
+    isRevisionMode ? (reviseMemo!.readRecipients?.join(", ") ?? "") : ""
   );
   const [accountCode, setAccountCode] = useState(() =>
-    isRevisionMode ? (reviseMemo!.accountCode ?? "") : "GA-OPS-2026"
+    isRevisionMode ? (reviseMemo!.accountCode ?? "") : ""
   );
   const [budgetPlan, setBudgetPlan] = useState(() =>
-    isRevisionMode ? (reviseMemo!.budgetPlan ?? 0) : 150000
+    isRevisionMode ? (reviseMemo!.budgetPlan ?? 0) : 0
   );
   const [budgetUsed, setBudgetUsed] = useState(() =>
-    isRevisionMode ? (reviseMemo!.budgetUsed ?? 0) : 68000
+    isRevisionMode ? (reviseMemo!.budgetUsed ?? 0) : 0
   );
   const [priceComparisons, setPriceComparisons] = useState<PriceComparison[]>(() => {
     if (isRevisionMode && (reviseMemo!.priceComparisons?.length ?? 0) > 0) {

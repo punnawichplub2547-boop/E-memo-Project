@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
@@ -10,6 +10,8 @@ import {
 } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
 import { serializeMemoRecord, type MemoDbRow, type MemoRevisionDbRow, type ReadActionDbRow } from "@/lib/db-memos";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
+import { isMemoVisibleTo } from "@/lib/memo-visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +23,16 @@ type MemoRevisionRowWithMemo = MemoRevisionDbRow & {
   memo_id: number;
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Auth enforcement — do not rely solely on middleware.
+    // getActiveSessionUserFromToken verifies the JWT signature AND checks DB status === "active".
+    const token = req.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(token);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const pool = getDbPool();
     const [memoRows] = await pool.query<QueryRows<MemoDbRow>>(
       "SELECT * FROM memos ORDER BY created_at DESC, id DESC"
@@ -54,13 +64,19 @@ export async function GET() {
       revisionsByMemoId.set(row.memo_id, rows);
     }
 
-    return NextResponse.json(
-      memoRows.map((row) => serializeMemoRecord(
-        row,
-        readsByMemoId.get(row.id) ?? [],
-        revisionsByMemoId.get(row.id) ?? [],
-      ))
-    );
+    const allMemos = memoRows.map((row) => serializeMemoRecord(
+      row,
+      readsByMemoId.get(row.id) ?? [],
+      revisionsByMemoId.get(row.id) ?? [],
+    ));
+
+    // Admin bypasses filtering — sees every memo including soft-deleted.
+    // All other roles see only memos permitted by isMemoVisibleTo.
+    const visible = session.roles.includes("admin")
+      ? allMemos
+      : allMemos.filter(m => isMemoVisibleTo(m, session));
+
+    return NextResponse.json(visible);
   } catch (error) {
     console.error("[GET /api/memos]", error);
     return NextResponse.json({ error: "Unable to load memos" }, { status: 500 });
