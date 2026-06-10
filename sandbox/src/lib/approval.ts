@@ -106,6 +106,7 @@ export type MemoSnapshot = {
   department: string;
   amount: number;
   description?: string;
+  closingRemark?: string;
   budgetStatus?: BudgetStatus;
   accountCode?: string;
   budgetPlan?: number;
@@ -164,6 +165,7 @@ export type MemoRecord = {
   revisionSubmittedAt?: string;
   revisions?: MemoRevision[];
   description?: string;
+  closingRemark?: string;
   budgetStatus?: BudgetStatus;
   accountCode?: string;
   budgetPlan?: number;

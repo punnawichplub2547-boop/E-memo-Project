@@ -14,6 +14,7 @@ export type MemoSeedRow = {
   budget_plan: Nullable<number>;
   budget_used: Nullable<number>;
   description: Nullable<string>;
+  closing_remark: Nullable<string>;
   status: string;
   workflow_state: Nullable<string>;
   current_step: string;
@@ -124,6 +125,7 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     budget_plan: memo.budgetPlan ?? null,
     budget_used: memo.budgetUsed ?? null,
     description: memo.description ?? null,
+    closing_remark: memo.closingRemark ?? null,
     status: memo.status,
     workflow_state: memo.workflowState ?? inferWorkflowState(memo.status),
     current_step: memo.currentStep,

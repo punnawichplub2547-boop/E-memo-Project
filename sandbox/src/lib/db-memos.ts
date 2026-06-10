@@ -34,6 +34,7 @@ export type MemoDbRow = {
   budget_plan: DbNumber;
   budget_used: DbNumber;
   description: string | null;
+  closing_remark: string | null;
   status: string;
   workflow_state: string | null;
   current_step: string;
