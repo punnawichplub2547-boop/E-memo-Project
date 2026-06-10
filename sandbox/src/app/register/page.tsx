@@ -279,13 +279,15 @@ export default function RegisterPage() {
             <div style={{ marginBottom: 44 }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 60, height: 60, borderRadius: 18,
-                background: "linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)",
-                fontSize: 22, fontWeight: 800, color: "#fff",
-                fontFamily: "'Syne', sans-serif",
+                width: 80, height: 60, borderRadius: 16,
+                background: "rgba(255,255,255,0.94)",
                 animation: "rg-logo-pulse 3.2s ease-in-out infinite",
                 marginBottom: 24,
-              }}>EM</div>
+                padding: "8px 10px",
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 56, height: "auto", display: "block" }} />
+              </div>
 
               <div style={{
                 fontSize: 30, fontWeight: 800, color: "#EDF4FF",

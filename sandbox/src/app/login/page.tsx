@@ -194,13 +194,15 @@ export default function LoginPage() {
             <div style={{ marginBottom: 44 }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 66, height: 66, borderRadius: 20,
-                background: "linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)",
-                fontSize: 24, fontWeight: 800, color: "#fff",
-                fontFamily: "'Syne', sans-serif",
+                width: 80, height: 66, borderRadius: 16,
+                background: "rgba(255,255,255,0.94)",
                 animation: "em-logo-pulse 3.2s ease-in-out infinite",
                 marginBottom: 26,
-              }}>EM</div>
+                padding: "8px 10px",
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 56, height: "auto", display: "block" }} />
+              </div>
 
               <div style={{
                 fontSize: 34, fontWeight: 800, color: "#EDF4FF",
