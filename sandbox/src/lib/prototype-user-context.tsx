@@ -1,9 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { DEFAULT_PROTOTYPE_USER_ID } from "./prototype-users";
+import { DEFAULT_PROTOTYPE_USER_ID, sessionUserToPrototypeUser } from "./prototype-users";
 import type { PrototypeUser } from "./prototype-users";
 import { useAdminUsers } from "./admin-users";
+import { useAuth } from "./auth-context";
 
 const STORAGE_KEY = "hr-ememo-prototype-user";
 
@@ -17,6 +18,7 @@ const PrototypeUserContext = createContext<PrototypeUserContextValue | null>(nul
 
 export function PrototypeUserProvider({ children }: { children: React.ReactNode }) {
   const { getUserById } = useAdminUsers();
+  const { user: authUser } = useAuth();
   const [userId, setUserIdState] = useState(DEFAULT_PROTOTYPE_USER_ID);
 
   useEffect(() => {
@@ -42,10 +44,14 @@ export function PrototypeUserProvider({ children }: { children: React.ReactNode 
   };
 
   const value = useMemo<PrototypeUserContextValue>(() => {
+    if (authUser) {
+      const user = sessionUserToPrototypeUser(authUser);
+      return { user, userId: user.id, setUserId };
+    }
     const user = getUserById(userId);
     return { user, userId: user.id, setUserId };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, getUserById]);
+  }, [authUser, userId, getUserById]);
 
   return (
     <PrototypeUserContext.Provider value={value}>

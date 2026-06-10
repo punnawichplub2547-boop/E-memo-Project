@@ -6,6 +6,7 @@ import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import { getDashboardMetrics, approvalLabels } from "@/lib/approval";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
+import { useAuth } from "@/lib/auth-context";
 import {
   IconDownload, IconPlus, IconRoute, IconCrown,
   IconSparkles, IconFileText, IconClock, IconCheckCircle, IconRefresh,
@@ -32,7 +33,18 @@ function memoActivity(m: MemoRecord) {
 export default function DashboardPage() {
   const { memos } = useMemos();
   const { user } = usePrototypeUser();
+  const { user: authUser, loading: authLoading } = useAuth();
   const metrics = getDashboardMetrics(memos);
+
+  const displayName = authLoading
+    ? null
+    : authUser
+      ? `${authUser.firstName} ${authUser.lastName}`.trim()
+      : user.name;
+
+  const canSeeExec = authUser
+    ? authUser.roles.includes("admin") || authUser.roles.includes("managing-director")
+    : user.roles.includes("admin") || user.roles.includes("managing-director");
   const hasMemos = memos.length > 0;
   const [today, setToday] = useState<Date | null>(null);
   useEffect(() => {
@@ -90,7 +102,9 @@ export default function DashboardPage() {
               <div style={{ position: "relative", padding: "28px 28px 26px", display: "flex", flexDirection: "column", gap: 20, minHeight: 200, justifyContent: "space-between" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#93C5FD", fontWeight: 600 }}>{todayLabel}</div>
-                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 }}>สวัสดีตอนเช้า, {user.name}</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                    สวัสดีตอนเช้า{displayName ? `, ${displayName}` : ""}
+                  </div>
                   <div style={{ fontSize: 13.5, color: "rgba(219,234,254,0.78)", lineHeight: 1.55 }}>
                     มีเอกสาร <strong style={{ color: "#fff" }}>{metrics.pending} ฉบับ</strong> รอการอนุมัติ{mdPendingCount > 0 && <> และ <strong style={{ color: "#E6C76B" }}>{mdPendingCount} ฉบับ</strong> ระดับ MD</>}
                   </div>
@@ -99,7 +113,9 @@ export default function DashboardPage() {
                   <Link href="/queue" className="em-btn" style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(147,197,253,0.30)", color: "#fff" }}>
                     <IconRoute size={15} /> Review Queue
                   </Link>
-                  <button className="em-btn gold"><IconCrown size={15} /> Executive View</button>
+                  {canSeeExec && (
+                    <Link href="/queue?tier=md" className="em-btn gold"><IconCrown size={15} /> Executive View</Link>
+                  )}
                 </div>
               </div>
             </div>

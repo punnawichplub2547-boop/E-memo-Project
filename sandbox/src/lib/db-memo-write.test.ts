@@ -16,7 +16,7 @@ import {
 } from "./db-memo-write";
 import { memoToDbSeedRow } from "./db-seed";
 
-const ACTOR = "อำภา หิงคำ";
+const ACTOR = "ปุณณวิช ภูประเสิรฐ";
 
 describe("DB memo write helpers", () => {
   const readActions: ReadAction[] = [

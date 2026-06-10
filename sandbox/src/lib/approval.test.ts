@@ -259,10 +259,10 @@ describe("dashboard metrics", () => {
   it("summarizes the seeded memo queue for the dashboard", () => {
     expect(getDashboardMetrics(seedMemos)).toEqual({
       total: 8,
-      pending: 4,
+      pending: 3,
       approved: 3,
       rejected: 1,
-      averageCycleHours: 18
+      averageCycleHours: 15
     });
   });
 

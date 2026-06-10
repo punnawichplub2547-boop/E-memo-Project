@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   IconGauge, IconPen, IconRoute, IconSearch,
   IconHistory, IconCrown, IconShield,
 } from "./icons";
 import { useMemos } from "@/lib/memo-store";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
-import { getPrototypeUserInitials, isPrototypeAdmin } from "@/lib/prototype-users";
+import { isPrototypeAdmin } from "@/lib/prototype-users";
 import { useAdminUsers } from "@/lib/admin-users";
+import { useAuth } from "@/lib/auth-context";
 
 const mainItems = [
   { id: "dashboard", href: "/",        label: "Dashboard",       Icon: IconGauge },
@@ -26,9 +27,11 @@ const execItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { memos } = useMemos();
-  const { user, userId, setUserId } = usePrototypeUser();
+  const { user: protoUser, userId, setUserId } = usePrototypeUser();
   const { users } = useAdminUsers();
+  const { user: authUser, logout, loading: authLoading } = useAuth();
   const pendingCount = memos.filter(m => m.status === "pending").length;
   const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
 
@@ -36,6 +39,34 @@ export function Sidebar() {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href.split("?")[0]);
   };
+
+  const isAdmin = authUser
+    ? authUser.roles.includes("admin")
+    : isPrototypeAdmin(protoUser);
+
+  const canSeeExec = authUser
+    ? authUser.roles.includes("admin") || authUser.roles.includes("managing-director")
+    : protoUser.roles.includes("admin") || protoUser.roles.includes("managing-director");
+
+  // Display: prefer real auth user; fall back to prototype selector during transition.
+  const displayName = authUser
+    ? `${authUser.firstName} ${authUser.lastName}`
+    : protoUser.name;
+  const displayDept = authUser ? authUser.department : protoUser.department;
+  const displayRole = authUser
+    ? authUser.roles.includes("admin") ? "Admin"
+      : authUser.roles.includes("managing-director") ? "Managing Director"
+      : authUser.roles.includes("general-manager") ? "General Manager"
+      : authUser.roles.includes("manager") ? "Manager / Top Section"
+      : "Requester"
+    : protoUser.roleLabel;
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p: string) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <aside className="em-side">
@@ -61,56 +92,97 @@ export function Sidebar() {
           </Link>
         ))}
 
-        <div className="em-nav-group-label" style={{ marginTop: 14 }}>Executive</div>
-        {execItems.map(({ id, href, label, Icon, gold }) => (
-          <Link
-            key={id}
-            href={href}
-            className={`em-nav-item${gold ? " gold" : ""}${isActive(href) && id !== "audit" ? " active" : ""}`}
-          >
-            <Icon size={17} />
-            <span>{label}</span>
-            {id === "exec" && mdPendingCount > 0 && <span className="em-nav-badge">{mdPendingCount}</span>}
-          </Link>
-        ))}
+        {canSeeExec && (
+          <>
+            <div className="em-nav-group-label" style={{ marginTop: 14 }}>Executive</div>
+            {execItems.map(({ id, href, label, Icon, gold }) => (
+              <Link
+                key={id}
+                href={href}
+                className={`em-nav-item${gold ? " gold" : ""}${isActive(href) && id !== "audit" ? " active" : ""}`}
+              >
+                <Icon size={17} />
+                <span>{label}</span>
+                {id === "exec" && mdPendingCount > 0 && <span className="em-nav-badge">{mdPendingCount}</span>}
+              </Link>
+            ))}
+          </>
+        )}
 
-        {isPrototypeAdmin(user) && (
+        {isAdmin && (
           <>
             <div className="em-nav-group-label" style={{ marginTop: 14 }}>System</div>
             <Link href="/admin" className={`em-nav-item${isActive("/admin") ? " active" : ""}`}>
               <IconShield size={17} />
               <span>Admin Panel</span>
             </Link>
+            <div style={{ padding: "8px 10px 0" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: "var(--ink-muted, #94a3b8)", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>
+                View As
+              </div>
+              <select
+                aria-label="View perspective"
+                value={userId}
+                onChange={e => setUserId(e.target.value)}
+                style={{
+                  width: "100%", padding: "6px 8px", borderRadius: 7,
+                  border: "1px solid var(--border)", outline: "none",
+                  background: "var(--surface, #1e293b)", color: "var(--ink)",
+                  fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
           </>
         )}
       </nav>
 
       <div className="em-side-footer">
-        <div className="em-avatar">{getPrototypeUserInitials(user)}</div>
-        <div style={{ minWidth: 0 }}>
-          <select
-            aria-label="Prototype user"
-            value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-            style={{
-              width: "100%",
-              border: 0,
-              outline: "none",
-              background: "transparent",
-              color: "var(--ink)",
-              fontSize: 12.5,
-              fontWeight: 700,
-              padding: 0,
-            }}
-          >
-            {users.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-          <div className="em-side-role">{user.department} · {user.roleLabel}</div>
-        </div>
+        {authLoading ? (
+          <>
+            <div className="em-avatar" style={{ background: "var(--border)", color: "transparent" }}>?</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ height: 11, width: "70%", borderRadius: 4, background: "var(--border)", marginBottom: 5 }} />
+              <div style={{ height: 9, width: "50%", borderRadius: 4, background: "var(--border)" }} />
+            </div>
+          </>
+        ) : authUser ? (
+          <>
+            <Link
+              href="/profile"
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                flex: 1, minWidth: 0, textDecoration: "none",
+                padding: "6px 8px", borderRadius: 8, margin: "-6px -8px",
+                transition: "background 150ms",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(37,99,235,0.07)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <div className="em-avatar" style={{ flexShrink: 0 }}>{initials}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayName}
+                </div>
+                <div className="em-side-role">{displayDept} · {displayRole}</div>
+              </div>
+            </Link>
+            <button
+              onClick={async () => { await logout(); router.replace("/login"); }}
+              title="ออกจากระบบ"
+              style={{
+                flexShrink: 0, background: "none", border: "1px solid var(--border)", cursor: "pointer",
+                color: "var(--ink-muted,#94a3b8)", padding: "4px 10px", borderRadius: 6,
+                fontSize: 11.5, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap",
+              }}
+            >
+              ออกจากระบบ
+            </button>
+          </>
+        ) : null}
       </div>
     </aside>
   );

@@ -16,20 +16,29 @@ describe("DB seed helpers", () => {
   });
 
   it("converts scalar fields and inferred workflow state for a seed memo", () => {
-    const pending = memoToDbSeedRow(seedMemos[0]);
-    const approved = memoToDbSeedRow(seedMemos[2]);
-    const rejected = memoToDbSeedRow(seedMemos[5]);
+    const pending = memoToDbSeedRow(seedMemos[0]);   // EM-2026-001 pending
+    const approved = memoToDbSeedRow(seedMemos[3]);  // EM-2026-004 approved
+    const rejected = memoToDbSeedRow(seedMemos[7]);  // EM-2026-008 rejected
 
     expect(pending.workflow_state).toBe("Issued");
     expect(approved.workflow_state).toBe("Approved");
     expect(rejected.workflow_state).toBe("Rejected");
-    expect(pending.created_at).toBe("2026-05-17 10:00:00");
-    expect(pending.updated_at).toBe("2026-05-18 02:20:00");
-    expect(pending.cycle_hours).toBe(12);
+    expect(pending.created_at).toBe("2026-06-09 02:15:00");
+    expect(pending.updated_at).toBe("2026-06-09 02:15:00");
+    expect(pending.cycle_hours).toBe(4);
   });
 
   it("uses null for absent JSON fields so legacy seed rows match DB-1 expectations", () => {
-    const row = memoToDbSeedRow(seedMemos[0]);
+    // Use a minimal fixture — EM-2026-001 now includes selectedRoute for demo quality.
+    const row = memoToDbSeedRow({
+      ...seedMemos[0],
+      selectedRoute: undefined,
+      recommendedRoute: undefined,
+      readRecipients: undefined,
+      attachments: undefined,
+      requestItems: undefined,
+      priceComparisons: undefined,
+    });
 
     expect(row.request_items_json).toBeNull();
     expect(row.price_comparisons_json).toBeNull();

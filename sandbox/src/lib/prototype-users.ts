@@ -1,9 +1,11 @@
 import type { ApprovalLevel, MemoRecord } from "./approval";
+import type { SessionUser } from "./auth-jwt";
 
 export type PrototypeRole =
   | "requester"
   | "manager"
   | "general-manager"
+  | "senior-general-manager"
   | "managing-director"
   | "read-recipient"
   | "admin";
@@ -21,30 +23,30 @@ export type PrototypeUser = {
 export const PROTOTYPE_USERS: PrototypeUser[] = [
   {
     id: "admin",
-    name: "อำภา หิงคำ",
-    department: "HR&GA",
-    roleLabel: "Admin / HR&GA Manager",
-    roles: ["admin", "manager", "read-recipient"],
-    approvalLevel: "Manager / Top Section",
-    readRecipientLabels: ["HR&GA", "อำภา หิงคำ"],
+    name: "ปุณณวิช ภูประเสริฐ",
+    department: "IT",
+    roleLabel: "Admin / IT Support",
+    roles: ["admin", "requester"],
+    approvalLevel: undefined,
+    readRecipientLabels: ["IT", "ปุณณวิช ภูประเสริฐ"],
   },
   {
     id: "requester",
-    name: "Project Intern",
-    department: "IT",
+    name: "นัดดา หาญกล้า",
+    department: "HR&GA",
     roleLabel: "Requester",
     roles: ["requester"],
   },
   {
     id: "production-requester",
-    name: "Production",
+    name: "สุภาพร เจริญสุข",
     department: "PD",
     roleLabel: "Requester",
     roles: ["requester"],
   },
   {
     id: "manager",
-    name: "Manager User",
+    name: "สมชาย รักษ์ดี",
     department: "HR&GA",
     roleLabel: "Manager / Top Section",
     roles: ["manager"],
@@ -52,7 +54,7 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
   },
   {
     id: "gm",
-    name: "GM User",
+    name: "ประเสริฐ สุขสวัสดิ์",
     department: "Management",
     roleLabel: "General Manager",
     roles: ["general-manager"],
@@ -60,7 +62,7 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
   },
   {
     id: "md",
-    name: "MD User",
+    name: "วิชาญ ประสิทธิ์ชัย",
     department: "Executive",
     roleLabel: "Managing Director",
     roles: ["managing-director"],
@@ -68,7 +70,7 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
   },
   {
     id: "accfin-reader",
-    name: "ACC/FIN User",
+    name: "กมลวรรณ สินธุ์ทอง",
     department: "ACC/FIN",
     roleLabel: "Read Recipient",
     roles: ["read-recipient"],
@@ -76,7 +78,7 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
   },
   {
     id: "hrga-reader",
-    name: "HR&GA User",
+    name: "ปิยะนุช บุญมา",
     department: "HR&GA",
     roleLabel: "Read Recipient",
     roles: ["read-recipient"],
@@ -89,6 +91,38 @@ export const DEFAULT_PROTOTYPE_USER = PROTOTYPE_USERS[0];
 
 export function getPrototypeUserById(id: string | null | undefined): PrototypeUser {
   return PROTOTYPE_USERS.find((user) => user.id === id) ?? DEFAULT_PROTOTYPE_USER;
+}
+
+export function sessionUserToPrototypeUser(user: SessionUser): PrototypeUser {
+  const name = `${user.firstName} ${user.lastName}`.trim();
+  const approvalLevel = toApprovalLevel(user.approvalLevel);
+  return {
+    id: `auth-${user.userId}`,
+    name,
+    department: user.department,
+    roleLabel: getRoleLabel(user.roles, approvalLevel),
+    roles: user.roles.filter(isPrototypeRole),
+    approvalLevel,
+    readRecipientLabels: [name, user.department, user.email].filter(Boolean),
+  };
+}
+
+function isPrototypeRole(role: string): role is PrototypeRole {
+  return ["requester", "manager", "general-manager", "senior-general-manager", "managing-director", "read-recipient", "admin"].includes(role);
+}
+
+function toApprovalLevel(level: string | null): ApprovalLevel | undefined {
+  if (level === "Manager / Top Section" || level === "General Manager" || level === "Managing Director") {
+    return level;
+  }
+  return undefined;
+}
+
+function getRoleLabel(roles: string[], approvalLevel?: ApprovalLevel): string {
+  if (roles.includes("admin")) return "Admin";
+  if (approvalLevel) return approvalLevel;
+  if (roles.includes("read-recipient")) return "Read Recipient";
+  return "Requester";
 }
 
 export function getPrototypeUserInitials(user: PrototypeUser): string {

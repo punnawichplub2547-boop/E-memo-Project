@@ -11,7 +11,7 @@ import {
 const baseMemo: MemoRecord = {
   id: "EM-TEST",
   title: "Permission Test",
-  requester: "Project Intern",
+  requester: "นัดดา หาญกล้า",
   department: "HR&GA",
   category: "general-purchase",
   amount: 1000,

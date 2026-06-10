@@ -7,6 +7,9 @@ import { useAdminUsers } from "@/lib/admin-users";
 import { useMemos } from "@/lib/memo-store";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { isPrototypeAdmin } from "@/lib/prototype-users";
+import { useAuth } from "@/lib/auth-context";
+import type { PublicUser } from "@/lib/db-users";
+import { PROTOTYPE_USERS } from "@/lib/prototype-users";
 import type { PrototypeRole, PrototypeUser } from "@/lib/prototype-users";
 import type { ApprovalLevel, MemoStatus } from "@/lib/approval";
 import { formatTimestamp } from "@/lib/format-timestamp";
@@ -20,6 +23,7 @@ const ALL_ROLES: { value: PrototypeRole; label: string }[] = [
   { value: "requester", label: "Requester" },
   { value: "manager", label: "Manager / Top Section" },
   { value: "general-manager", label: "General Manager" },
+  { value: "senior-general-manager", label: "Sr. General Manager" },
   { value: "managing-director", label: "Managing Director" },
   { value: "read-recipient", label: "Read Recipient" },
   { value: "admin", label: "Admin" },
@@ -41,7 +45,7 @@ const statusColor: Record<MemoStatus, string> = {
   draft: "#6B7280",
 };
 
-type Tab = "users" | "memos" | "system";
+type Tab = "db-users" | "users" | "memos" | "system";
 
 type EditUserState = {
   name: string;
@@ -60,18 +64,32 @@ const emptyNewUser = (): NewUserState => ({
 });
 
 export default function AdminPage() {
-  const { user } = usePrototypeUser();
+  const { user, userId: protoUserId, setUserId: setProtoUserId } = usePrototypeUser();
+  const { user: authUser } = useAuth();
   const { users, addUser, updateUser, deleteUser, resetToDefaults } = useAdminUsers();
   const { allMemos, dispatch } = useMemos();
   const adminCount = users.filter(isPrototypeAdmin).length;
-  const [tab, setTab] = useState<Tab>("users");
+  const [tab, setTab] = useState<Tab>("db-users");
   const stampNow = () => formatTimestamp(new Date());
 
-  // Users tab state
+  // DB users tab state
+  const [dbUsers, setDbUsers] = useState<PublicUser[]>([]);
+  const [dbUsersLoading, setDbUsersLoading] = useState(false);
+  const [dbUsersError, setDbUsersError] = useState("");
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [approveRoles, setApproveRoles] = useState<string[]>(["requester"]);
+  const [approveLevel, setApproveLevel] = useState<string>("");
+
+  // Prototype users tab state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditUserState | null>(null);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState<NewUserState>(emptyNewUser);
+
+  // Change role (DB users tab) state
+  const [changeRoleId, setChangeRoleId] = useState<number | null>(null);
+  const [changeRoleRoles, setChangeRoleRoles] = useState<string[]>([]);
+  const [changeRoleLevel, setChangeRoleLevel] = useState<string>("");
 
   // Memos tab state
   const [confirmDeleteMemoId, setConfirmDeleteMemoId] = useState<string | null>(null);
@@ -83,6 +101,20 @@ export default function AdminPage() {
   const [dbStatus, setDbStatus] = useState<"checking" | "ok" | "error">("checking");
   const [aiStatus, setAiStatus] = useState<{ thaillm: boolean; groq: boolean } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+
+  useEffect(() => {
+    if (tab !== "db-users") return;
+    const timer = window.setTimeout(() => {
+      setDbUsersLoading(true);
+      setDbUsersError("");
+      fetch("/api/admin/users")
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then((data: { users: PublicUser[] }) => setDbUsers(data.users))
+        .catch(() => setDbUsersError("Failed to load users. Check DB connection."))
+        .finally(() => setDbUsersLoading(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [tab]);
 
   useEffect(() => {
     if (tab !== "system") return;
@@ -99,7 +131,9 @@ export default function AdminPage() {
     void checkStatus();
   }, [tab]);
 
-  if (!isPrototypeAdmin(user)) {
+  const isAdminAccess = authUser ? authUser.roles.includes("admin") : isPrototypeAdmin(user);
+
+  if (!isAdminAccess) {
     return (
       <div className="em-art">
         <Sidebar />
@@ -185,7 +219,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
-            {([ ["users", IconUsers, "User Management"], ["memos", IconFileText, "Memo Management"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
+            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
               <button key={t} role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t as Tab)}
                 style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: tab === t ? "var(--accent)" : "var(--muted)", borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`, marginBottom: -1, transition: "color 150ms" }}
@@ -195,7 +229,207 @@ export default function AdminPage() {
             ))}
           </div>
 
-          {/* ── USERS TAB ──────────────────────────────────────────── */}
+          {/* ── REGISTERED USERS TAB ──────────────────────────────── */}
+          {tab === "db-users" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Registered Users</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                    Approve pending accounts and manage roles. Data is persisted to MySQL.
+                  </div>
+                </div>
+                <button className="em-btn" onClick={() => { setDbUsersLoading(true); fetch("/api/admin/users").then(r => r.json()).then((d: { users: PublicUser[] }) => setDbUsers(d.users)).catch(() => {}).finally(() => setDbUsersLoading(false)); }}>
+                  <IconRefresh size={14} /> Refresh
+                </button>
+              </div>
+
+              {dbUsersLoading && <div style={{ color: "var(--muted)", fontSize: 13 }}>Loading…</div>}
+              {dbUsersError && <div style={{ color: "#f87171", fontSize: 13 }}>{dbUsersError}</div>}
+
+              {/* Pending approvals */}
+              {dbUsers.filter(u => u.status === "pending").length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                    Pending Approval ({dbUsers.filter(u => u.status === "pending").length})
+                  </div>
+                  <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
+                          {["Employee ID", "Name", "Email", "Department", "Registered", "Actions"].map(h => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbUsers.filter(u => u.status === "pending").map(u => (
+                          <tr key={u.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 12 }}>{u.employee_card_id}</td>
+                            <td style={{ padding: "10px 14px", fontWeight: 600 }}>{u.first_name} {u.last_name}</td>
+                            <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)" }}>{u.email}</td>
+                            <td style={{ padding: "10px 14px" }}>{u.department || "—"}</td>
+                            <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)" }}>{u.created_at?.slice(0, 10)}</td>
+                            <td style={{ padding: "10px 14px" }}>
+                              {approvingId === u.id ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 260 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Assign roles:</div>
+                                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                    {(["requester","manager","general-manager","managing-director","read-recipient","admin"] as const).map(r => (
+                                      <label key={r} style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                        <input type="checkbox" checked={approveRoles.includes(r)}
+                                          onChange={e => setApproveRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))} />
+                                        {r}
+                                      </label>
+                                    ))}
+                                  </div>
+                                  {(approveRoles.includes("manager") || approveRoles.includes("general-manager") || approveRoles.includes("managing-director")) && (
+                                    <select value={approveLevel} onChange={e => setApproveLevel(e.target.value)}
+                                      style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink)", outline: "none" }}>
+                                      <option value="">— Approval Level —</option>
+                                      {APPROVAL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                                    </select>
+                                  )}
+                                  <div style={{ display: "flex", gap: 6 }}>
+                                    <button className="em-btn primary" style={{ fontSize: 12 }} onClick={async () => {
+                                      await fetch(`/api/admin/users/${u.id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: approveRoles, approvalLevel: approveLevel || null }) });
+                                      setApprovingId(null);
+                                      setApproveRoles(["requester"]);
+                                      setApproveLevel("");
+                                      const fresh = await fetch("/api/admin/users").then(r => r.json()) as { users: PublicUser[] };
+                                      setDbUsers(fresh.users);
+                                    }}><IconCheck size={12} /> Approve</button>
+                                    <button className="em-btn" style={{ fontSize: 12 }} onClick={() => { setApprovingId(null); setApproveRoles(["requester"]); setApproveLevel(""); }}>Cancel</button>
+                                    <button className="em-btn" style={{ fontSize: 12, color: "#ef4444" }} onClick={async () => {
+                                      if (!confirm(`Reject ${u.first_name} ${u.last_name}? This will delete their pending account.`)) return;
+                                      await fetch(`/api/admin/users/${u.id}/reject`, { method: "POST" });
+                                      const fresh = await fetch("/api/admin/users").then(r => r.json()) as { users: PublicUser[] };
+                                      setDbUsers(fresh.users);
+                                    }}>Reject</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button className="em-btn primary" style={{ fontSize: 12 }} onClick={() => { setApprovingId(u.id); setApproveRoles(["requester"]); setApproveLevel(""); }}>
+                                  <IconCheck size={12} /> Approve…
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Active / suspended users */}
+              {dbUsers.filter(u => u.status !== "pending").length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                    Active Users ({dbUsers.filter(u => u.status === "active").length})
+                  </div>
+                  <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
+                          {["Employee ID", "Name", "Email", "Dept", "Roles", "Status", "Actions"].map(h => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbUsers.filter(u => u.status !== "pending").map(u => {
+                          let roles: string[] = [];
+                          try { roles = JSON.parse(u.roles_json) as string[]; } catch {}
+                          return (
+                            <tr key={u.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                              <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 12 }}>{u.employee_card_id}</td>
+                              <td style={{ padding: "10px 14px", fontWeight: 600 }}>{u.first_name} {u.last_name}</td>
+                              <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)" }}>{u.email}</td>
+                              <td style={{ padding: "10px 14px" }}>{u.department || "—"}</td>
+                              <td style={{ padding: "10px 14px" }}>
+                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                  {roles.map(r => (
+                                    <span key={r} style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 12, background: r === "admin" ? "rgba(234,179,8,0.15)" : "rgba(59,130,246,0.12)", color: r === "admin" ? "#A16207" : "var(--accent)", border: `1px solid ${r === "admin" ? "rgba(234,179,8,0.3)" : "rgba(59,130,246,0.2)"}`, fontWeight: 600 }}>{r}</span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ padding: "10px 14px" }}>
+                                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, fontWeight: 600, background: u.status === "active" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)", color: u.status === "active" ? "#22c55e" : "#ef4444", border: `1px solid ${u.status === "active" ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}` }}>
+                                  {u.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: "10px 14px" }}>
+                                {changeRoleId === u.id ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 300 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Assign roles:</div>
+                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                      {(["requester","manager","general-manager","senior-general-manager","managing-director","read-recipient","admin"] as const).map(r => (
+                                        <label key={r} style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                          <input type="checkbox" checked={changeRoleRoles.includes(r)}
+                                            onChange={e => setChangeRoleRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))} />
+                                          {r}
+                                        </label>
+                                      ))}
+                                    </div>
+                                    {(changeRoleRoles.includes("manager") || changeRoleRoles.includes("general-manager") || changeRoleRoles.includes("senior-general-manager") || changeRoleRoles.includes("managing-director")) && (
+                                      <select value={changeRoleLevel} onChange={e => setChangeRoleLevel(e.target.value)}
+                                        style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink)", outline: "none" }}>
+                                        <option value="">— Approval Level —</option>
+                                        {APPROVAL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                                      </select>
+                                    )}
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <button className="em-btn primary" style={{ fontSize: 12 }} onClick={async () => {
+                                        if (changeRoleRoles.length === 0) return;
+                                        await fetch(`/api/admin/users/${u.id}/roles`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: changeRoleRoles, approvalLevel: changeRoleLevel || null }) });
+                                        setChangeRoleId(null);
+                                        const fresh = await fetch("/api/admin/users").then(r => r.json()) as { users: PublicUser[] };
+                                        setDbUsers(fresh.users);
+                                      }}><IconCheck size={12} /> Save</button>
+                                      <button className="em-btn" style={{ fontSize: 12 }} onClick={() => setChangeRoleId(null)}>Cancel</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                    <button className="em-btn" style={{ fontSize: 12 }}
+                                      disabled={authUser?.userId === u.id}
+                                      title={authUser?.userId === u.id ? "Cannot change your own roles" : "Change roles"}
+                                      onClick={() => { setChangeRoleId(u.id); setChangeRoleRoles(roles); setChangeRoleLevel(u.approval_level ?? ""); }}>
+                                      <IconKey size={12} /> Change Role
+                                    </button>
+                                    <button className="em-btn" style={{ fontSize: 12, color: u.status === "active" ? "#ef4444" : "#22c55e" }}
+                                      disabled={authUser?.userId === u.id}
+                                      title={authUser?.userId === u.id ? "Cannot change your own account" : u.status === "active" ? "Suspend" : "Reactivate"}
+                                      onClick={async () => {
+                                        const nextStatus = u.status === "active" ? "suspended" : "active";
+                                        await fetch(`/api/admin/users/${u.id}/roles`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) });
+                                        const fresh = await fetch("/api/admin/users").then(r => r.json()) as { users: PublicUser[] };
+                                        setDbUsers(fresh.users);
+                                      }}>
+                                      {u.status === "active" ? "Suspend" : "Reactivate"}
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {!dbUsersLoading && !dbUsersError && dbUsers.length === 0 && (
+                <div style={{ color: "var(--muted)", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
+                  No registered users yet. Run the migration SQL to create the users table.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── PROTOTYPE USERS TAB ────────────────────────────────── */}
           {tab === "users" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -286,7 +520,7 @@ export default function AdminPage() {
 
               <div style={{ fontSize: 12, color: "var(--muted)", padding: "8px 0" }}>
                 <IconKey size={12} style={{ verticalAlign: "middle", marginRight: 5 }} />
-                <strong>No passwords</strong> — this prototype uses a dropdown selector, not real auth. Phase 5 will add real login with hashed credentials and a Reset Password flow.
+                <strong>Prototype-only users</strong> - these localStorage profiles remain for workflow simulation. Real login users are managed in the Registered Users tab.
               </div>
             </div>
           )}
@@ -421,9 +655,36 @@ export default function AdminPage() {
               </div>
 
               <div className="em-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Not Yet Implemented</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>View Perspective</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>
+                  Switch how the prototype sidebar and navigation appear — simulates another role&apos;s view without logging out.
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {PROTOTYPE_USERS.map(u => (
+                    <button
+                      key={u.id}
+                      className="em-btn"
+                      onClick={() => setProtoUserId(u.id)}
+                      style={{
+                        fontWeight: protoUserId === u.id ? 700 : 500,
+                        background: protoUserId === u.id ? "rgba(37,99,235,0.12)" : undefined,
+                        color: protoUserId === u.id ? "var(--primary)" : undefined,
+                        border: protoUserId === u.id ? "1px solid rgba(37,99,235,0.3)" : undefined,
+                      }}
+                    >
+                      {u.name} <span style={{ opacity: 0.55, fontSize: 11 }}>({u.roleLabel})</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>
+                  Current: <strong>{PROTOTYPE_USERS.find(u => u.id === protoUserId)?.name ?? "—"}</strong> · {PROTOTYPE_USERS.find(u => u.id === protoUserId)?.roleLabel}
+                </div>
+              </div>
+
+              <div className="em-card" style={{ padding: 20 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Still Deferred</div>
                 <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>
-                  Phase 5: Real authentication (JWT / session), hashed passwords, role-based route guards, email notifications, document attachment storage, and production-grade DB schema. This admin panel will become a real user management interface at that point.
+                  Login, hashed passwords, user approval, and role management are now active for the trial. Remaining production work: password reset, email notifications, full server-side permission coverage, and production-grade auth/session hardening.
                 </div>
               </div>
             </div>
@@ -487,7 +748,7 @@ function UserForm({ state, onChange, fieldStyle, toggleRole, showId }: {
       {state.roles.includes("read-recipient") && (
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, display: "block", marginBottom: 4 }}>Read Recipient Labels <span style={{ fontWeight: 400 }}>(comma-separated)</span></label>
-          <input style={fieldStyle} placeholder="e.g. HR&GA, อำภา หิงคำ" value={state.readRecipientLabels} onChange={e => onChange({ ...state, readRecipientLabels: e.target.value })} />
+          <input style={fieldStyle} placeholder="e.g. HR&GA, ปุณณวิช ภูประเสิรฐ" value={state.readRecipientLabels} onChange={e => onChange({ ...state, readRecipientLabels: e.target.value })} />
         </div>
       )}
     </div>

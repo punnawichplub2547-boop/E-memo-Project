@@ -37,6 +37,8 @@ export const IconUpload = (p: IconProps) => <Ic {...p}><path d="M21 15v4a2 2 0 0
 export const IconCheck = (p: IconProps) => <Ic {...p}><path d="M5 12l5 5 9-12"/></Ic>;
 export const IconCheckCircle = (p: IconProps) => <Ic {...p}><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="M22 4L12 14l-3-3"/></Ic>;
 export const IconX = (p: IconProps) => <Ic {...p}><path d="M18 6L6 18M6 6l12 12"/></Ic>;
+export const IconEye = (p: IconProps) => <Ic {...p}><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="3"/></Ic>;
+export const IconEyeOff = (p: IconProps) => <Ic {...p}><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4 4"/><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17.6 17.6 0 0 1-2.3 3.1"/><path d="M6.7 6.7C4 8.5 2.5 12 2.5 12s3.5 7 9.5 7a10 10 0 0 0 4.2-.9"/></Ic>;
 export const IconArrowRight = (p: IconProps) => <Ic {...p}><path d="M5 12h14M13 5l7 7-7 7"/></Ic>;
 export const IconArrowUp = (p: IconProps) => <Ic {...p}><path d="M12 19V5M5 12l7-7 7 7"/></Ic>;
 export const IconArrowDown = (p: IconProps) => <Ic {...p}><path d="M12 5v14M5 12l7 7 7-7"/></Ic>;

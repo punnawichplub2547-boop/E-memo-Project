@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: hr-ememo-sandbox
     restart: unless-stopped
+    env_file:
+      - path: .env.local
+        required: false
     depends_on:
       hr-ememo-db:
         condition: service_healthy
@@ -15,6 +18,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DATABASE_URL: mysql://${MYSQL_USER:-hr_ememo}:${MYSQL_PASSWORD:-hr_ememo_dev_password}@hr-ememo-db:3306/${MYSQL_DATABASE:-hr_ememo}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     volumes:
       # Persist uploaded attachment binaries so they survive container rebuild/recreate.
       # Runtime cwd is /app, so the app writes to /app/storage/attachments.

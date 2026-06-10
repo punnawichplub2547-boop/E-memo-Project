@@ -12,7 +12,10 @@
     "db:seed": "tsx scripts/seed-db.ts"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "gpt-tokenizer": "^3.4.0",
+    "jose": "^6.2.3",
     "lucide-react": "^0.468.0",
     "mysql2": "^3.22.4",
     "next": "16.2.6",

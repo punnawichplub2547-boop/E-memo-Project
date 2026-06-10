@@ -293,8 +293,13 @@ describe("memoReducer — REJECT_MEMO", () => {
   });
 
   it("backward-compat: existing rejected memo with no rejectDisposition is not treated as revision-allowed", () => {
-    // Seed memo EM-2026-007 is already status: "rejected" with no rejectDisposition (legacy data).
-    const legacy = seedMemos.find((m) => m.status === "rejected")!;
+    // Legacy/imported memos may have status "rejected" but no rejectDisposition (closed by default).
+    const legacy: MemoRecord = {
+      ...seedMemos[0],
+      id: "EM-LEGACY-REJECT",
+      status: "rejected",
+      rejectDisposition: undefined,
+    };
     expect(legacy.rejectDisposition).toBeUndefined();
     // The drawer condition for showing Resubmit is: status === "rejected" && rejectDisposition === "revision-allowed".
     // With rejectDisposition undefined, this evaluates to false — memo is treated as closed.

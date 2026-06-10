@@ -1,10 +1,12 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
+import { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { sanitizeAttachmentFileName } from "@/lib/attachments";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,12 +14,18 @@ export const dynamic = "force-dynamic";
 type MemoIdRow = RowDataPacket & { id: number };
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
   let connection: PoolConnection | null = null;
   try {
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(token);
+    if (!session?.roles.includes("admin")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
