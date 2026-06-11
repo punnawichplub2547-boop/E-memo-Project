@@ -74,6 +74,9 @@ async function loadActor(
    FROM users WHERE id = ? LIMIT 1`,
     [actorUserId],
   );
+  // Routes already validate the session user; this fires only on a TOCTOU
+  // window (user deleted mid-request) or direct service invocation (e.g.
+  // a future Telegram webhook), where existence must not be revealed.
   const user = rows[0];
   if (!user) {
     throw new WorkflowActionError(403, "Forbidden");

@@ -19,6 +19,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Drain the legacy request body; its fields are untrusted and unused.
+    await request.json().catch(() => undefined);
+
     await approveMemoAction({ memoNo, actorUserId: session.userId, source: "web" });
     return NextResponse.json({ ok: true });
   } catch (error) {
