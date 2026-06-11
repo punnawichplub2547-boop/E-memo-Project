@@ -420,6 +420,28 @@ describe("evaluateReturnAction", () => {
     });
     expect(result).toEqual({ ok: false, status: 400, message: "returnReason is required" });
   });
+
+  it("rejects voided memo", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo({ deleted_at: "2026-06-10 08:00:00" }),
+      actor: makeActor(),
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+  });
+
+  it("rejects non-pending memo", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo({ status: "approved" }),
+      actor: makeActor(),
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+  });
 });
 
 describe("evaluateRejectAction", () => {
@@ -469,5 +491,29 @@ describe("evaluateRejectAction", () => {
       now: NOW,
     });
     expect(result).toEqual({ ok: false, status: 400, message: "rejectReason is required" });
+  });
+
+  it("rejects voided memo", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo({ deleted_at: "2026-06-10 08:00:00" }),
+      actor: makeActor(),
+      disposition: "close",
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+  });
+
+  it("rejects non-pending memo", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo({ status: "returned" }),
+      actor: makeActor(),
+      disposition: "close",
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
   });
 });
