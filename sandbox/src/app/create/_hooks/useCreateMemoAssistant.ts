@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type AssistantTab = "routing" | "draft";
+export type AssistantTab = "routing" | "draft" | "remark";
 
 const STORAGE_KEY = "ememo-create-assistant-panel";
 
@@ -14,7 +14,7 @@ function readStorage(): { expanded: boolean; tab: AssistantTab } {
       const parsed = JSON.parse(raw) as { expanded?: boolean; tab?: AssistantTab };
       return {
         expanded: typeof parsed.expanded === "boolean" ? parsed.expanded : true,
-        tab: parsed.tab === "routing" || parsed.tab === "draft" ? parsed.tab : "routing",
+        tab: parsed.tab === "routing" || parsed.tab === "draft" || parsed.tab === "remark" ? parsed.tab : "routing",
       };
     }
   } catch { /* ignore */ }

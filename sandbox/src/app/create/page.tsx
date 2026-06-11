@@ -714,19 +714,13 @@ function CreatePageContent() {
                 onAiSuggest={handleAiSuggest}
               />
 
-              <div className="em-desc-remark-row">
-                <DescriptionCard
-                  description={description}
-                  onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
-                  aiError={aiError}
-                  isPdfLoading={isPdfLoading}
-                  onPdfClick={() => pdfInputRef.current?.click()}
-                />
-                <ClosingRemarkCard
-                  value={closingRemark}
-                  onChange={setClosingRemark}
-                />
-              </div>
+              <DescriptionCard
+                description={description}
+                onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
+                aiError={aiError}
+                isPdfLoading={isPdfLoading}
+                onPdfClick={() => pdfInputRef.current?.click()}
+              />
             </div>
 
             {/* Assistant column — single unified tree; CSS drives desktop/mobile layout */}
@@ -751,6 +745,15 @@ function CreatePageContent() {
                   aria-label="Open AI Draft Preview panel"
                 >
                   <IconSparkles size={18} />
+                </button>
+                <button
+                  type="button"
+                  className={`em-create-assistant-rail-btn ${assistantTab === "remark" ? "is-active" : ""}`}
+                  onClick={() => { setAssistantTab("remark"); setAssistantExpanded(true); }}
+                  title="หมายเหตุ / Closing Remark"
+                  aria-label="Open Closing Remark panel"
+                >
+                  <IconFileText size={18} />
                 </button>
               </div>
 
@@ -789,6 +792,19 @@ function CreatePageContent() {
                       <IconSparkles size={14} />
                       AI Draft Preview
                     </button>
+                    <button
+                      id="create-assistant-tab-remark"
+                      type="button"
+                      role="tab"
+                      aria-controls={ASSISTANT_PANEL_ID}
+                      aria-selected={assistantTab === "remark"}
+                      tabIndex={assistantTab === "remark" ? 0 : -1}
+                      className={`em-tab ${assistantTab === "remark" ? "active" : ""}`}
+                      onClick={() => setAssistantTab("remark")}
+                    >
+                      <IconFileText size={14} />
+                      หมายเหตุ
+                    </button>
                   </div>
                   {/* Collapse button: display:none by default; CSS shows it on desktop only */}
                   <button
@@ -807,7 +823,7 @@ function CreatePageContent() {
                   id={ASSISTANT_PANEL_ID}
                   className="em-create-assistant-body"
                   role="tabpanel"
-                  aria-labelledby={assistantTab === "routing" ? "create-assistant-tab-routing" : "create-assistant-tab-draft"}
+                  aria-labelledby={`create-assistant-tab-${assistantTab}`}
                   data-tab={assistantTab}
                 >
                   <div className="em-create-tab-pane" data-pane="routing">
@@ -874,6 +890,12 @@ function CreatePageContent() {
                       requestItemsGrandTotal={requestItemsGrandTotal}
                       cleanOverrideReason={cleanOverrideReason}
                       issuerName={user.name}
+                    />
+                  </div>
+                  <div className="em-create-tab-pane" data-pane="remark">
+                    <ClosingRemarkCard
+                      value={closingRemark}
+                      onChange={setClosingRemark}
                     />
                   </div>
                 </div>

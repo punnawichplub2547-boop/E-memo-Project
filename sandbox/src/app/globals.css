@@ -506,17 +506,6 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   gap: 14px;
   min-width: 0;
 }
-.em-desc-remark-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-  align-items: stretch;
-}
-@media (min-width: 1100px) {
-  .em-desc-remark-row {
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-  }
-}
 .em-create-assistant-col {
   min-width: 0;
 }
@@ -554,10 +543,11 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-create-assistant-body .em-card {
   margin: 0;
 }
-/* Tab pane switching: CSS hides the inactive pane via data-tab on the body */
-.em-create-tab-pane { display: block; }
-.em-create-assistant-body[data-tab="routing"] .em-create-tab-pane[data-pane="draft"] { display: none; }
-.em-create-assistant-body[data-tab="draft"] .em-create-tab-pane[data-pane="routing"] { display: none; }
+/* Tab pane switching: CSS shows only the pane matching data-tab on the body */
+.em-create-tab-pane { display: none; }
+.em-create-assistant-body[data-tab="routing"] .em-create-tab-pane[data-pane="routing"] { display: block; }
+.em-create-assistant-body[data-tab="draft"] .em-create-tab-pane[data-pane="draft"] { display: block; }
+.em-create-assistant-body[data-tab="remark"] .em-create-tab-pane[data-pane="remark"] { display: block; }
 /* Icon rail: hidden everywhere by default; shown on desktop when panel is collapsed */
 .em-create-assistant-rail {
   display: none;
