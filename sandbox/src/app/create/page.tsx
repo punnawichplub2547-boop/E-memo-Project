@@ -714,13 +714,19 @@ function CreatePageContent() {
                 onAiSuggest={handleAiSuggest}
               />
 
-              <DescriptionCard
-                description={description}
-                onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
-                aiError={aiError}
-                isPdfLoading={isPdfLoading}
-                onPdfClick={() => pdfInputRef.current?.click()}
-              />
+              <div className="em-desc-remark-row">
+                <DescriptionCard
+                  description={description}
+                  onDescriptionChange={(v) => { setDescription(v); setAiError(null); }}
+                  aiError={aiError}
+                  isPdfLoading={isPdfLoading}
+                  onPdfClick={() => pdfInputRef.current?.click()}
+                />
+                <ClosingRemarkCard
+                  value={closingRemark}
+                  onChange={setClosingRemark}
+                />
+              </div>
             </div>
 
             {/* Assistant column — single unified tree; CSS drives desktop/mobile layout */}
@@ -918,11 +924,6 @@ function CreatePageContent() {
                   onRemoveFile={removeAttachmentFile}
                 />
               )}
-
-              <ClosingRemarkCard
-                value={closingRemark}
-                onChange={setClosingRemark}
-              />
 
             </div>
 
