@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { IconSearch, IconBell } from "./icons";
 
 interface TopbarProps {
@@ -11,6 +12,20 @@ interface TopbarProps {
 }
 
 export function Topbar({ crumbs = [], title, actions, showSearch = true }: TopbarProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!showSearch) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        router.push("/search");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSearch, router]);
+
   return (
     <header className="em-topbar">
       <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
@@ -32,11 +47,17 @@ export function Topbar({ crumbs = [], title, actions, showSearch = true }: Topba
       </div>
 
       {showSearch && (
-        <div className="em-top-search">
+        <button
+          type="button"
+          className="em-top-search"
+          onClick={() => router.push("/search")}
+          title="ค้นหา memo (Ctrl+K)"
+          style={{ cursor: "pointer", font: "inherit", textAlign: "left" }}
+        >
           <IconSearch size={15} />
           <span>ค้นหา memo, ผู้อนุมัติ, แผนก…</span>
           <span className="em-kbd">⌘K</span>
-        </div>
+        </button>
       )}
 
       <div className="em-top-actions">

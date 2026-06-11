@@ -144,6 +144,7 @@ export default function SearchPage() {
               <div className="em-hero-search">
                 <IconSearch size={18} style={{ color: "var(--muted)", flexShrink: 0 }} />
                 <input
+                  autoFocus
                   value={query}
                   onChange={e => handleQueryChange(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleAiSearch()}
