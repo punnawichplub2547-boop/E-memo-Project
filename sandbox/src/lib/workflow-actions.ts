@@ -27,7 +27,8 @@ export class WorkflowActionError extends Error {
 }
 
 type MemoRowResult = RowDataPacket & WorkflowMemoRow;
-type UserRowResult = RowDataPacket & UserRow;
+type ActorRowResult = RowDataPacket &
+  Pick<UserRow, "id" | "first_name" | "last_name" | "roles_json" | "approval_level" | "status">;
 type PendingCountRow = RowDataPacket & { pending_count: number };
 
 async function withWorkflowTransaction<T>(
@@ -53,7 +54,9 @@ async function loadMemoForUpdate(
   memoNo: string,
 ): Promise<WorkflowMemoRow> {
   const [rows] = await connection.execute<MemoRowResult[]>(
-    "SELECT * FROM memos WHERE memo_no = ? FOR UPDATE",
+    `SELECT id, memo_no, status, current_step, revision_no,
+        selected_route_json, deleted_at
+   FROM memos WHERE memo_no = ? FOR UPDATE`,
     [memoNo],
   );
   if (rows.length === 0) {
@@ -66,13 +69,14 @@ async function loadActor(
   connection: PoolConnection,
   actorUserId: number,
 ): Promise<WorkflowActorRow> {
-  const [rows] = await connection.execute<UserRowResult[]>(
-    "SELECT * FROM users WHERE id = ? LIMIT 1",
+  const [rows] = await connection.execute<ActorRowResult[]>(
+    `SELECT id, first_name, last_name, roles_json, approval_level, status
+   FROM users WHERE id = ? LIMIT 1`,
     [actorUserId],
   );
   const user = rows[0];
   if (!user) {
-    throw new WorkflowActionError(403, "User account is not active");
+    throw new WorkflowActionError(403, "Forbidden");
   }
   return {
     id: user.id,
@@ -134,6 +138,7 @@ export async function approveMemoAction(input: {
   source: WorkflowActionSource;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: true }> {
+  // Capture once before the transaction so acted_at and updated_at are identical.
   const now = new Date();
   return withWorkflowTransaction(async (connection) => {
     const memo = await loadMemoForUpdate(connection, input.memoNo);
@@ -177,6 +182,7 @@ export async function returnMemoAction(input: {
   source: WorkflowActionSource;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: true }> {
+  // Capture once before the transaction so acted_at and updated_at are identical.
   const now = new Date();
   return withWorkflowTransaction(async (connection) => {
     const memo = await loadMemoForUpdate(connection, input.memoNo);
@@ -213,6 +219,7 @@ export async function rejectMemoAction(input: {
   source: WorkflowActionSource;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: true }> {
+  // Capture once before the transaction so acted_at and updated_at are identical.
   const now = new Date();
   return withWorkflowTransaction(async (connection) => {
     const memo = await loadMemoForUpdate(connection, input.memoNo);
