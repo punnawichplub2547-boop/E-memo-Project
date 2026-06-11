@@ -4,8 +4,13 @@ import {
   buildActionMetadata,
   calculateNextStep,
   canActOnStep,
+  evaluateApproveAction,
+  evaluateRejectAction,
+  evaluateReturnAction,
   nowMysqlUtcDateTime,
   parseRouteJson,
+  type WorkflowActorRow,
+  type WorkflowMemoRow,
 } from "./workflow-rules";
 
 const FULL_ROUTE = ["Manager / Top Section", "General Manager", "Managing Director"];
@@ -151,5 +156,318 @@ describe("nowMysqlUtcDateTime", () => {
 
   it("defaults to now and matches the MySQL shape", () => {
     expect(nowMysqlUtcDateTime()).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+});
+
+const NOW = new Date(Date.UTC(2026, 5, 11, 9, 0, 0));
+const NOW_SQL = "2026-06-11 09:00:00";
+
+function makeMemo(overrides: Partial<WorkflowMemoRow> = {}): WorkflowMemoRow {
+  return {
+    id: 42,
+    memo_no: "EM-2026-001",
+    status: "pending",
+    current_step: "Manager / Top Section",
+    revision_no: 0,
+    selected_route_json: JSON.stringify(FULL_ROUTE),
+    deleted_at: null,
+    ...overrides,
+  };
+}
+
+function makeActor(overrides: Partial<WorkflowActorRow> = {}): WorkflowActorRow {
+  return {
+    id: 7,
+    first_name: "สมชาย",
+    last_name: "รักษ์ดี",
+    roles: ["manager"],
+    approval_level: "Manager / Top Section",
+    status: "active",
+    ...overrides,
+  };
+}
+
+describe("evaluateApproveAction", () => {
+  it("manager approves at Manager step → intermediate check, advances to GM", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toEqual({
+      status: "pending",
+      workflow_state: "Checked",
+      current_step: "General Manager",
+      updated_at: NOW_SQL,
+    });
+    expect(result.payload.workflowAction).toEqual({
+      revision_no: 0,
+      action_type: "check",
+      step_label: "Manager / Top Section",
+      actor_name: "สมชาย รักษ์ดี",
+      result: "intermediate",
+      reason: null,
+      acted_at: NOW_SQL,
+      metadata_json: JSON.stringify({ source: "web" }),
+    });
+  });
+
+  it("manager cannot approve at GM step → 403", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ current_step: "General Manager" }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      message: "You do not have permission for this step",
+    });
+  });
+
+  it("GM approves GM step and advances to MD when route continues", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ current_step: "General Manager" }),
+      actor: makeActor({
+        id: 8,
+        first_name: "ประเสริฐ",
+        last_name: "สุขสวัสดิ์",
+        roles: ["general-manager"],
+        approval_level: "General Manager",
+      }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.current_step).toBe("Managing Director");
+    expect(result.payload.memoUpdate.status).toBe("pending");
+  });
+
+  it("MD approving final MD step marks memo approved", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ current_step: "Managing Director" }),
+      actor: makeActor({
+        id: 9,
+        first_name: "วิชาญ",
+        last_name: "ประสิทธิ์ชัย",
+        roles: ["managing-director"],
+        approval_level: "Managing Director",
+      }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toEqual({
+      status: "approved",
+      workflow_state: "Approved",
+      current_step: "Managing Director",
+      updated_at: NOW_SQL,
+    });
+    expect(result.payload.workflowAction.action_type).toBe("approve");
+    expect(result.payload.workflowAction.result).toBe("final");
+  });
+
+  it("approve is blocked when pending read actions exist", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      pendingReadCount: 2,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      message: "Pending read acknowledgements remain",
+    });
+  });
+
+  it("rejects inactive actor", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo(),
+      actor: makeActor({ status: "suspended" }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 403, message: "User account is not active" });
+  });
+
+  it("rejects non-pending memo", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ status: "approved" }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+  });
+
+  it("rejects voided memo", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ deleted_at: "2026-06-10 08:00:00" }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+  });
+
+  it("errors with 422 when route is missing", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ selected_route_json: null }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(422);
+  });
+
+  it("actor_name is derived from the DB user row, never from a request body", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo(),
+      actor: makeActor({ first_name: "ปุณณวิช", last_name: "ภูประเสริฐ", roles: ["admin"] }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.workflowAction.actor_name).toBe("ปุณณวิช ภูประเสริฐ");
+  });
+
+  it("metadata_json merges telegram metadata with source", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "telegram",
+      metadata: { telegram_user_id: "123" },
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(JSON.parse(result.payload.workflowAction.metadata_json)).toEqual({
+      source: "telegram",
+      telegram_user_id: "123",
+    });
+  });
+});
+
+describe("evaluateReturnAction", () => {
+  it("authorized approver returns memo with reason", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      reason: "ข้อมูลงบประมาณไม่ครบ",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toEqual({
+      status: "returned",
+      return_reason: "ข้อมูลงบประมาณไม่ครบ",
+      updated_at: NOW_SQL,
+    });
+    expect(result.payload.workflowAction).toEqual({
+      revision_no: 0,
+      action_type: "return_for_revision",
+      step_label: "Manager / Top Section",
+      actor_name: "สมชาย รักษ์ดี",
+      result: null,
+      reason: "ข้อมูลงบประมาณไม่ครบ",
+      acted_at: NOW_SQL,
+      metadata_json: JSON.stringify({ source: "web" }),
+    });
+  });
+
+  it("requires an authorized approver (manager cannot return at GM step)", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo({ current_step: "General Manager" }),
+      actor: makeActor(),
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(403);
+  });
+
+  it("requires a non-empty reason", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      reason: "   ",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 400, message: "returnReason is required" });
+  });
+});
+
+describe("evaluateRejectAction", () => {
+  it("authorized approver rejects with disposition and reason", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      disposition: "revision-allowed",
+      reason: "ราคาสูงเกินงบ",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toEqual({
+      status: "rejected",
+      reject_disposition: "revision-allowed",
+      reject_reason: "ราคาสูงเกินงบ",
+      updated_at: NOW_SQL,
+    });
+    expect(result.payload.workflowAction.action_type).toBe("reject");
+    expect(result.payload.workflowAction.result).toBe("revision-allowed");
+    expect(result.payload.workflowAction.reason).toBe("ราคาสูงเกินงบ");
+  });
+
+  it("requires an authorized active approver", () => {
+    const inactive = evaluateRejectAction({
+      memo: makeMemo(),
+      actor: makeActor({ status: "pending" }),
+      disposition: "close",
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(inactive.ok).toBe(false);
+    if (inactive.ok) return;
+    expect(inactive.status).toBe(403);
+  });
+
+  it("requires a non-empty reason", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo(),
+      actor: makeActor(),
+      disposition: "close",
+      reason: "",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 400, message: "rejectReason is required" });
   });
 });

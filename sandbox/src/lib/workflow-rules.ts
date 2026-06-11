@@ -8,7 +8,7 @@ export type WorkflowActionSource = "web" | "telegram";
 export type WorkflowMemoRow = {
   id: number;
   memo_no: string;
-  status: string;
+  status: "draft" | "pending" | "approved" | "rejected" | "returned";
   current_step: string;
   revision_no: number;
   selected_route_json: unknown;
@@ -22,7 +22,7 @@ export type WorkflowActorRow = {
   last_name: string;
   roles: string[];
   approval_level: string | null;
-  status: string;
+  status: "pending" | "active" | "suspended";
 };
 
 export function canActOnStep(
@@ -107,4 +107,186 @@ export function buildActionMetadata(
 
 export function nowMysqlUtcDateTime(date: Date = new Date()): string {
   return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+export type WorkflowEvaluation<T> =
+  | { ok: true; payload: T }
+  | { ok: false; status: number; message: string };
+
+// Shared guards for approve / return / reject. Returns null when the actor may act.
+function guardActorAndMemo(
+  memo: WorkflowMemoRow,
+  actor: WorkflowActorRow,
+): { ok: false; status: number; message: string } | null {
+  if (actor.status !== "active") {
+    return { ok: false, status: 403, message: "User account is not active" };
+  }
+  if (memo.deleted_at !== null) {
+    return { ok: false, status: 409, message: "Memo has been voided" };
+  }
+  if (memo.status !== "pending") {
+    return { ok: false, status: 409, message: "Memo is not pending" };
+  }
+  if (!canActOnStep(actor, memo.current_step)) {
+    return { ok: false, status: 403, message: "You do not have permission for this step" };
+  }
+  return null;
+}
+
+export type WorkflowActionRow = {
+  revision_no: number;
+  action_type: string;
+  step_label: string | null;
+  actor_name: string;
+  result: string | null;
+  reason: string | null;
+  acted_at: string;
+  metadata_json: string;
+};
+
+export type ApproveActionPayload = {
+  memoUpdate: {
+    status: "pending" | "approved";
+    workflow_state: "Checked" | "Approved";
+    current_step: string;
+    updated_at: string;
+  };
+  workflowAction: WorkflowActionRow;
+};
+
+export function evaluateApproveAction(input: {
+  memo: WorkflowMemoRow;
+  actor: WorkflowActorRow;
+  pendingReadCount: number;
+  source: WorkflowActionSource;
+  metadata?: Record<string, unknown>;
+  now?: Date;
+}): WorkflowEvaluation<ApproveActionPayload> {
+  const guard = guardActorAndMemo(input.memo, input.actor);
+  if (guard) return guard;
+  if (input.pendingReadCount > 0) {
+    return { ok: false, status: 409, message: "Pending read acknowledgements remain" };
+  }
+  const next = calculateNextStep(input.memo.selected_route_json, input.memo.current_step);
+  if (!next.ok) return { ok: false, status: 422, message: next.message };
+
+  const actedAt = nowMysqlUtcDateTime(input.now);
+  return {
+    ok: true,
+    payload: {
+      memoUpdate: {
+        status: next.nextStatus,
+        workflow_state: next.nextWorkflowState,
+        current_step: next.nextCurrentStep,
+        updated_at: actedAt,
+      },
+      workflowAction: {
+        revision_no: input.memo.revision_no,
+        action_type: next.isFinal ? "approve" : "check",
+        step_label: input.memo.current_step,
+        actor_name: actorDisplayName(input.actor),
+        result: next.isFinal ? "final" : "intermediate",
+        reason: null,
+        acted_at: actedAt,
+        metadata_json: buildActionMetadata(input.source, input.metadata),
+      },
+    },
+  };
+}
+
+export type ReturnActionPayload = {
+  memoUpdate: {
+    status: "returned";
+    return_reason: string;
+    updated_at: string;
+  };
+  workflowAction: WorkflowActionRow;
+};
+
+export function evaluateReturnAction(input: {
+  memo: WorkflowMemoRow;
+  actor: WorkflowActorRow;
+  reason: string;
+  source: WorkflowActionSource;
+  metadata?: Record<string, unknown>;
+  now?: Date;
+}): WorkflowEvaluation<ReturnActionPayload> {
+  const guard = guardActorAndMemo(input.memo, input.actor);
+  if (guard) return guard;
+  const reason = input.reason.trim();
+  if (!reason) {
+    return { ok: false, status: 400, message: "returnReason is required" };
+  }
+
+  const actedAt = nowMysqlUtcDateTime(input.now);
+  return {
+    ok: true,
+    payload: {
+      memoUpdate: {
+        status: "returned",
+        return_reason: reason,
+        updated_at: actedAt,
+      },
+      workflowAction: {
+        revision_no: input.memo.revision_no,
+        action_type: "return_for_revision",
+        step_label: input.memo.current_step,
+        actor_name: actorDisplayName(input.actor),
+        result: null,
+        reason,
+        acted_at: actedAt,
+        metadata_json: buildActionMetadata(input.source, input.metadata),
+      },
+    },
+  };
+}
+
+export type RejectActionPayload = {
+  memoUpdate: {
+    status: "rejected";
+    reject_disposition: "close" | "revision-allowed";
+    reject_reason: string;
+    updated_at: string;
+  };
+  workflowAction: WorkflowActionRow;
+};
+
+export function evaluateRejectAction(input: {
+  memo: WorkflowMemoRow;
+  actor: WorkflowActorRow;
+  disposition: "close" | "revision-allowed";
+  reason: string;
+  source: WorkflowActionSource;
+  metadata?: Record<string, unknown>;
+  now?: Date;
+}): WorkflowEvaluation<RejectActionPayload> {
+  const guard = guardActorAndMemo(input.memo, input.actor);
+  if (guard) return guard;
+  const reason = input.reason.trim();
+  if (!reason) {
+    return { ok: false, status: 400, message: "rejectReason is required" };
+  }
+
+  const actedAt = nowMysqlUtcDateTime(input.now);
+  return {
+    ok: true,
+    payload: {
+      memoUpdate: {
+        status: "rejected",
+        reject_disposition: input.disposition,
+        reject_reason: reason,
+        updated_at: actedAt,
+      },
+      workflowAction: {
+        revision_no: input.memo.revision_no,
+        action_type: "reject",
+        step_label: input.memo.current_step,
+        actor_name: actorDisplayName(input.actor),
+        result: input.disposition,
+        reason,
+        acted_at: actedAt,
+        metadata_json: buildActionMetadata(input.source, input.metadata),
+      },
+    },
+  };
 }
