@@ -294,6 +294,46 @@ describe("read-recipient role", () => {
   });
 });
 
+// ── CC visibility is role-independent ────────────────────────────────────────
+
+describe("CC visibility is role-independent (no read-recipient role needed)", () => {
+  it("requester-only user sees memo they are CC'd on by name", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({
+        requester: "สุภาพร เจริญสุข",
+        readRecipients: ["นัดดา หาญกล้า"],
+      }),
+      makeSession({ firstName: "นัดดา", lastName: "หาญกล้า", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("requester-only user sees memo they are CC'd on by department", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({
+        requester: "สุภาพร เจริญสุข",
+        readRecipients: ["HR&GA"],
+      }),
+      makeSession({ firstName: "นัดดา", lastName: "หาญกล้า", department: "HR&GA", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("user with empty roles sees memo they are CC'd on by email", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({
+        readActions: [{ recipient: "nadda@car-1996.com", status: "pending" }],
+      }),
+      makeSession({ email: "nadda@car-1996.com", roles: [] }),
+    )).toBe(true);
+  });
+
+  it("requester-only user does NOT see memo they are not CC'd on", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["IT"] }),
+      makeSession({ firstName: "นัดดา", lastName: "หาญกล้า", department: "HR&GA", roles: ["requester"] }),
+    )).toBe(false);
+  });
+});
+
 // ── Multi-role users ──────────────────────────────────────────────────────────
 
 describe("multi-role users", () => {

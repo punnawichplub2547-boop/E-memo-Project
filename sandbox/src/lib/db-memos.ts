@@ -102,6 +102,7 @@ export function serializeMemoRecord(
     budgetPlan: toNumber(row.budget_plan),
     budgetUsed: toNumber(row.budget_used),
     description: optional(row.description),
+    closingRemark: optional(row.closing_remark),
     status: row.status as MemoStatus,
     workflowState: optional(row.workflow_state) as WorkflowState | undefined,
     currentStep: row.current_step as ApprovalLevel,

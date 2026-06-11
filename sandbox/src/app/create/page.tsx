@@ -29,6 +29,7 @@ import {
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
+import { ClosingRemarkCard } from "./_components/ClosingRemarkCard";
 import { RequestItemsCard } from "./_components/RequestItemsCard";
 import { BudgetCard } from "./_components/BudgetCard";
 import { DraftPreviewPanel } from "./_components/DraftPreviewPanel";
@@ -95,6 +96,9 @@ function CreatePageContent() {
   );
   const [description, setDescription] = useState(() =>
     isRevisionMode ? (reviseMemo!.description ?? "") : ""
+  );
+  const [closingRemark, setClosingRemark] = useState(() =>
+    isRevisionMode ? (reviseMemo!.closingRemark ?? "") : ""
   );
   const [isPriceAdjustment, setIsPriceAdjustment] = useState(() =>
     isRevisionMode ? (reviseMemo!.isPriceAdjustment ?? false) : false
@@ -500,6 +504,7 @@ function CreatePageContent() {
         department,
         amount,
         description: description.trim() || undefined,
+        closingRemark: closingRemark.trim() || undefined,
         budgetStatus,
         accountCode: accountCode.trim() || undefined,
         budgetPlan,
@@ -556,6 +561,7 @@ function CreatePageContent() {
           ? orderedReadRecipients.map((r): ReadAction => ({ recipient: r, status: "pending" }))
           : undefined,
         description: description.trim() || undefined,
+        closingRemark: closingRemark.trim() || undefined,
         budgetStatus,
         accountCode: accountCode.trim() || undefined,
         budgetPlan,
@@ -912,6 +918,11 @@ function CreatePageContent() {
                   onRemoveFile={removeAttachmentFile}
                 />
               )}
+
+              <ClosingRemarkCard
+                value={closingRemark}
+                onChange={setClosingRemark}
+              />
 
             </div>
 

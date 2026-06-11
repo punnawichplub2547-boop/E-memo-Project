@@ -196,7 +196,17 @@ export function DrawerPanel({
           )}
         </section>
 
-        {/* 4. Request items */}
+        {/* 4. Closing Remark / หมายเหตุ */}
+        {memo.closingRemark && (
+          <section>
+            <div className="em-eyebrow" style={{ marginBottom: 6 }}>หมายเหตุ / Closing Remark</div>
+            <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ink-2)", margin: 0, padding: "12px 14px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--line)", whiteSpace: "pre-wrap" }}>
+              {memo.closingRemark}
+            </p>
+          </section>
+        )}
+
+        {/* 5. Request items */}
         <section>
           <div className="em-eyebrow" style={{ marginBottom: 8 }}>รายการที่ขออนุมัติ / Request Items</div>
           {memo.requestItems && memo.requestItems.some(r => r.name.trim() || r.unitPrice > 0) ? (() => {

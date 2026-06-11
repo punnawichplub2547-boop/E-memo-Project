@@ -4,12 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   IconGauge, IconPen, IconRoute, IconSearch,
-  IconHistory, IconCrown, IconShield,
+  IconHistory, IconCrown, IconShield, IconBarChart,
 } from "./icons";
 import { useMemos } from "@/lib/memo-store";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { isPrototypeAdmin } from "@/lib/prototype-users";
-import { useAdminUsers } from "@/lib/admin-users";
 import { useAuth } from "@/lib/auth-context";
 
 const mainItems = [
@@ -29,8 +28,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { memos } = useMemos();
-  const { user: protoUser, userId, setUserId } = usePrototypeUser();
-  const { users } = useAdminUsers();
+  const { user: protoUser } = usePrototypeUser();
   const { user: authUser, logout, loading: authLoading } = useAuth();
   const pendingCount = memos.filter(m => m.status === "pending").length;
   const mdPendingCount = memos.filter(m => m.status === "pending" && m.currentStep === "Managing Director").length;
@@ -47,6 +45,10 @@ export function Sidebar() {
   const canSeeExec = authUser
     ? authUser.roles.includes("admin") || authUser.roles.includes("managing-director")
     : protoUser.roles.includes("admin") || protoUser.roles.includes("managing-director");
+
+  const canSeeReport = authUser
+    ? authUser.roles.some(r => ["admin", "manager", "general-manager", "managing-director"].includes(r))
+    : protoUser.roles.some(r => ["admin", "manager", "general-manager", "managing-director"].includes(r));
 
   // Display: prefer real auth user; fall back to prototype selector during transition.
   const displayName = authUser
@@ -92,6 +94,16 @@ export function Sidebar() {
           </Link>
         ))}
 
+        {canSeeReport && (
+          <Link
+            href="/report"
+            className={`em-nav-item${isActive("/report") ? " active" : ""}`}
+          >
+            <IconBarChart size={17} />
+            <span>Monthly Report</span>
+          </Link>
+        )}
+
         {canSeeExec && (
           <>
             <div className="em-nav-group-label" style={{ marginTop: 14 }}>Executive</div>
@@ -116,26 +128,6 @@ export function Sidebar() {
               <IconShield size={17} />
               <span>Admin Panel</span>
             </Link>
-            <div style={{ padding: "8px 10px 0" }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "var(--ink-muted, #94a3b8)", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>
-                View As
-              </div>
-              <select
-                aria-label="View perspective"
-                value={userId}
-                onChange={e => setUserId(e.target.value)}
-                style={{
-                  width: "100%", padding: "6px 8px", borderRadius: 7,
-                  border: "1px solid var(--border)", outline: "none",
-                  background: "var(--surface, #1e293b)", color: "var(--ink)",
-                  fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </div>
           </>
         )}
       </nav>

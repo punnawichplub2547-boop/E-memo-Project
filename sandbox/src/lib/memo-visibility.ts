@@ -43,17 +43,16 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
   // Managing Director: also sees notifyMD memos (awareness only — not approval permission)
   if (session.roles.includes("managing-director") && memo.notifyMD === true) return true;
 
-  // Read recipient: sees memos where any identity label matches a recipient entry
-  if (session.roles.includes("read-recipient")) {
-    const labels = new Set<string>(
-      [fullName, session.department, session.email].filter((s): s is string => Boolean(s))
-    );
-    const recipients: string[] = [
-      ...(memo.readRecipients ?? []),
-      ...(memo.readActions?.map(ra => ra.recipient) ?? []),
-    ];
-    if (recipients.some(r => labels.has(r))) return true;
-  }
+  // CC visibility: any user whose name, department, or email appears in read recipients
+  // can see the memo — no read-recipient role required.
+  const labels = new Set<string>(
+    [fullName, session.department, session.email].filter((s): s is string => Boolean(s))
+  );
+  const recipients: string[] = [
+    ...(memo.readRecipients ?? []),
+    ...(memo.readActions?.map(ra => ra.recipient) ?? []),
+  ];
+  if (recipients.some(r => labels.has(r))) return true;
 
   return false;
 }

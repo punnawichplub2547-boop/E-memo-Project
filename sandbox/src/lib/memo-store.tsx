@@ -38,6 +38,7 @@ type Action =
       department: string;
       amount: number;
       description?: string;
+      closingRemark?: string;
       budgetStatus?: BudgetStatus;
       accountCode?: string;
       budgetPlan?: number;
@@ -220,6 +221,7 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           department: action.department,
           amount: action.amount,
           description: action.description,
+          closingRemark: action.closingRemark,
           budgetStatus: action.budgetStatus,
           accountCode: action.accountCode,
           budgetPlan: action.budgetPlan,
