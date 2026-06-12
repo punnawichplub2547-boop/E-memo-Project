@@ -40,16 +40,8 @@ import { PriceComparisonCard } from "./_components/PriceComparisonCard";
 import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { canResubmitMemo } from "@/lib/prototype-users";
+import { ReadRecipientPicker } from "./_components/ReadRecipientPicker";
 
-// TODO: Promote ordered read/review recipients into sequential workflow steps
-// once queue actions can advance per-reader. For now, the prototype preserves
-// input order for audit and display without enforcing step-by-step read routing.
-function parseReadRecipientsInput(value: string) {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
 
 function getEffectiveRequestQty(qty: number) {
   return qty > 0 ? qty : 1;
@@ -112,8 +104,8 @@ function CreatePageContent() {
   const [deptMonthlyOverBudgetTotal, setDeptMonthlyOverBudgetTotal] = useState(() =>
     isRevisionMode ? (reviseMemo!.departmentMonthlyOverBudgetTotal ?? 0) : 0
   );
-  const [readRecipients, setReadRecipients] = useState(() =>
-    isRevisionMode ? (reviseMemo!.readRecipients?.join(", ") ?? "") : ""
+  const [readRecipients, setReadRecipients] = useState<string[]>(() =>
+    isRevisionMode ? (reviseMemo!.readRecipients ?? []) : []
   );
   const [accountCode, setAccountCode] = useState(() =>
     isRevisionMode ? (reviseMemo!.accountCode ?? "") : ""
@@ -286,10 +278,7 @@ function CreatePageContent() {
   const isOverridden = routeReview.mode !== "recommended";
   const budgetRemaining = budgetPlan - budgetUsed - amount;
   const cleanOverrideReason = routeOverrideReason.trim();
-  const orderedReadRecipients = useMemo(
-    () => parseReadRecipientsInput(readRecipients),
-    [readRecipients]
-  );
+  const orderedReadRecipients = readRecipients;
   const firstCheckingStep = selectedRoute[0] ?? "Manager / Top Section";
   const selectedVendor = priceComparisons.find(r => r.isSelected) ?? priceComparisons[0];
   const hasPricedVendor = priceComparisons.some(r => r.offeredPrice > 0);
@@ -853,23 +842,10 @@ function CreatePageContent() {
                         ผู้รับทราบ / Read Recipients
                       </div>
                       <div className="em-field">
-                        <textarea
-                          className="em-textarea"
-                          style={{ minHeight: 60 }}
+                        <ReadRecipientPicker
                           value={readRecipients}
-                          placeholder="ACC/FIN, QA/QC, Production Manager"
-                          onChange={(e) => setReadRecipients(e.target.value)}
+                          onChange={setReadRecipients}
                         />
-                        <div className="em-help">คั่นด้วย comma หรือขึ้นบรรทัดใหม่ · ลำดับจะถูกบันทึกตาม[...]</div>
-                        {orderedReadRecipients.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                            {orderedReadRecipients.map((r, i) => (
-                              <span key={`${r}-${i}`} className="em-tier" style={{ background: "var(--surface-2)", color: "var(--ink-2)" }}>
-                                {i + 1}. {r}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

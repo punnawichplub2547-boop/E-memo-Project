@@ -449,3 +449,35 @@ describe("edge cases", () => {
     )).toBe(false);
   });
 });
+
+// ── Email-based CC (new: readRecipients stores email strings) ─────────────────
+
+describe("email-based CC visibility", () => {
+  it("user sees memo when their email is in readRecipients", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["somchai@car-1996.com"] }),
+      makeSession({ email: "somchai@car-1996.com", firstName: "สมชาย", lastName: "ดีดี", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("user does not see memo when their email is not in readRecipients", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["other@car-1996.com"] }),
+      makeSession({ email: "somchai@car-1996.com", firstName: "สมชาย", lastName: "ดีดี", roles: ["requester"] }),
+    )).toBe(false);
+  });
+
+  it("old-style name/dept CC still works alongside email CC (backward compat)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["ACC/FIN"] }),
+      makeSession({ email: "other@car-1996.com", department: "ACC/FIN", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("email match is exact — partial email does not match", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["somchai@car-1996.com"] }),
+      makeSession({ email: "somchai@car-1996.co", roles: ["requester"] }),
+    )).toBe(false);
+  });
+});

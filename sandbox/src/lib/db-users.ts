@@ -113,3 +113,33 @@ export async function updateUserStatus(
 export function parseRoles(rolesJson: string): string[] {
   try { return JSON.parse(rolesJson) as string[]; } catch { return ["requester"]; }
 }
+
+export type UserSearchResult = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+};
+
+// MD is excluded — they have their own notifyMD notification path.
+// Requires q.length >= 2 to prevent full-list enumeration.
+export async function searchActiveUsers(q: string): Promise<UserSearchResult[]> {
+  if (q.trim().length < 2) return [];
+  const pool = getDbPool();
+  const prefix = `${q.trim()}%`;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT email, first_name, last_name, department FROM users
+     WHERE status = 'active'
+       AND (approval_level IS NULL OR approval_level != 'Managing Director')
+       AND (email LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?)
+     ORDER BY first_name, last_name
+     LIMIT 8`,
+    [prefix, prefix],
+  );
+  return (rows as Array<{ email: string; first_name: string; last_name: string; department: string }>).map(r => ({
+    email: r.email,
+    firstName: r.first_name,
+    lastName: r.last_name,
+    department: r.department,
+  }));
+}
