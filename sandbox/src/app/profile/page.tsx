@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
@@ -30,6 +31,27 @@ const ROLE_COLORS: Record<string, { bg: string; color: string; glow: string }> =
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const router = useRouter();
+
+  type TelegramStatus = { linked: false } | { linked: true; username: string | null; linkedAt: string };
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
+
+  useEffect(() => {
+    fetch("/api/profile/telegram-account")
+      .then(r => r.json())
+      .then((d: TelegramStatus) => setTelegramStatus(d))
+      .catch(() => setTelegramStatus({ linked: false }));
+  }, []);
+
+  async function handleConnectTelegram() {
+    const res = await fetch("/api/profile/telegram-link-token", { method: "POST" });
+    const data = await res.json() as { deepLink?: string };
+    if (data.deepLink) window.open(data.deepLink, "_blank");
+  }
+
+  async function handleRevokeTelegram() {
+    await fetch("/api/profile/telegram-account", { method: "DELETE" });
+    setTelegramStatus({ linked: false });
+  }
 
   if (!user) {
     return (
@@ -357,6 +379,30 @@ export default function ProfilePage() {
                 <span style={{ fontSize: 14, fontWeight: 500, color: "#16A34A" }}>Active — 8h session</span>
               </div>
             </div>
+          </div>
+
+          {/* Telegram connection card */}
+          <div style={{ marginTop: 24, padding: "16px 20px", background: "var(--surface-raised)", borderRadius: 10, border: "1px solid var(--border)" }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--ink)" }}>Telegram</div>
+            {telegramStatus === null && <span style={{ color: "var(--ink-muted)", fontSize: 14 }}>กำลังโหลด…</span>}
+            {telegramStatus !== null && !telegramStatus.linked && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ color: "var(--ink-muted)", fontSize: 14 }}>ยังไม่ได้เชื่อมต่อ</span>
+                <button onClick={handleConnectTelegram} style={{ padding: "6px 14px", borderRadius: 6, background: "#229ED9", color: "#fff", border: "none", cursor: "pointer", fontSize: 14 }}>
+                  เชื่อมต่อ Telegram
+                </button>
+              </div>
+            )}
+            {telegramStatus !== null && telegramStatus.linked && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ color: "var(--ink-muted)", fontSize: 14 }}>
+                  {telegramStatus.username ? `@${telegramStatus.username}` : "เชื่อมต่อแล้ว"} · {String(telegramStatus.linkedAt).slice(0, 10)}
+                </span>
+                <button onClick={handleRevokeTelegram} style={{ padding: "6px 14px", borderRadius: 6, background: "var(--surface)", color: "var(--ink-muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 14 }}>
+                  ยกเลิกการเชื่อมต่อ
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Logout button */}
