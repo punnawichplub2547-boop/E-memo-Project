@@ -137,6 +137,34 @@ describe("approver roles", () => {
     )).toBe(false);
   });
 
+  it("manager does not see memo in route but from a different department", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["Manager / Top Section"], department: "IT" }),
+      makeSession({ roles: ["manager"], approvalLevel: "Manager / Top Section", department: "HR&GA" }),
+    )).toBe(false);
+  });
+
+  it("manager sees memo in route from their own department", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["Manager / Top Section"], department: "IT" }),
+      makeSession({ roles: ["manager"], approvalLevel: "Manager / Top Section", department: "IT" }),
+    )).toBe(true);
+  });
+
+  it("GM sees memo in route from a different department (no dept restriction)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["General Manager"], department: "PC" }),
+      makeSession({ roles: ["general-manager"], approvalLevel: "General Manager", department: "GM" }),
+    )).toBe(true);
+  });
+
+  it("MD sees memo in route from a different department (no dept restriction)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["Managing Director"], department: "MK" }),
+      makeSession({ roles: ["managing-director"], approvalLevel: "Managing Director", department: "MD" }),
+    )).toBe(true);
+  });
+
   it("GM sees memo with General Manager in selectedRoute", () => {
     expect(isMemoVisibleTo(
       makeMemo({ selectedRoute: ["Manager / Top Section", "General Manager"] }),

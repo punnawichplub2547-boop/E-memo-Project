@@ -30,14 +30,23 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
   // Requester: sees memos they submitted (exact name match — see temporary limitation above)
   if (session.roles.includes("requester") && memo.requester === fullName) return true;
 
-  // Approver: sees memos where their approval level appears in any route source or is currentStep
+  // Approver: sees memos where their approval level appears in any route source or is currentStep.
+  // Manager / Top Section has an extra department filter — they only see memos from their own
+  // department. GM and MD have no department restriction.
   const approvalLevel = toApprovalLevel(session.approvalLevel);
   if (approvalLevel) {
     const routeSteps = new Set<string>([
       ...(memo.selectedRoute ?? []),
       ...(memo.recommendedRoute ?? []),
     ]);
-    if (routeSteps.has(approvalLevel) || memo.currentStep === approvalLevel) return true;
+    const inRoute = routeSteps.has(approvalLevel) || memo.currentStep === approvalLevel;
+    if (inRoute) {
+      if (approvalLevel === "Manager / Top Section") {
+        if (session.department && memo.department === session.department) return true;
+      } else {
+        return true;
+      }
+    }
   }
 
   // Managing Director: also sees notifyMD memos (awareness only — not approval permission)
