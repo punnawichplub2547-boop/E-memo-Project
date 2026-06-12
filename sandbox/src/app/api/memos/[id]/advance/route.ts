@@ -1,79 +1,34 @@
-import { NextResponse } from "next/server";
-import type { PoolConnection } from "mysql2/promise";
-import type { RowDataPacket } from "mysql2";
-import { getDbPool } from "@/lib/db";
-import { buildAdvanceStepPayload, type AdvanceStepBody } from "@/lib/db-memo-write";
+import { NextRequest, NextResponse } from "next/server";
+import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
+import { approveMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
-
+// Hardened per docs/telegram-workflow-hardening-spec.md: the server decides
+// actor, permission, and next workflow state. Any legacy body fields the old
+// client still sends (actorName, nextCurrentStep, ...) are ignored entirely.
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
-  let connection: PoolConnection | null = null;
   try {
-    const body = (await request.json()) as AdvanceStepBody;
-    const pool = getDbPool();
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? FOR UPDATE",
-      [memoNo]
-    );
-
-    if (rows.length === 0) {
-      await connection.rollback();
-      return NextResponse.json({ error: "Memo not found" }, { status: 404 });
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(token);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const memoDbId = rows[0].id;
-    const { memoUpdate, workflowAction } = buildAdvanceStepPayload(body);
+    // Drain the legacy request body; its fields are untrusted and unused.
+    await request.json().catch(() => undefined);
 
-    await connection.execute(
-      `UPDATE memos SET
-         current_step = ?,
-         workflow_state = ?,
-         status = ?,
-         updated_at = ?
-       WHERE id = ?`,
-      [
-        memoUpdate.current_step,
-        memoUpdate.workflow_state,
-        memoUpdate.status,
-        memoUpdate.updated_at,
-        memoDbId,
-      ]
-    );
-
-    await connection.execute(
-      `INSERT INTO workflow_step_actions (
-         memo_id, revision_no, action_type, step_label, actor_name,
-         result, reason, acted_at, metadata_json
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        memoDbId,
-        workflowAction.revision_no,
-        workflowAction.action_type,
-        workflowAction.step_label,
-        workflowAction.actor_name,
-        workflowAction.result,
-        null,
-        workflowAction.acted_at,
-        workflowAction.metadata_json,
-      ]
-    );
-
-    await connection.commit();
+    await approveMemoAction({ memoNo, actorUserId: session.userId, source: "web" });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (connection) await connection.rollback().catch(() => {});
+    if (error instanceof WorkflowActionError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("[POST /api/memos/[id]/advance]", error);
     return NextResponse.json({ error: "Unable to advance memo step" }, { status: 500 });
-  } finally {
-    connection?.release();
   }
 }

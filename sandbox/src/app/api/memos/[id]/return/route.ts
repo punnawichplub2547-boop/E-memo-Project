@@ -1,77 +1,38 @@
-import { NextResponse } from "next/server";
-import type { PoolConnection } from "mysql2/promise";
-import type { RowDataPacket } from "mysql2";
-import { getDbPool } from "@/lib/db";
-import { buildReturnMemoPayload, type ReturnMemoBody } from "@/lib/db-memo-write";
+import { NextRequest, NextResponse } from "next/server";
+import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
+import { returnMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
-
+// Hardened per docs/telegram-workflow-hardening-spec.md. Only `returnReason`
+// is read from the body; actor identity and step come from the session + DB.
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
-  let connection: PoolConnection | null = null;
   try {
-    const body = (await request.json()) as ReturnMemoBody;
-    const pool = getDbPool();
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? FOR UPDATE",
-      [memoNo]
-    );
-
-    if (rows.length === 0) {
-      await connection.rollback();
-      return NextResponse.json({ error: "Memo not found" }, { status: 404 });
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(token);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const memoDbId = rows[0].id;
-    const { memoUpdate, workflowAction } = buildReturnMemoPayload(body);
+    const body = (await request.json().catch(() => ({}))) as { returnReason?: unknown };
+    const returnReason = typeof body.returnReason === "string" ? body.returnReason : "";
 
-    await connection.execute(
-      `UPDATE memos SET
-         status = ?,
-         return_reason = ?,
-         updated_at = ?
-       WHERE id = ?`,
-      [
-        memoUpdate.status,
-        memoUpdate.return_reason,
-        memoUpdate.updated_at,
-        memoDbId,
-      ]
-    );
-
-    await connection.execute(
-      `INSERT INTO workflow_step_actions (
-         memo_id, revision_no, action_type, step_label, actor_name,
-         result, reason, acted_at, metadata_json
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        memoDbId,
-        workflowAction.revision_no,
-        workflowAction.action_type,
-        workflowAction.step_label,
-        workflowAction.actor_name,
-        workflowAction.result,
-        workflowAction.reason,
-        workflowAction.acted_at,
-        workflowAction.metadata_json,
-      ]
-    );
-
-    await connection.commit();
+    await returnMemoAction({
+      memoNo,
+      actorUserId: session.userId,
+      reason: returnReason,
+      source: "web",
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (connection) await connection.rollback().catch(() => {});
+    if (error instanceof WorkflowActionError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("[POST /api/memos/[id]/return]", error);
     return NextResponse.json({ error: "Unable to return memo" }, { status: 500 });
-  } finally {
-    connection?.release();
   }
 }
