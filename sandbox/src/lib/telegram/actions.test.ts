@@ -2,32 +2,26 @@ import { describe, expect, it, vi } from "vitest";
 import { consumeApproveActionToken } from "./actions";
 import type { Pool } from "mysql2/promise";
 
-const FUTURE = new Date(Date.now() + 60_000).toISOString().replace("T", " ").slice(0, 19);
-
-function makePool(row: object | null): Pool {
+function makePoolSuccess(memoNo: string, userId: number): Pool {
   return {
     query: vi.fn()
-      .mockResolvedValueOnce([[...(row ? [row] : [])], undefined])
-      .mockResolvedValueOnce([{ affectedRows: 1 }, undefined]),
+      .mockResolvedValueOnce([{ affectedRows: 1 }, undefined])
+      .mockResolvedValueOnce([[{ user_id: userId, memo_no: memoNo }], undefined]),
   } as unknown as Pool;
 }
 
-const validRow = { id: 1, memo_id: 5, memo_no: "EM-2026-001", user_id: 7, telegram_user_id_owner: "123456", expires_at: FUTURE, used_at: null };
+function makePoolFailed(): Pool {
+  return {
+    query: vi.fn().mockResolvedValueOnce([{ affectedRows: 0 }, undefined]),
+  } as unknown as Pool;
+}
 
 describe("consumeApproveActionToken", () => {
-  it("returns memoNo and userId for valid matching token", async () => {
-    expect(await consumeApproveActionToken(1, 123456n, makePool(validRow))).toEqual({ memoNo: "EM-2026-001", userId: 7 });
+  it("returns memoNo and userId when atomic UPDATE succeeds", async () => {
+    expect(await consumeApproveActionToken(1, 123456n, makePoolSuccess("EM-2026-001", 7))).toEqual({ memoNo: "EM-2026-001", userId: 7 });
   });
-  it("returns null when not found", async () => {
-    expect(await consumeApproveActionToken(99, 1n, makePool(null))).toBeNull();
-  });
-  it("returns null when telegram_user_id does not match", async () => {
-    expect(await consumeApproveActionToken(1, 999n, makePool(validRow))).toBeNull();
-  });
-  it("returns null when already used", async () => {
-    expect(await consumeApproveActionToken(1, 123456n, makePool({ ...validRow, used_at: "2026-06-12 09:00:00" }))).toBeNull();
-  });
-  it("returns null when expired", async () => {
-    expect(await consumeApproveActionToken(1, 123456n, makePool({ ...validRow, expires_at: "2020-01-01 00:00:00" }))).toBeNull();
+  // affectedRows=0 covers: not found, already used, expired, wrong telegram_user_id — SQL handles all atomically
+  it("returns null when token is not found, used, expired, or wrong telegram_user_id", async () => {
+    expect(await consumeApproveActionToken(99, 1n, makePoolFailed())).toBeNull();
   });
 });

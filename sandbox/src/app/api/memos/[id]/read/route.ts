@@ -1,27 +1,34 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { buildMarkReadPayload, type MarkReadBody } from "@/lib/db-memo-write";
+import { COOKIE_NAME } from "@/lib/auth-jwt";
+import { getActiveSessionUserFromToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
+type MemoIdRow = RowDataPacket & { id: number; revision_no: number };
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(sessionToken);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id: memoNo } = await params;
   let connection: PoolConnection | null = null;
   try {
     const body = (await request.json()) as MarkReadBody;
+    body.actorName = `${session.firstName} ${session.lastName}`;
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? FOR UPDATE",
+      "SELECT id, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -29,6 +36,21 @@ export async function POST(
       await connection.rollback();
       return NextResponse.json({ error: "Memo not found" }, { status: 404 });
     }
+
+    const isAdmin = session.roles.includes("admin");
+    const sessionFullName = `${session.firstName} ${session.lastName}`;
+    // Recipients can be stored as full name, email (new CC), or department (old CC).
+    const isOwnRecipient =
+      body.recipient === sessionFullName ||
+      body.recipient === session.email ||
+      body.recipient === session.department;
+    if (!isAdmin && !isOwnRecipient) {
+      await connection.rollback();
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Use DB revision_no — never trust client.
+    body.revisionNo = rows[0].revision_no;
 
     const memoDbId = rows[0].id;
     const { readActionUpdate, workflowAction } = buildMarkReadPayload(body);

@@ -1,9 +1,7 @@
 import type { Pool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { nowMysqlUtcDateTime } from "@/lib/workflow-rules";
-import { createTokenExpiry, generateRawToken, hashToken, isTokenExpired } from "./tokens";
-
-type LinkTokenRow = RowDataPacket & { id: number; user_id: number; expires_at: string; used_at: string | null };
+import { createTokenExpiry, generateRawToken, hashToken } from "./tokens";
 
 export async function createLinkToken(userId: number, pool: Pool): Promise<string> {
   const rawToken = generateRawToken();
@@ -16,14 +14,18 @@ export async function createLinkToken(userId: number, pool: Pool): Promise<strin
 }
 
 export async function consumeLinkToken(rawToken: string, pool: Pool): Promise<{ userId: number } | null> {
-  const [rows] = await pool.query<LinkTokenRow[]>(
-    "SELECT id, user_id, expires_at, used_at FROM telegram_link_tokens WHERE token_hash = ? LIMIT 1",
-    [hashToken(rawToken)],
+  const hash = hashToken(rawToken);
+  // Atomic: only one concurrent request wins; expiry and used_at checked in SQL.
+  const [result] = await pool.query(
+    "UPDATE telegram_link_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()",
+    [nowMysqlUtcDateTime(), hash],
+  ) as [{ affectedRows: number }, unknown];
+  if (result.affectedRows !== 1) return null;
+  const [rows] = await pool.query<(RowDataPacket & { user_id: number })[]>(
+    "SELECT user_id FROM telegram_link_tokens WHERE token_hash = ? LIMIT 1",
+    [hash],
   );
-  const row = rows[0];
-  if (!row || row.used_at !== null || isTokenExpired(row.expires_at)) return null;
-  await pool.query("UPDATE telegram_link_tokens SET used_at = ? WHERE id = ?", [nowMysqlUtcDateTime(), row.id]);
-  return { userId: row.user_id };
+  return rows[0] ? { userId: rows[0].user_id } : null;
 }
 
 export async function upsertTelegramAccount(

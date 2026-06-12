@@ -1,17 +1,7 @@
 import type { Pool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { nowMysqlUtcDateTime } from "@/lib/workflow-rules";
-import { createTokenExpiry, generateRawToken, hashToken, isTokenExpired } from "./tokens";
-
-type ActionTokenRow = RowDataPacket & {
-  id: number;
-  memo_id: number;
-  memo_no: string;
-  user_id: number;
-  telegram_user_id_owner: string;
-  expires_at: string;
-  used_at: string | null;
-};
+import { createTokenExpiry, generateRawToken, hashToken } from "./tokens";
 
 // Returns { tokenDbId } — caller puts "approve:<tokenDbId>" in Telegram callback_data.
 export async function createApproveActionToken(
@@ -36,18 +26,18 @@ export async function consumeApproveActionToken(
   telegramUserId: bigint,
   pool: Pool,
 ): Promise<{ memoNo: string; userId: number } | null> {
-  const [rows] = await pool.query<ActionTokenRow[]>(
-    `SELECT t.id, t.memo_id, m.memo_no, t.user_id,
-            JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.telegram_user_id')) AS telegram_user_id_owner,
-            t.expires_at, t.used_at
-     FROM telegram_action_tokens t
-     JOIN memos m ON m.id = t.memo_id
-     WHERE t.id = ? AND t.action_type = 'approve' LIMIT 1`,
+  // Atomic: telegram_user_id ownership, expiry, and used_at all checked in SQL.
+  const [result] = await pool.query(
+    `UPDATE telegram_action_tokens SET used_at = ?
+     WHERE id = ? AND action_type = 'approve' AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()
+       AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.telegram_user_id')) = ?`,
+    [nowMysqlUtcDateTime(), tokenDbId, telegramUserId.toString()],
+  ) as [{ affectedRows: number }, unknown];
+  if (result.affectedRows !== 1) return null;
+  const [rows] = await pool.query<(RowDataPacket & { user_id: number; memo_no: string })[]>(
+    `SELECT t.user_id, m.memo_no FROM telegram_action_tokens t
+     JOIN memos m ON m.id = t.memo_id WHERE t.id = ? LIMIT 1`,
     [tokenDbId],
   );
-  const row = rows[0];
-  if (!row || row.used_at !== null || isTokenExpired(row.expires_at)) return null;
-  if (row.telegram_user_id_owner !== telegramUserId.toString()) return null;
-  await pool.query("UPDATE telegram_action_tokens SET used_at = ? WHERE id = ?", [nowMysqlUtcDateTime(), row.id]);
-  return { memoNo: row.memo_no, userId: row.user_id };
+  return rows[0] ? { memoNo: rows[0].memo_no, userId: rows[0].user_id } : null;
 }

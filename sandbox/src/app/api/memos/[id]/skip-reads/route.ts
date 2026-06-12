@@ -1,27 +1,34 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { buildSkipAllReadsPayload, type SkipAllReadsBody } from "@/lib/db-memo-write";
+import { COOKIE_NAME } from "@/lib/auth-jwt";
+import { getActiveSessionUserFromToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
+type MemoIdRow = RowDataPacket & { id: number; current_step: string; status: string; revision_no: number };
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(sessionToken);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id: memoNo } = await params;
   let connection: PoolConnection | null = null;
   try {
     const body = (await request.json()) as SkipAllReadsBody;
+    body.actorName = `${session.firstName} ${session.lastName}`;
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? FOR UPDATE",
+      "SELECT id, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -30,7 +37,23 @@ export async function POST(
       return NextResponse.json({ error: "Memo not found" }, { status: 404 });
     }
 
-    const memoDbId = rows[0].id;
+    const memo = rows[0];
+
+    const isAdmin = session.roles.includes("admin");
+    if (!isAdmin && session.approvalLevel !== memo.current_step) {
+      await connection.rollback();
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (memo.status !== "pending") {
+      await connection.rollback();
+      return NextResponse.json({ error: "Memo is not pending" }, { status: 409 });
+    }
+
+    // Use DB revision_no — never trust client.
+    body.revisionNo = memo.revision_no;
+
+    const memoDbId = memo.id;
     const { readActionUpdate, workflowAction } = buildSkipAllReadsPayload(body);
 
     if (body.recipients.length > 0) {
