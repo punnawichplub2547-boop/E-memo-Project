@@ -2,7 +2,8 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { IconSearch, IconBell } from "./icons";
+import { IconSearch } from "./icons";
+import { NotificationBell } from "./notification-bell";
 
 interface TopbarProps {
   crumbs?: string[];
@@ -62,9 +63,7 @@ export function Topbar({ crumbs = [], title, actions, showSearch = true }: Topba
 
       <div className="em-top-actions">
         {actions}
-        <div className="em-bell">
-          <IconBell size={17} />
-        </div>
+        <NotificationBell />
       </div>
     </header>
   );

@@ -45,10 +45,11 @@ function QueuePageContent() {
   const tierParam = searchParams.get("tier") ?? "";
   const tierFilter: ApprovalLevel | null = TIER_STEP_MAP[tierParam] ?? null;
   const tierLabel: string | null = TIER_LABEL[tierParam] ?? null;
+  const memoParam = searchParams.get("memo");
 
   const [activeTab, setActiveTab] = useState<TabStatus>(() => (tierFilter ? "pending" : "all"));
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(memoParam);
   const [isDesktopSplit, setIsDesktopSplit] = useState(false);
   const [isCompactTable, setIsCompactTable] = useState(false);
 
@@ -73,6 +74,14 @@ function QueuePageContent() {
     const applyTierDefault = () => setActiveTab(tierFilter ? "pending" : "all");
     applyTierDefault();
   }, [tierFilter]);
+
+  // Open the drawer for a memo deep-linked via ?memo= (e.g. from a notification).
+  useEffect(() => {
+    const applyMemoParam = () => {
+      if (memoParam) setSelected(memoParam);
+    };
+    applyMemoParam();
+  }, [memoParam]);
 
   const tierMemos = tierFilter ? memos.filter((m) => m.currentStep === tierFilter) : memos;
 

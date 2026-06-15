@@ -53,7 +53,10 @@ export async function notifyMemoEvent(
     if (!memo) return;
 
     const appUrl = process.env.APP_PUBLIC_BASE_URL ?? "http://localhost:3000";
-    const queueUrl = `${appUrl}/queue`;
+    // In-app notifications store a relative path (deep-linked to the memo) so the
+    // bell never navigates off-origin. Telegram buttons need an absolute URL.
+    const queuePath = `/queue?memo=${encodeURIComponent(memo.memo_no)}`;
+    const queueUrl = `${appUrl}${queuePath}`;
     const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
 
     if (eventType === "advanced" && memo.status === "approved") {
@@ -61,7 +64,7 @@ export async function notifyMemoEvent(
       const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
       if (requesterId) {
         const text = buildMemoNotificationText("memo_approved", ctx);
-        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type: "memo_approved", title: `อนุมัติแล้ว: ${memo.memo_no}`, body: text, actionUrl: queueUrl });
+        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type: "memo_approved", title: `อนุมัติแล้ว: ${memo.memo_no}`, body: text, actionUrl: queuePath });
         const chatId = await getChatId(requesterId);
         if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
       }
@@ -73,7 +76,7 @@ export async function notifyMemoEvent(
       const recipientIds = await resolveApprovalStepRecipients(memo.current_step, pool);
       for (const recipientUserId of recipientIds) {
         const text = buildMemoNotificationText("memo_pending_approval", ctx);
-        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId, type: "memo_pending_approval", title: `รออนุมัติ: ${memo.memo_no}`, body: text, actionUrl: queueUrl });
+        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId, type: "memo_pending_approval", title: `รออนุมัติ: ${memo.memo_no}`, body: text, actionUrl: queuePath });
         const chatId = await getChatId(recipientUserId);
         if (chatId) {
           const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
@@ -92,7 +95,7 @@ export async function notifyMemoEvent(
     const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
     if (requesterId) {
       const text = buildMemoNotificationText(type, ctx);
-      const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type, title: `${label}: ${memo.memo_no}`, body: text, actionUrl: queueUrl });
+      const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type, title: `${label}: ${memo.memo_no}`, body: text, actionUrl: queuePath });
       const chatId = await getChatId(requesterId);
       if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
     }

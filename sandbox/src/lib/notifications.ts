@@ -51,6 +51,110 @@ export async function createNotification(
   return result.insertId;
 }
 
+export type NotificationRow = {
+  id: number;
+  memoId: number | null;
+  type: string;
+  title: string;
+  body: string | null;
+  actionUrl: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+type RawNotificationRow = {
+  id: number;
+  memo_id: number | null;
+  notification_type: string;
+  title: string;
+  body: string | null;
+  action_url: string | null;
+  is_read: number | boolean;
+  read_at: string | null;
+  created_at: string;
+};
+
+function mapNotificationRow(row: RawNotificationRow): NotificationRow {
+  return {
+    id: Number(row.id),
+    memoId: row.memo_id === null ? null : Number(row.memo_id),
+    type: row.notification_type,
+    title: row.title,
+    body: row.body,
+    actionUrl: row.action_url,
+    isRead: Boolean(row.is_read),
+    readAt: row.read_at,
+    createdAt: row.created_at,
+  };
+}
+
+// Parses the ?limit query param. Falls back to 20 for missing / non-numeric /
+// zero / negative input. listNotificationsForUser additionally clamps to [1,50].
+export function parseNotificationLimit(raw: string | null): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 20;
+}
+
+// Returns the recipient's most recent notifications plus their unread count.
+// Ownership is enforced by `recipient_user_id = ?` — callers pass the session user id.
+export async function listNotificationsForUser(
+  pool: Pool,
+  recipientUserId: number,
+  limit = 20,
+): Promise<{ notifications: NotificationRow[]; unreadCount: number }> {
+  const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 50);
+  // SAFE to interpolate ONLY because safeLimit is clamped to an integer in [1,50]
+  // above — it can never be a string. Do NOT copy this pattern for any value that
+  // isn't similarly clamped (mysql2 rejects `LIMIT ?` placeholders by default).
+  const [rows] = (await pool.query(
+    `SELECT id, memo_id, notification_type, title, body, action_url, is_read, read_at, created_at
+     FROM notifications
+     WHERE recipient_user_id = ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT ${safeLimit}`,
+    [recipientUserId],
+  )) as [RawNotificationRow[], unknown];
+  const [countRows] = (await pool.query(
+    `SELECT COUNT(*) AS unread FROM notifications WHERE recipient_user_id = ? AND is_read = FALSE`,
+    [recipientUserId],
+  )) as [Array<{ unread: number }>, unknown];
+  return {
+    notifications: rows.map(mapNotificationRow),
+    unreadCount: Number(countRows[0]?.unread ?? 0),
+  };
+}
+
+// Marks a single notification read; the recipient guard prevents marking another user's row.
+// Returns true only when a still-unread row owned by the user was updated.
+export async function markNotificationRead(
+  pool: Pool,
+  recipientUserId: number,
+  notificationId: number,
+): Promise<boolean> {
+  const now = nowMysqlUtcDateTime();
+  const [result] = (await pool.query(
+    `UPDATE notifications SET is_read = TRUE, read_at = ?
+     WHERE id = ? AND recipient_user_id = ? AND is_read = FALSE`,
+    [now, notificationId, recipientUserId],
+  )) as [{ affectedRows: number }, unknown];
+  return result.affectedRows > 0;
+}
+
+// Marks every unread notification owned by the user as read; returns the count updated.
+export async function markAllNotificationsRead(
+  pool: Pool,
+  recipientUserId: number,
+): Promise<number> {
+  const now = nowMysqlUtcDateTime();
+  const [result] = (await pool.query(
+    `UPDATE notifications SET is_read = TRUE, read_at = ?
+     WHERE recipient_user_id = ? AND is_read = FALSE`,
+    [now, recipientUserId],
+  )) as [{ affectedRows: number }, unknown];
+  return result.affectedRows;
+}
+
 export async function createTelegramDelivery(
   pool: Pool,
   notificationId: number,
