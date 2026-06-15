@@ -1,19 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { buildSubmitRevisionPayload, type SubmitRevisionBody } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
+import { COOKIE_NAME } from "@/lib/auth-jwt";
+import { getActiveSessionUserFromToken } from "@/lib/auth";
+import { notifyMemoEvent } from "@/lib/notify-memo-event";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
+type MemoIdRow = RowDataPacket & {
+  id: number;
+  requester_name: string;
+  status: string;
+  reject_disposition: string | null;
+  revision_no: number;
+};
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
+  const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(sessionToken);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   let connection: PoolConnection | null = null;
   try {
     const body = (await request.json()) as SubmitRevisionBody;
@@ -22,7 +35,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? FOR UPDATE",
+      "SELECT id, requester_name, status, reject_disposition, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -31,8 +44,35 @@ export async function POST(
       return NextResponse.json({ error: "Memo not found" }, { status: 404 });
     }
 
-    const memoDbId = rows[0].id;
+    const memo = rows[0];
+
+    const isAdmin = session.roles.includes("admin");
+    if (!isAdmin && memo.requester_name !== `${session.firstName} ${session.lastName}`) {
+      await connection.rollback();
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // State machine guard: only returned or rejected+revision-allowed can be revised
+    // (mirrors the resubmit route — prevents resurrecting a pending/approved memo).
+    const canResubmit =
+      memo.status === "returned" ||
+      (memo.status === "rejected" && memo.reject_disposition === "revision-allowed");
+    if (!canResubmit) {
+      await connection.rollback();
+      return NextResponse.json({ error: "Memo cannot be resubmitted in its current state" }, { status: 409 });
+    }
+
+    body.actorName = `${session.firstName} ${session.lastName}`;
+    // Server derives the revision number from the DB, never the client.
+    body.oldRevisionNo = memo.revision_no;
+
+    const memoDbId = memo.id;
     const { memoRevision, memoUpdate, newReadActions, workflowAction } = buildSubmitRevisionPayload(body);
+
+    // Server-derive current_step from the first step of the submitted route so the
+    // client cannot redirect approval notifications to an arbitrary approval level.
+    const submittedRoute = JSON.parse(memoUpdate.selected_route_json || "[]") as string[];
+    memoUpdate.current_step = submittedRoute[0] ?? "Manager / Top Section";
 
     await connection.execute(
       `INSERT INTO memo_revisions (
@@ -135,6 +175,7 @@ export async function POST(
     );
 
     await connection.commit();
+    void notifyMemoEvent(memoNo, "resubmitted", session.userId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});

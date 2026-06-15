@@ -20,7 +20,7 @@ export async function POST(
     const returnReason = typeof body.returnReason === "string" ? body.returnReason : "";
 
     await returnMemoAction({ memoNo, actorUserId: session.userId, reason: returnReason, source: "web" });
-    void notifyMemoEvent(memoNo, "returned").catch(() => {});
+    void notifyMemoEvent(memoNo, "returned", session.userId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof WorkflowActionError) return NextResponse.json({ error: error.message }, { status: error.status });

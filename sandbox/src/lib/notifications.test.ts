@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
 import {
   buildMemoNotificationText,
+  buildMemoNotificationTitle,
   listNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -98,6 +99,17 @@ describe("markNotificationRead", () => {
   it("returns false when nothing matched (wrong owner or already read)", async () => {
     const { pool } = makeFakePool([{ affectedRows: 0 }]);
     expect(await markNotificationRead(pool, 42, 5)).toBe(false);
+  });
+});
+
+describe("buildMemoNotificationTitle", () => {
+  it("uses the Thai label for known types", () => {
+    expect(buildMemoNotificationTitle("memo_submitted", "EM-1")).toBe("ส่งเข้าระบบแล้ว: EM-1");
+    expect(buildMemoNotificationTitle("memo_status_update", "EM-2")).toBe("อัปเดตสถานะ: EM-2");
+    expect(buildMemoNotificationTitle("memo_approved", "EM-3")).toBe("อนุมัติแล้ว: EM-3");
+  });
+  it("falls back to the raw type for unknown types", () => {
+    expect(buildMemoNotificationTitle("something_else", "EM-4")).toBe("something_else: EM-4");
   });
 });
 

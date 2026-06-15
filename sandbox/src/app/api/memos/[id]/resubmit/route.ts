@@ -5,6 +5,7 @@ import { getDbPool } from "@/lib/db";
 import { buildResubmitMemoPayload, type ResubmitMemoBody } from "@/lib/db-memo-write";
 import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
+import { notifyMemoEvent } from "@/lib/notify-memo-event";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,7 @@ export async function POST(
     );
 
     await connection.commit();
+    void notifyMemoEvent(memoNo, "resubmitted", session.userId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});

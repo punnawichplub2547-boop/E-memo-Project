@@ -17,7 +17,7 @@ export async function POST(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     await approveMemoAction({ memoNo, actorUserId: session.userId, source: "web" });
-    void notifyMemoEvent(memoNo, "advanced").catch(() => {});
+    void notifyMemoEvent(memoNo, "advanced", session.userId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof WorkflowActionError) return NextResponse.json({ error: error.message }, { status: error.status });

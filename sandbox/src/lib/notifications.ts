@@ -15,7 +15,13 @@ const TYPE_LABELS: Record<string, string> = {
   memo_returned:         "ส่งคืนแก้ไข",
   memo_rejected:         "ปฏิเสธ",
   memo_approved:         "อนุมัติแล้ว",
+  memo_submitted:        "ส่งเข้าระบบแล้ว",
+  memo_status_update:    "อัปเดตสถานะ",
 };
+
+export function buildMemoNotificationTitle(type: string, memoNo: string): string {
+  return `${TYPE_LABELS[type] ?? type}: ${memoNo}`;
+}
 
 export function buildMemoNotificationText(
   type: string,

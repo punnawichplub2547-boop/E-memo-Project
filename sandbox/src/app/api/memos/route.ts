@@ -12,6 +12,7 @@ import type { MemoSeedRow } from "@/lib/db-seed";
 import { serializeMemoRecord, type MemoDbRow, type MemoRevisionDbRow, type ReadActionDbRow } from "@/lib/db-memos";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { isMemoVisibleTo } from "@/lib/memo-visibility";
+import { notifyMemoEvent } from "@/lib/notify-memo-event";
 
 export const dynamic = "force-dynamic";
 
@@ -83,16 +84,25 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(token);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   let connection: PoolConnection | null = null;
   try {
     const memo = await request.json() as MemoRecord;
+    // Never trust the client for identity — the creator is the session user.
+    memo.requester = `${session.firstName} ${session.lastName}`;
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const memoId = await insertMemo(connection, memo);
     await connection.commit();
+
+    // Fire-and-forget AFTER commit so the read_actions rows are visible to the dispatcher pool.
+    void notifyMemoEvent(memo.id, "submitted", session.userId).catch(() => {});
 
     return NextResponse.json({ id: memo.id, memoDbId: memoId }, { status: 201 });
   } catch (error) {

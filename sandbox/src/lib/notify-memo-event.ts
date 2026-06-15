@@ -1,32 +1,75 @@
 // Fire-and-forget dispatcher. Never throws. Workflow must not be blocked by notification failures.
+import type { Pool } from "mysql2/promise";
 import { getDbPool } from "./db";
-import { buildMemoNotificationText, createNotification, createTelegramDelivery, markDeliveryStatus } from "./notifications";
-import { resolveApprovalStepRecipients, resolveRequesterRecipient } from "./notification-recipients";
+import {
+  buildMemoNotificationText,
+  buildMemoNotificationTitle,
+  createNotification,
+  createTelegramDelivery,
+  markDeliveryStatus,
+} from "./notifications";
+import {
+  resolveApprovalStepRecipients,
+  resolveRequesterRecipient,
+  resolveMemoCcRecipients,
+} from "./notification-recipients";
 import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
 import { createApproveActionToken } from "./telegram/actions";
 import type { RowDataPacket } from "mysql2";
 
 type MemoRow = RowDataPacket & {
-  id: number; memo_no: string; title: string; requester_name: string; current_step: string; status: string;
+  id: number; memo_no: string; title: string; requester_name: string;
+  current_step: string; status: string; revision_no: number;
 };
-type ChatRow = RowDataPacket & { telegram_chat_id: string };
+type ChatRow = RowDataPacket & { user_id: number; telegram_chat_id: string };
 
-async function getMemo(memoNo: string) {
+export type MemoEventType = "submitted" | "resubmitted" | "advanced" | "returned" | "rejected";
+
+// Pure: who should receive a watcher (FYI) notification for an event.
+// excludeIds removes recipients already handled by a different channel (e.g. the
+// actionable approver notification) so an approver who is also a CC isn't doubled up.
+export function computeWatcherRecipients(input: {
+  requesterId: number | null;
+  ccIds: number[];
+  actorId: number | null;
+  excludeActor: boolean;
+  excludeIds?: number[];
+}): number[] {
+  const set = new Set<number>();
+  if (input.requesterId != null) set.add(input.requesterId);
+  for (const id of input.ccIds) if (id != null) set.add(id);
+  if (input.excludeActor && input.actorId != null) set.delete(input.actorId);
+  for (const id of input.excludeIds ?? []) set.delete(id);
+  return [...set];
+}
+
+async function getMemo(memoNo: string): Promise<MemoRow | null> {
   const pool = getDbPool();
   const [rows] = await pool.query<MemoRow[]>(
-    "SELECT id, memo_no, title, requester_name, current_step, status FROM memos WHERE memo_no = ? LIMIT 1",
+    "SELECT id, memo_no, title, requester_name, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1",
     [memoNo],
   );
   return rows[0] ?? null;
 }
 
-async function getChatId(userId: number): Promise<bigint | null> {
-  const pool = getDbPool();
+// Batch-load active Telegram chat ids. Bad/missing chat ids are skipped (not fatal)
+// so one malformed row can't sink the whole event.
+export async function getChatIds(pool: Pool, userIds: number[]): Promise<Map<number, bigint>> {
+  const map = new Map<number, bigint>();
+  if (userIds.length === 0) return map;
   const [rows] = await pool.query<ChatRow[]>(
-    "SELECT telegram_chat_id FROM user_telegram_accounts WHERE user_id = ? AND is_active = TRUE LIMIT 1",
-    [userId],
+    "SELECT user_id, telegram_chat_id FROM user_telegram_accounts WHERE user_id IN (?) AND is_active = TRUE",
+    [userIds],
   );
-  return rows[0] ? BigInt(rows[0].telegram_chat_id) : null;
+  for (const r of rows) {
+    if (r.telegram_chat_id == null || r.telegram_chat_id === "") continue;
+    try {
+      map.set(r.user_id, BigInt(r.telegram_chat_id));
+    } catch {
+      console.warn(`[getChatIds] invalid telegram_chat_id for user ${r.user_id}`);
+    }
+  }
+  return map;
 }
 
 async function sendAndTrack(
@@ -43,62 +86,99 @@ async function sendAndTrack(
   });
 }
 
+// Actionable: notify the approvers at the memo's current step, with an approve button.
+// Returns the approver user ids so the caller can exclude them from the watcher fan-out.
+async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string): Promise<number[]> {
+  const pool = getDbPool();
+  const recipientIds = await resolveApprovalStepRecipients(memo.current_step, pool);
+  if (recipientIds.length === 0) return [];
+  const chatIds = await getChatIds(pool, recipientIds);
+  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  const text = buildMemoNotificationText("memo_pending_approval", ctx);
+  for (const recipientUserId of recipientIds) {
+    const notifId = await createNotification(pool, {
+      memoId: memo.id, recipientUserId, type: "memo_pending_approval",
+      title: buildMemoNotificationTitle("memo_pending_approval", memo.memo_no), body: text, actionUrl: queuePath,
+    });
+    const chatId = chatIds.get(recipientUserId);
+    if (chatId) {
+      const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
+      await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[
+        { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
+        { text: "เปิดใน E-Memo", url: queueUrl },
+      ]]));
+    }
+  }
+  return recipientIds;
+}
+
+// Watcher (FYI): notify requester + individual CC. `submitted` keeps the actor
+// (requester confirmation) and uses memo_submitted/memo_cc; other events exclude
+// the actor and use a single shared type. excludeIds drops recipients already
+// notified as actionable approvers (no double-notify).
+async function notifyWatchers(
+  memo: MemoRow,
+  types: { requesterType: string; ccType: string },
+  actorUserId: number | null,
+  excludeActor: boolean,
+  queuePath: string,
+  queueUrl: string,
+  excludeIds: number[] = [],
+): Promise<void> {
+  const pool = getDbPool();
+  const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
+  const ccIds = await resolveMemoCcRecipients(memo.id, memo.revision_no, pool);
+  const recipients = computeWatcherRecipients({ requesterId, ccIds, actorId: actorUserId, excludeActor, excludeIds });
+  if (recipients.length === 0) return;
+  const chatIds = await getChatIds(pool, recipients);
+  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  for (const userId of recipients) {
+    const type = userId === requesterId ? types.requesterType : types.ccType;
+    const text = buildMemoNotificationText(type, ctx);
+    const notifId = await createNotification(pool, {
+      memoId: memo.id, recipientUserId: userId, type,
+      title: buildMemoNotificationTitle(type, memo.memo_no), body: text, actionUrl: queuePath,
+    });
+    const chatId = chatIds.get(userId);
+    if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+  }
+}
+
 export async function notifyMemoEvent(
   memoNo: string,
-  eventType: "advanced" | "returned" | "rejected",
+  eventType: MemoEventType,
+  actorUserId: number | null,
 ): Promise<void> {
   try {
-    const pool = getDbPool();
     const memo = await getMemo(memoNo);
     if (!memo) return;
 
     const appUrl = process.env.APP_PUBLIC_BASE_URL ?? "http://localhost:3000";
-    // In-app notifications store a relative path (deep-linked to the memo) so the
-    // bell never navigates off-origin. Telegram buttons need an absolute URL.
     const queuePath = `/queue?memo=${encodeURIComponent(memo.memo_no)}`;
     const queueUrl = `${appUrl}${queuePath}`;
-    const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+    const statusUpdate = { requesterType: "memo_status_update", ccType: "memo_status_update" };
 
+    if (eventType === "submitted") {
+      await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl);
+      return;
+    }
+    if (eventType === "resubmitted") {
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      await notifyWatchers(memo, statusUpdate, actorUserId, true, queuePath, queueUrl, approverIds);
+      return;
+    }
     if (eventType === "advanced" && memo.status === "approved") {
-      // Final step was just approved — notify requester
-      const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
-      if (requesterId) {
-        const text = buildMemoNotificationText("memo_approved", ctx);
-        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type: "memo_approved", title: `อนุมัติแล้ว: ${memo.memo_no}`, body: text, actionUrl: queuePath });
-        const chatId = await getChatId(requesterId);
-        if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
-      }
+      await notifyWatchers(memo, { requesterType: "memo_approved", ccType: "memo_approved" }, actorUserId, true, queuePath, queueUrl);
       return;
     }
-
     if (eventType === "advanced") {
-      // Intermediate step — notify next approvers with Approve button
-      const recipientIds = await resolveApprovalStepRecipients(memo.current_step, pool);
-      for (const recipientUserId of recipientIds) {
-        const text = buildMemoNotificationText("memo_pending_approval", ctx);
-        const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId, type: "memo_pending_approval", title: `รออนุมัติ: ${memo.memo_no}`, body: text, actionUrl: queuePath });
-        const chatId = await getChatId(recipientUserId);
-        if (chatId) {
-          const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
-          await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[
-            { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
-            { text: "เปิดใน E-Memo", url: queueUrl },
-          ]]));
-        }
-      }
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      await notifyWatchers(memo, statusUpdate, actorUserId, true, queuePath, queueUrl, approverIds);
       return;
     }
-
-    // returned / rejected — notify requester
+    // returned | rejected
     const type = eventType === "returned" ? "memo_returned" : "memo_rejected";
-    const label = eventType === "returned" ? "ส่งคืนแก้ไข" : "ปฏิเสธ";
-    const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
-    if (requesterId) {
-      const text = buildMemoNotificationText(type, ctx);
-      const notifId = await createNotification(pool, { memoId: memo.id, recipientUserId: requesterId, type, title: `${label}: ${memo.memo_no}`, body: text, actionUrl: queuePath });
-      const chatId = await getChatId(requesterId);
-      if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
-    }
+    await notifyWatchers(memo, { requesterType: type, ccType: type }, actorUserId, true, queuePath, queueUrl);
   } catch (err) {
     console.error("[notifyMemoEvent] non-fatal error:", err);
   }

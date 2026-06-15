@@ -23,7 +23,7 @@ export async function POST(
     const rejectReason = typeof body.rejectReason === "string" ? body.rejectReason : "";
 
     await rejectMemoAction({ memoNo, actorUserId: session.userId, disposition, reason: rejectReason, source: "web" });
-    void notifyMemoEvent(memoNo, "rejected").catch(() => {});
+    void notifyMemoEvent(memoNo, "rejected", session.userId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof WorkflowActionError) return NextResponse.json({ error: error.message }, { status: error.status });
