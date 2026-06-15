@@ -7,8 +7,8 @@ import { useMemos } from "@/lib/memo-store";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { ApprovalLevel, approvalLabels } from "@/lib/approval";
 import {
-  IconDownload, IconPlus, IconFilter, IconSearch, IconSort,
-  IconCrown, IconUsers, IconChevDown, IconCalendar,
+  IconDownload, IconPlus, IconSearch, IconSort,
+  IconCrown, IconUsers, IconCalendar,
   IconDots,
 } from "@/components/icons";
 import Link from "next/link";
@@ -21,6 +21,8 @@ import {
   canResubmitMemo,
   canReturnOrRejectMemo,
 } from "@/lib/prototype-users";
+import { FilterDropdown } from "@/components/filter-dropdown";
+import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#047857", "#B45309", "#BE123C", "#0891B2", "#6D28D9"];
 const avatarColor = (s: string) => AVATAR_COLORS[s.charCodeAt(0) % AVATAR_COLORS.length];
@@ -30,10 +32,10 @@ const TIER_STEP_MAP: Record<string, ApprovalLevel> = {
   gm:      "General Manager",
   manager: "Manager / Top Section",
 };
-const TIER_LABEL: Record<string, string> = {
-  md:      "MD Queue",
-  gm:      "GM Queue",
-  manager: "Manager Queue",
+const STEP_TIER_LABEL: Record<string, string> = {
+  "Managing Director":     "MD Queue",
+  "General Manager":       "GM Queue",
+  "Manager / Top Section": "Manager Queue",
 };
 
 type TabStatus = "all" | "pending" | "approved" | "rejected" | "draft" | "returned";
@@ -43,11 +45,16 @@ function QueuePageContent() {
   const { user } = usePrototypeUser();
   const searchParams = useSearchParams();
   const tierParam = searchParams.get("tier") ?? "";
-  const tierFilter: ApprovalLevel | null = TIER_STEP_MAP[tierParam] ?? null;
-  const tierLabel: string | null = TIER_LABEL[tierParam] ?? null;
   const memoParam = searchParams.get("memo");
+  // `tier` drives both the live list filter AND the executive-view chrome, seeded
+  // from the ?tier= URL so executive links pre-select it. Deriving the chrome from
+  // the same state keeps the banner/footer label always consistent with the list.
+  const [tier, setTier] = useState<string>(() => TIER_STEP_MAP[tierParam] ?? "");
+  const [dateDays, setDateDays] = useState("0");
+  const now = new Date();
+  const activeTierLabel = tier ? STEP_TIER_LABEL[tier] ?? null : null;
 
-  const [activeTab, setActiveTab] = useState<TabStatus>(() => (tierFilter ? "pending" : "all"));
+  const [activeTab, setActiveTab] = useState<TabStatus>(() => (tier ? "pending" : "all"));
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(memoParam);
   const [isDesktopSplit, setIsDesktopSplit] = useState(false);
@@ -71,9 +78,9 @@ function QueuePageContent() {
 
   // Reset the status tab to "pending" when entering a tier view, "all" when leaving.
   useEffect(() => {
-    const applyTierDefault = () => setActiveTab(tierFilter ? "pending" : "all");
+    const applyTierDefault = () => setActiveTab(tier ? "pending" : "all");
     applyTierDefault();
-  }, [tierFilter]);
+  }, [tier]);
 
   // Open the drawer for a memo deep-linked via ?memo= (e.g. from a notification).
   useEffect(() => {
@@ -83,10 +90,11 @@ function QueuePageContent() {
     applyMemoParam();
   }, [memoParam]);
 
-  const tierMemos = tierFilter ? memos.filter((m) => m.currentStep === tierFilter) : memos;
+  const tierMemos = memos.filter((m) => matchesTier(m.currentStep, tier));
 
   const filtered = tierMemos.filter((m) => {
     const matchTab = activeTab === "all" || m.status === activeTab;
+    const matchDate = isWithinDays(m.createdAt, Number(dateDays), now);
     const q = search.toLowerCase();
     const matchSearch =
       !q ||
@@ -94,7 +102,7 @@ function QueuePageContent() {
         .join(" ")
         .toLowerCase()
         .includes(q);
-    return matchTab && matchSearch;
+    return matchTab && matchDate && matchSearch;
   });
 
   const selectedMemo = memos.find((m) => m.id === selected) ?? null;
@@ -159,11 +167,11 @@ function QueuePageContent() {
       <Sidebar />
       <div className="em-work" style={{ position: "relative" }}>
         <Topbar
-          crumbs={tierFilter ? ["Approval Queue", tierLabel!] : ["Approval Queue"]}
-          title={tierFilter ? `Executive Review — ${tierLabel}` : "Approval Queue"}
+          crumbs={tier ? ["Approval Queue", activeTierLabel!] : ["Approval Queue"]}
+          title={tier ? `Executive Review — ${activeTierLabel}` : "Approval Queue"}
           actions={
             <>
-              {tierFilter && (
+              {tier && (
                 <Link href="/queue" className="em-btn sm ghost">
                   ← All queues
                 </Link>
@@ -203,64 +211,21 @@ function QueuePageContent() {
 
               <div style={{ width: 1, height: 26, background: "var(--line)" }} />
 
-              {tierFilter ? (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  border: "1px solid rgba(201,168,76,0.45)",
-                  borderRadius: 8,
-                  fontSize: 12.5,
-                  background: "var(--gold-soft)",
-                }}>
-                  <IconCrown size={13} style={{ color: "var(--gold)" }} />
-                  <span style={{ color: "#7C5E0F", fontWeight: 600 }}>{tierFilter}</span>
-                  <Link
-                    href="/queue"
-                    style={{ color: "#7C5E0F", marginLeft: 2, lineHeight: 1, textDecoration: "none", fontSize: 15, fontWeight: 400 }}
-                    title="Clear tier filter"
-                  >
-                    ×
-                  </Link>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "6px 10px",
-                    border: "1px solid var(--line-2)",
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    background: "var(--surface)",
-                  }}
-                >
-                  <IconUsers size={13} style={{ color: "var(--muted)" }} />
-                  <span style={{ color: "var(--muted)" }}>Tier:</span>
-                  <strong style={{ color: "var(--ink)" }}>All levels</strong>
-                  <IconChevDown size={13} style={{ color: "var(--muted)" }} />
-                </div>
-              )}
+              <FilterDropdown
+                icon={<IconUsers size={13} />}
+                label="Tier"
+                options={tierOptions("All levels")}
+                selected={tier}
+                onSelect={setTier}
+              />
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  border: "1px solid var(--line-2)",
-                  borderRadius: 8,
-                  fontSize: 12.5,
-                  background: "var(--surface)",
-                }}
-              >
-                <IconCalendar size={13} style={{ color: "var(--muted)" }} />
-                <span style={{ color: "var(--muted)" }}>Date:</span>
-                <strong style={{ color: "var(--ink)" }}>Last 30 days</strong>
-                <IconChevDown size={13} style={{ color: "var(--muted)" }} />
-              </div>
+              <FilterDropdown
+                icon={<IconCalendar size={13} />}
+                label="Date"
+                options={DATE_OPTIONS}
+                selected={dateDays}
+                onSelect={setDateDays}
+              />
 
               <div
                 style={{
@@ -291,9 +256,6 @@ function QueuePageContent() {
                 />
               </div>
 
-              <button className="em-btn sm">
-                <IconFilter size={13} /> More filters
-              </button>
             </div>
           </div>
 
@@ -362,8 +324,8 @@ function QueuePageContent() {
                             colSpan={useCompactColumns ? 4 : 7}
                             style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}
                           >
-                            {tierFilter
-                              ? `No ${tierLabel} memos match the current filters.`
+                            {tier
+                              ? `No ${activeTierLabel} memos match the current filters.`
                               : "No memos match the current filters."}
                           </td>
                         </tr>
@@ -552,8 +514,8 @@ function QueuePageContent() {
                 >
                   <div>
                     Showing {filtered.length} of{" "}
-                    {tierFilter
-                      ? `${tierMemos.length} ${tierLabel} memos`
+                    {tier
+                      ? `${tierMemos.length} ${activeTierLabel} memos`
                       : `${memos.length} memos`}
                   </div>
                 </div>

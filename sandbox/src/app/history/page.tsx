@@ -13,6 +13,8 @@ import {
 import { MemoRecord, approvalLabels } from "@/lib/approval";
 import { groupMemosByDate } from "@/lib/group-memos";
 import Link from "next/link";
+import { FilterDropdown } from "@/components/filter-dropdown";
+import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
 
 const routeSummary = (memo: MemoRecord) =>
   memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
@@ -29,8 +31,13 @@ const ACTION_CONFIG: Record<HistoryAction, { icon: React.ReactNode; color: strin
 export default function HistoryPage() {
   const { memos } = useMemos();
   const [tabFilter, setTabFilter] = useState<"all" | "approved" | "rejected" | "returned" | "md" | "slow">("all");
+  const [actorTier, setActorTier] = useState("");
+  const [dateDays, setDateDays] = useState("0");
+  const now = new Date();
 
   const filtered = memos.filter(m => {
+    if (!matchesTier(m.currentStep, actorTier)) return false;
+    if (!isWithinDays(m.createdAt, Number(dateDays), now)) return false;
     if (tabFilter === "all") return true;
     if (tabFilter === "md") return m.currentStep === "Managing Director";
     if (tabFilter === "slow") return m.cycleHours > 24;
@@ -93,18 +100,20 @@ export default function HistoryPage() {
               </div>
             )}
             <div style={{ flex: 1 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12.5, background: "var(--surface)" }}>
-              <IconCalendar size={13} style={{ color: "var(--muted)" }} />
-              <span style={{ color: "var(--muted)" }}>Range:</span>
-              <strong style={{ color: "var(--ink)" }}>All time</strong>
-              <IconChevDown size={13} style={{ color: "var(--muted)" }} />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12.5, background: "var(--surface)" }}>
-              <IconUsers size={13} style={{ color: "var(--muted)" }} />
-              <span style={{ color: "var(--muted)" }}>Actor:</span>
-              <strong style={{ color: "var(--ink)" }}>All approvers</strong>
-              <IconChevDown size={13} style={{ color: "var(--muted)" }} />
-            </div>
+            <FilterDropdown
+              icon={<IconCalendar size={13} />}
+              label="Range"
+              options={DATE_OPTIONS}
+              selected={dateDays}
+              onSelect={setDateDays}
+            />
+            <FilterDropdown
+              icon={<IconUsers size={13} />}
+              label="Actor"
+              options={tierOptions("All approvers")}
+              selected={actorTier}
+              onSelect={setActorTier}
+            />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
