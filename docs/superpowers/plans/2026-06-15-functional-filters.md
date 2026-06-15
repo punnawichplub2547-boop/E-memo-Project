@@ -1,5 +1,7 @@
 # Functional Filter Dropdowns Implementation Plan
 
+> **✅ STATUS: IMPLEMENTED & PUSHED to main (commit `954022f`, 2026-06-15).** All 5 tasks done; 369 tests, lint, build green; Playwright-smoked. Reviewed by fahsai (P1 banner/list consistency fixed). Do NOT re-execute — kept for history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the decorative Tier/Date chips on the Approval Queue and the Range/Actor chips on History actually filter the visible list (client-side, combined with the existing search/status filters), and remove the dead "More filters" button.
