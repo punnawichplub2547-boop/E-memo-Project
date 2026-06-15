@@ -1,5 +1,7 @@
 # Notification Fan-out Implementation Plan
 
+> **✅ STATUS: IMPLEMENTED & PUSHED to main (commit `9f394b5`, 2026-06-15).** All 9 tasks done; 359 tests, lint, build green; smoke-tested end-to-end. Reviewed by fahsai (3 rounds). Do NOT re-execute — kept for history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Notify the requester + individual CC recipients (in-app always, Telegram if linked) when a memo is submitted and on every status change (advance/return/reject/resubmit), not just at completion.
