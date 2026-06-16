@@ -7,6 +7,7 @@ import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { sanitizeAttachmentFileName } from "@/lib/attachments";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
+import { deleteMemoCascadeRows } from "@/lib/destroy-memo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,10 +42,7 @@ export async function DELETE(
     }
 
     const memoDbId = rows[0].id;
-    await connection.execute("DELETE FROM read_actions WHERE memo_id = ?", [memoDbId]);
-    await connection.execute("DELETE FROM workflow_step_actions WHERE memo_id = ?", [memoDbId]);
-    await connection.execute("DELETE FROM memo_revisions WHERE memo_id = ?", [memoDbId]);
-    await connection.execute("DELETE FROM memos WHERE id = ?", [memoDbId]);
+    await deleteMemoCascadeRows(connection, memoDbId);
 
     await connection.commit();
     await removeAttachmentDirectory(memoNo);
