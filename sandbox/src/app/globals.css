@@ -391,16 +391,19 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   font-size: 10px; font-weight: 700; line-height: 1;
 }
 
-/* ===== Notification panel ===== */
+/* ===== Notification panel =====
+   Rendered via portal to <body> (see notification-bell.tsx) so it's positioned
+   relative to the viewport instead of being trapped inside .em-topbar's sticky
+   stacking context — that trap previously let the panel visually bleed over
+   page content below the header (filter bars, drawer) inconsistently. */
 .em-notif-panel {
-  position: absolute;
-  top: calc(100% + 8px); right: 0;
+  position: fixed;
   width: 340px; max-width: calc(100vw - 32px);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
-  z-index: 60;
+  z-index: 1000;
   overflow: hidden;
 }
 .em-notif-head {

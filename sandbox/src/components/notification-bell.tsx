@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { IconBell, IconCheck } from "./icons";
 import { toSafeInternalPath } from "@/lib/safe-path";
@@ -43,7 +44,9 @@ export function NotificationBell() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -72,30 +75,47 @@ export function NotificationBell() {
     return () => window.clearInterval(id);
   }, [load]);
 
+  const computePanelPos = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPanelPos({ top: rect.bottom + 8, right: Math.max(16, window.innerWidth - rect.right) });
+  }, []);
+
   const toggleOpen = useCallback(() => {
     setOpen((v) => {
       const next = !v;
-      if (next) void load(); // refresh immediately when opening
+      if (next) {
+        computePanelPos();
+        void load(); // refresh immediately when opening
+      }
       return next;
     });
-  }, [load]);
+  }, [load, computePanelPos]);
 
-  // Close on outside click / Escape.
+  // Close on outside click / Escape; reposition on resize.
+  // The panel renders in a portal (see below), so "outside" must exclude both
+  // the bell button (rootRef) and the portaled panel itself (panelRef).
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    const onResize = () => computePanelPos();
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
     };
-  }, [open]);
+  }, [open, computePanelPos]);
 
   const handleItemClick = useCallback(
     async (item: NotificationItem) => {
@@ -140,41 +160,49 @@ export function NotificationBell() {
         {unread > 0 && <span className="em-bell-badge">{badge}</span>}
       </button>
 
-      {open && (
-        <div className="em-notif-panel" role="menu">
-          <div className="em-notif-head">
-            <span className="em-notif-title">การแจ้งเตือน</span>
-            {unread > 0 && (
-              <button type="button" className="em-notif-readall" onClick={handleMarkAll}>
-                <IconCheck size={13} /> อ่านทั้งหมด
-              </button>
-            )}
-          </div>
-
-          <div className="em-notif-list">
-            {items.length === 0 ? (
-              <div className="em-notif-empty">ยังไม่มีการแจ้งเตือน</div>
-            ) : (
-              items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`em-notif-item${item.isRead ? "" : " is-unread"}`}
-                  onClick={() => handleItemClick(item)}
-                  role="menuitem"
-                >
-                  {!item.isRead && <span className="em-notif-dot" aria-hidden />}
-                  <span className="em-notif-body">
-                    <span className="em-notif-item-title">{item.title}</span>
-                    {item.body && <span className="em-notif-item-sub">{item.body}</span>}
-                    <span className="em-notif-time">{relativeThai(item.createdAt)}</span>
-                  </span>
+      {open &&
+        panelPos &&
+        createPortal(
+          <div
+            className="em-notif-panel"
+            role="menu"
+            ref={panelRef}
+            style={{ top: panelPos.top, right: panelPos.right }}
+          >
+            <div className="em-notif-head">
+              <span className="em-notif-title">การแจ้งเตือน</span>
+              {unread > 0 && (
+                <button type="button" className="em-notif-readall" onClick={handleMarkAll}>
+                  <IconCheck size={13} /> อ่านทั้งหมด
                 </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+              )}
+            </div>
+
+            <div className="em-notif-list">
+              {items.length === 0 ? (
+                <div className="em-notif-empty">ยังไม่มีการแจ้งเตือน</div>
+              ) : (
+                items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`em-notif-item${item.isRead ? "" : " is-unread"}`}
+                    onClick={() => handleItemClick(item)}
+                    role="menuitem"
+                  >
+                    {!item.isRead && <span className="em-notif-dot" aria-hidden />}
+                    <span className="em-notif-body">
+                      <span className="em-notif-item-title">{item.title}</span>
+                      {item.body && <span className="em-notif-item-sub">{item.body}</span>}
+                      <span className="em-notif-time">{relativeThai(item.createdAt)}</span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
