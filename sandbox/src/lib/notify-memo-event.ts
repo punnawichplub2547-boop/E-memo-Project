@@ -3,6 +3,7 @@ import type { Pool } from "mysql2/promise";
 import { getDbPool } from "./db";
 import {
   buildMemoNotificationText,
+  buildMemoNotificationHtml,
   buildMemoNotificationTitle,
   createNotification,
   createTelegramDelivery,
@@ -94,16 +95,17 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
   if (recipientIds.length === 0) return [];
   const chatIds = await getChatIds(pool, recipientIds);
   const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
-  const text = buildMemoNotificationText("memo_pending_approval", ctx);
+  const body = buildMemoNotificationText("memo_pending_approval", ctx);
+  const tgHtml = buildMemoNotificationHtml("memo_pending_approval", ctx);
   for (const recipientUserId of recipientIds) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId, type: "memo_pending_approval",
-      title: buildMemoNotificationTitle("memo_pending_approval", memo.memo_no), body: text, actionUrl: queuePath,
+      title: buildMemoNotificationTitle("memo_pending_approval", memo.memo_no), body, actionUrl: queuePath,
     });
     const chatId = chatIds.get(recipientUserId);
     if (chatId) {
       const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
-      await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[
+      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[
         { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
         { text: "เปิดใน E-Memo", url: queueUrl },
       ]]));
@@ -134,13 +136,14 @@ async function notifyWatchers(
   const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
   for (const userId of recipients) {
     const type = userId === requesterId ? types.requesterType : types.ccType;
-    const text = buildMemoNotificationText(type, ctx);
+    const body = buildMemoNotificationText(type, ctx);
+    const tgHtml = buildMemoNotificationHtml(type, ctx);
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type,
-      title: buildMemoNotificationTitle(type, memo.memo_no), body: text, actionUrl: queuePath,
+      title: buildMemoNotificationTitle(type, memo.memo_no), body, actionUrl: queuePath,
     });
     const chatId = chatIds.get(userId);
-    if (chatId) await sendAndTrack(pool, notifId, chatId, text, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+    if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
   }
 }
 

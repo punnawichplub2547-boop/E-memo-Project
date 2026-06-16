@@ -1,5 +1,6 @@
 import type { Pool } from "mysql2/promise";
 import { nowMysqlUtcDateTime } from "./workflow-rules";
+import { escHtml } from "./telegram/client";
 
 export type MemoNotificationContext = {
   memoNo: string;
@@ -29,11 +30,25 @@ export function buildMemoNotificationText(
 ): string {
   const label = TYPE_LABELS[type] ?? type;
   return [
-    `<b>E-Memo: ${label}</b>`,
+    `E-Memo: ${label}`,
     `เลขที่: ${memo.memoNo}`,
     `เรื่อง: ${memo.title}`,
     `ผู้ขอ: ${memo.requesterName}`,
     `สถานะ: ${label} (${memo.currentStep})`,
+  ].join("\n");
+}
+
+export function buildMemoNotificationHtml(
+  type: string,
+  memo: MemoNotificationContext,
+): string {
+  const label = TYPE_LABELS[type] ?? type;
+  return [
+    `<b>E-Memo: ${escHtml(label)}</b>`,
+    `เลขที่: ${escHtml(memo.memoNo)}`,
+    `เรื่อง: ${escHtml(memo.title)}`,
+    `ผู้ขอ: ${escHtml(memo.requesterName)}`,
+    `สถานะ: ${escHtml(label)} (${escHtml(memo.currentStep)})`,
   ].join("\n");
 }
 

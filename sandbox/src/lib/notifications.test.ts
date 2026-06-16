@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
 import {
   buildMemoNotificationText,
+  buildMemoNotificationHtml,
   buildMemoNotificationTitle,
   listNotificationsForUser,
   markAllNotificationsRead,
@@ -40,6 +41,43 @@ describe("buildMemoNotificationText", () => {
   });
   it("rejected message contains ปฏิเสธ", () => {
     expect(buildMemoNotificationText("memo_rejected", memo)).toContain("ปฏิเสธ");
+  });
+  it("produces plain text — no HTML tags", () => {
+    const t = buildMemoNotificationText("memo_pending_approval", memo);
+    expect(t).not.toContain("<b>");
+    expect(t).not.toContain("</b>");
+  });
+  it("does not HTML-escape special chars in user data", () => {
+    const special = { ...memo, title: "A & B", requesterName: "Test <Admin>" };
+    const t = buildMemoNotificationText("memo_pending_approval", special);
+    expect(t).toContain("A & B");
+    expect(t).toContain("Test <Admin>");
+    expect(t).not.toContain("&amp;");
+    expect(t).not.toContain("&lt;");
+  });
+});
+
+describe("buildMemoNotificationHtml", () => {
+  it("wraps label in bold tag", () => {
+    const h = buildMemoNotificationHtml("memo_pending_approval", memo);
+    expect(h).toContain("<b>E-Memo:");
+    expect(h).toContain("</b>");
+  });
+  it("includes all fields", () => {
+    const h = buildMemoNotificationHtml("memo_pending_approval", memo);
+    expect(h).toContain("EM-2026-042");
+    expect(h).toContain("ซื้อวัตถุดิบ");
+    expect(h).toContain("สมชาย");
+  });
+  it("HTML-escapes & in user data", () => {
+    const h = buildMemoNotificationHtml("memo_pending_approval", { ...memo, title: "A & B" });
+    expect(h).toContain("A &amp; B");
+    expect(h).not.toContain("A & B");
+  });
+  it("HTML-escapes < and > in user data", () => {
+    const h = buildMemoNotificationHtml("memo_pending_approval", { ...memo, requesterName: "Test <Admin>" });
+    expect(h).toContain("Test &lt;Admin&gt;");
+    expect(h).not.toContain("Test <Admin>");
   });
 });
 

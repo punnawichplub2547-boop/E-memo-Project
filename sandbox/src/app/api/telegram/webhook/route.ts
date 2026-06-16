@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { findUserById } from "@/lib/db-users";
-import { sendTelegramMessage, answerCallbackQuery } from "@/lib/telegram/client";
+import { sendTelegramMessage, answerCallbackQuery, escHtml } from "@/lib/telegram/client";
 import { consumeLinkToken, upsertTelegramAccount } from "@/lib/telegram/linking";
 import { consumeApproveActionToken } from "@/lib/telegram/actions";
 import { approveMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
@@ -48,7 +48,7 @@ async function handleStart(update: TelegramUpdate, rawToken: string): Promise<vo
     { userId: user.id, telegramUserId: BigInt(from.id), chatId, username: from.username, firstName: from.first_name, lastName: from.last_name },
     pool,
   );
-  await sendTelegramMessage(chatId, `✅ เชื่อมต่อ Telegram สำเร็จ\nสวัสดี ${user.first_name} ${user.last_name}\nคุณจะได้รับการแจ้งเตือน E-Memo ที่นี่`);
+  await sendTelegramMessage(chatId, `✅ เชื่อมต่อ Telegram สำเร็จ\nสวัสดี ${escHtml(user.first_name)} ${escHtml(user.last_name)}\nคุณจะได้รับการแจ้งเตือน E-Memo ที่นี่`);
 }
 
 async function handleApproveCallback(cqId: string, tokenDbId: number, telegramUserId: bigint, chatId: bigint): Promise<void> {
@@ -66,7 +66,7 @@ async function handleApproveCallback(cqId: string, tokenDbId: number, telegramUs
       metadata: { telegram_user_id: telegramUserId.toString(), telegram_chat_id: chatId.toString() },
     });
     await answerCallbackQuery(cqId, "อนุมัติสำเร็จ ✅");
-    await sendTelegramMessage(chatId, `✅ อนุมัติ ${result.memoNo} สำเร็จแล้ว`);
+    await sendTelegramMessage(chatId, `✅ อนุมัติ ${escHtml(result.memoNo)} สำเร็จแล้ว`);
   } catch (err) {
     const msg = err instanceof WorkflowActionError ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";
     await answerCallbackQuery(cqId, msg, true);

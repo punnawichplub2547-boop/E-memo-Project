@@ -1,3 +1,7 @@
+export function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 type TelegramButton =
   | { text: string; callback_data: string }
   | { text: string; url: string };
