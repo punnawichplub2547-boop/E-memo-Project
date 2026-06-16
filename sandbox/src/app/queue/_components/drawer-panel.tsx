@@ -4,7 +4,7 @@ import React from "react";
 import { MemoRecord, approvalLabels, computePriceRowTotals } from "@/lib/approval";
 import {
   IconCrown, IconUsers, IconBell, IconCheck,
-  IconPrinter, IconX, IconReturn, IconPen,
+  IconPrinter, IconX, IconReturn, IconPen, IconDownload,
 } from "@/components/icons";
 import { DrawerFooter } from "./drawer-footer";
 import { AuditLogSection } from "./audit-log-section";
@@ -129,6 +129,14 @@ export function DrawerPanel({
           )}
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <a
+            className="em-btn sm ghost icon-only"
+            href={`/api/memos/${encodeURIComponent(memo.id)}/export-excel`}
+            title="Export เป็น Excel (ฟอร์ม F-DC-006)"
+            download
+          >
+            <IconDownload size={14} />
+          </a>
           <button className="em-btn sm ghost icon-only">
             <IconPrinter size={14} />
           </button>
