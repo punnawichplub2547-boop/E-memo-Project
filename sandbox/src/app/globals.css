@@ -1283,6 +1283,7 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 }
 
 @media (max-width: 768px) {
+  /* ── Sidebar → bottom nav bar ─────────────────────────── */
   .em-side {
     position: fixed;
     bottom: 0; top: auto; left: 0; right: 0;
@@ -1294,9 +1295,115 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
     box-shadow: 0 -6px 32px rgba(0,0,0,0.35);
   }
   .em-work { margin-left: 0; padding-bottom: 72px; }
-  .em-nav { flex-direction: row; }
+  .em-nav { flex-direction: row; flex: 1; justify-content: space-around; gap: 0; }
   .em-side-footer { display: none; }
-  .em-content { padding: 16px; }
+  /* Hide brand mark + section labels inside bottom nav — icon row only */
+  .em-brand { display: none; }
+  .em-nav-group-label { display: none; }
+  /* Nav items: centered column, equal spacing */
+  .em-nav-item {
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 3px;
+    flex: 1;
+    border-radius: 12px;
+    min-width: 0;
+    font-size: 0;   /* hide text by shrinking, icon SVGs scale independently */
+  }
+  .em-nav-item svg { width: 20px; height: 20px; }
+  .em-nav-badge {
+    display: flex;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    font-size: 9px;
+    padding: 1px 4px;
+    min-width: 14px;
+    height: 14px;
+  }
+  /* Relative positioning for badge inside nav items on mobile */
+  .em-nav-item { position: relative; }
+
+  /* ── Topbar ────────────────────────────────────────────── */
+  .em-topbar {
+    padding: 10px 14px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .em-top-search { display: none; }
+  .em-crumbs { display: none; }
+  .em-page-title { font-size: 15px; }
+  /* Keep actions but shrink them */
+  .em-top-actions { gap: 6px; }
+  /* Hide secondary action buttons in topbar on mobile (Export, Download) */
+  .em-top-actions > a.em-btn:not(.primary):not(.em-bell-btn),
+  .em-top-actions > button.em-btn:not(.primary):not([aria-label="notifications"]):not(:last-of-type) {
+    display: none;
+  }
+
+  /* ── Content area ──────────────────────────────────────── */
+  .em-content {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* ── Cards ─────────────────────────────────────────────── */
+  .em-card-head { padding: 12px 14px; }
+  .em-card-body { padding: 14px; }
+
+  /* ── History/Queue KPI summary bar ─────────────────────── */
+  /* The 5-col grid is set inline; override with !important here.
+     2 columns on narrow, with horizontal scroll fallback. */
+  .em-kpi-bar {
+    grid-template-columns: repeat(3, 1fr) !important;
+    overflow-x: auto !important;
+  }
+  /* When fewer than 3 fit, let it scroll */
+  .em-summary-block {
+    min-width: 110px;
+  }
+
+  /* ── Tabs (filter bar) ──────────────────────────────────── */
+  .em-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .em-tabs::-webkit-scrollbar { display: none; }
+
+  /* ── Form grids (create form multi-column) ──────────────── */
+  .em-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Create page ────────────────────────────────────────── */
+  .em-create-content { padding: 12px; gap: 10px; }
+  .em-create-content .em-card-head { padding: 10px 12px; }
+  .em-create-content .em-card-body { padding: 12px; }
+  /* Stepper: hide labels, keep dots compact */
+  .em-create-step-label { display: none; }
+  .em-create-step-connector { max-width: 20px; min-width: 8px; }
+
+  /* ── Filter row with search box ─────────────────────────── */
+  /* The search input in queue page has minWidth 200 — relax it */
+  .em-content [style*="minWidth: 200"] {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  /* ── Buttons: smaller touch targets in dense rows ────────── */
+  .em-btn.sm { height: 32px; padding: 0 10px; }
+
+  /* ── Table: allow horizontal scroll on very small screens ─── */
+  .em-table { font-size: 12px; }
+  .em-table th, .em-table td { padding: 9px 8px; }
+
+  /* ── Report KPI grid already handled in rpt-kpi-grid ──────── */
+
+  /* ── em-content gap control ────────────────────────────── */
+  .em-content { display: flex; flex-direction: column; }
 }
 
 /* ===== Premium polish layer ===== */
@@ -1416,3 +1523,233 @@ a:focus-visible, .em-nav-item:focus-visible, .em-tab:focus-visible, .em-chip:foc
 .em-filter-item:hover { background: var(--surface-2); }
 .em-filter-item.is-selected { color: var(--primary); font-weight: 600; }
 .em-filter-check { width: 14px; display: inline-flex; color: var(--primary); }
+
+/* ===== Monthly Report (/report) ===== */
+
+/* Month navigation bar */
+.rpt-month-nav {
+  padding: 12px 18px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rpt-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.rpt-month-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--primary);
+}
+.rpt-month-icon {
+  display: flex;
+  align-items: center;
+  color: var(--primary);
+  opacity: 0.7;
+}
+.rpt-month-label {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* KPI grid */
+.rpt-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+/* KPI card */
+.rpt-kpi-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rpt-fadein 0.45s ease forwards;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border-top: 3px solid var(--rpt-accent, var(--primary));
+}
+.rpt-kpi-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+  transform: translateY(-2px);
+}
+.rpt-kpi-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rpt-kpi-num {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.rpt-kpi-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 5px;
+}
+.rpt-kpi-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Charts row */
+.rpt-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 180px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.rpt-chart-panel { height: fit-content; }
+.rpt-gauge-panel {
+  display: flex;
+  flex-direction: column;
+}
+.rpt-dept-chart { grid-column: 3; }
+
+/* Department bar rows */
+.rpt-dept-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  animation: rpt-rowslide 0.4s ease forwards;
+}
+.rpt-dept-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Table */
+.rpt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rpt-table th {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.rpt-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.rpt-table-row {
+  opacity: 0;
+  animation: rpt-fadein 0.35s ease forwards;
+  transition: background 0.15s;
+}
+.rpt-table-row:last-child td { border-bottom: none; }
+.rpt-table-row:hover td { background: var(--surface-2); }
+
+/* Loading */
+.rpt-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.rpt-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: rpt-spin 0.75s linear infinite;
+}
+
+/* Empty state */
+.rpt-empty {
+  text-align: center;
+  padding: 56px 32px !important;
+}
+.rpt-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.rpt-empty-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
+.rpt-empty-sub { font-size: 13px; color: var(--muted); }
+
+/* Footer note */
+.rpt-footer-note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 0 8px;
+}
+
+/* Keyframes */
+@keyframes rpt-fadein {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rpt-rowslide {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes rpt-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .rpt-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .rpt-charts-row { grid-template-columns: 1fr 1fr; }
+  .rpt-dept-chart { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .rpt-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .rpt-charts-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 500px) {
+  .rpt-kpi-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Very small phones (≤420px) ─────────────────────────────── */
+@media (max-width: 420px) {
+  /* KPI bar: 2 columns so numbers don't wrap unreadably */
+  .em-kpi-bar {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Topbar title shorter */
+  .em-page-title { font-size: 14px; }
+  /* Content tighter */
+  .em-content { padding: 10px; }
+  .em-card-head { padding: 10px 12px; }
+  .em-card-body { padding: 12px; }
+  /* Report KPI: 2 col */
+  .rpt-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+}

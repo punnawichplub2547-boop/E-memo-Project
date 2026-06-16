@@ -74,7 +74,7 @@ export default function HistoryPage() {
         <div className="em-content">
 
           {/* Summary bar */}
-          <div className="em-card" style={{ padding: 0, display: "grid", gridTemplateColumns: "repeat(5,1fr)", overflow: "hidden" }}>
+          <div className="em-card em-kpi-bar" style={{ padding: 0, display: "grid", gridTemplateColumns: "repeat(5,1fr)", overflow: "hidden" }}>
             <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" active={tabFilter === "all"} onClick={() => setTabFilter("all")} />
             <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" active={tabFilter === "approved"} onClick={() => setTabFilter(tabFilter === "approved" ? "all" : "approved")} />
             <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconSlash size={16} />} accent="rose" active={tabFilter === "rejected"} onClick={() => setTabFilter(tabFilter === "rejected" ? "all" : "rejected")} />
