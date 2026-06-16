@@ -186,7 +186,7 @@ function QueuePageContent() {
           }
         />
         <div className="em-content">
-          <div className="em-card" style={{ padding: 14 }}>
+          <div className="em-card em-filter-card" style={{ padding: 14 }}>
             <div
               style={{
                 display: "flex",

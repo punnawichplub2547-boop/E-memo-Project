@@ -717,6 +717,10 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   position: relative;
   transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
 }
+.em-filter-card {
+  overflow: visible;
+  z-index: 12;
+}
 .em-card-head {
   display: flex;
   align-items: center;

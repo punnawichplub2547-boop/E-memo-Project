@@ -83,7 +83,7 @@ export default function HistoryPage() {
           </div>
 
           {/* Filter */}
-          <div className="em-card" style={{ padding: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div className="em-card em-filter-card" style={{ padding: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div className="em-tabs">
               {(["all", "approved", "rejected", "returned"] as const).map(t => (
                 <div key={t} className={`em-tab${tabFilter === t ? " active" : ""}`} onClick={() => setTabFilter(t)} style={{ cursor: "pointer" }}>
