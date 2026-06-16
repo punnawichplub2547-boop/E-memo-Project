@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { findUserById } from "@/lib/db-users";
@@ -24,7 +25,14 @@ type TelegramUpdate = {
 
 function verifySecret(request: NextRequest): boolean {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  return !!secret && request.headers.get("x-telegram-bot-api-secret-token") === secret;
+  if (!secret) return false;
+  const header = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+  if (header.length !== secret.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(header, "utf8"), Buffer.from(secret, "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 async function handleStart(update: TelegramUpdate, rawToken: string): Promise<void> {
@@ -80,24 +88,28 @@ export async function POST(request: NextRequest) {
   try { update = (await request.json()) as TelegramUpdate; }
   catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
-  if (update.message?.text?.startsWith("/start ")) {
-    const rawToken = update.message.text.slice(7).trim();
-    if (rawToken) await handleStart(update, rawToken);
-    return NextResponse.json({ ok: true });
-  }
-
-  if (update.callback_query) {
-    const cq = update.callback_query;
-    const chatId = BigInt(cq.message?.chat.id ?? 0);
-    const telegramUserId = BigInt(cq.from.id);
-    const data = cq.data ?? "";
-    if (data.startsWith("approve:")) {
-      const tokenDbId = parseInt(data.slice(8), 10);
-      if (!isNaN(tokenDbId)) await handleApproveCallback(cq.id, tokenDbId, telegramUserId, chatId);
-    } else {
-      await answerCallbackQuery(cq.id, "ไม่รู้จักคำสั่งนี้");
+  try {
+    if (update.message?.text?.startsWith("/start ")) {
+      const rawToken = update.message.text.slice(7).trim();
+      if (rawToken) await handleStart(update, rawToken);
+      return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ ok: true });
+
+    if (update.callback_query) {
+      const cq = update.callback_query;
+      const chatId = BigInt(cq.message?.chat.id ?? 0);
+      const telegramUserId = BigInt(cq.from.id);
+      const data = cq.data ?? "";
+      if (data.startsWith("approve:")) {
+        const tokenDbId = parseInt(data.slice(8), 10);
+        if (!isNaN(tokenDbId)) await handleApproveCallback(cq.id, tokenDbId, telegramUserId, chatId);
+      } else {
+        await answerCallbackQuery(cq.id, "ไม่รู้จักคำสั่งนี้");
+      }
+      return NextResponse.json({ ok: true });
+    }
+  } catch (err) {
+    console.error("[telegram/webhook] unexpected error:", err);
   }
 
   return NextResponse.json({ ok: true });
