@@ -7,7 +7,7 @@ import { useMemos } from "@/lib/memo-store";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { ApprovalLevel, approvalLabels } from "@/lib/approval";
 import {
-  IconDownload, IconPlus, IconSearch, IconSort,
+  IconPlus, IconSearch, IconSort,
   IconCrown, IconUsers, IconCalendar,
   IconDots,
 } from "@/components/icons";
@@ -176,9 +176,6 @@ function QueuePageContent() {
                   ← All queues
                 </Link>
               )}
-              <button className="em-btn">
-                <IconDownload size={15} /> Export
-              </button>
               <Link href="/create" className="em-btn primary">
                 <IconPlus size={15} /> New Memo
               </Link>
