@@ -93,6 +93,36 @@ function money(n: number | undefined | null): number {
   return Math.round((n ?? 0) * 100) / 100;
 }
 
+// Sum the configured widths of a merged column range (Excel "width" units).
+function rangeWidth(ws: ExcelJS.Worksheet, startCol: number, endCol: number): number {
+  let w = 0;
+  for (let c = startCol; c <= endCol; c++) w += ws.getColumn(c).width ?? 9;
+  return w;
+}
+
+// ExcelJS does not auto-fit row height for wrapped text, so long Thai strings spill out of
+// their cell. Estimate the wrapped line count for `text` inside the merged range and grow the
+// row so nothing clips. We under-estimate chars-per-line on purpose (taller is safe, clipped
+// is not). Never shrinks a row that another column already made taller.
+function fitRowHeight(
+  ws: ExcelJS.Worksheet,
+  row: number,
+  text: string | number | null | undefined,
+  startCol: number,
+  endCol: number,
+  opts: { lineHeight?: number; minHeight?: number; fontSize?: number } = {},
+): void {
+  const lineHeight = opts.lineHeight ?? 15;
+  const fontScale = (opts.fontSize ?? 10) / 10;
+  const charsPerLine = Math.max(1, Math.floor((rangeWidth(ws, startCol, endCol) / fontScale) * 0.8));
+  let lines = 0;
+  for (const segment of String(text ?? "").split("\n")) {
+    lines += Math.max(1, Math.ceil(segment.length / charsPerLine));
+  }
+  const needed = Math.max(lines * lineHeight, opts.minHeight ?? lineHeight);
+  ws.getRow(row).height = Math.max(ws.getRow(row).height ?? 0, needed);
+}
+
 function findSignature(signatures: MemoSignature[], stepLabel: ApprovalLevel): MemoSignature | undefined {
   const matches = signatures.filter((s) => s.stepLabel === stepLabel);
   return matches[matches.length - 1];
@@ -156,7 +186,9 @@ export async function buildMemoExcelWorkbook(
   ];
   metaRows.forEach(([label, value], i) => {
     const row = gridStartRow + 1 + i;
-    setRange(ws, 1, 3, row, `${label}: ${value}`, { size: 9, wrap: true });
+    const text = `${label}: ${value}`;
+    setRange(ws, 1, 3, row, text, { size: 9, wrap: true });
+    fitRowHeight(ws, row, text, 1, 3, { fontSize: 9, minHeight: 16 });
   });
 
   DEPT_GRID.forEach((cols, i) => {
@@ -175,10 +207,9 @@ export async function buildMemoExcelWorkbook(
   let r = gridStartRow + DEPT_GRID.length;
   setRange(ws, 1, TOTAL_COLS, r, "เรียน ผู้บังคับบัญชาตามสายงานอนุมัติ", { size: 10 }); r++;
   setRange(ws, 1, TOTAL_COLS, r, `เรื่อง: ${memo.title}`, { bold: true, size: 10.5 }); r++;
-  ws.getRow(r).height = 32;
-  setRange(ws, 1, TOTAL_COLS, r, `เนื่องจาก/เหตุผล: ${memo.description ?? "-"}`, { size: 10, wrap: true, valign: "top" }); r++;
-  ws.getRow(r).height = 32;
-  setRange(ws, 1, TOTAL_COLS, r, `ดังนั้น: ${memo.closingRemark ?? "-"}`, { size: 10, wrap: true, valign: "top" }); r++;
+  const reasonText = `เนื่องจาก/เหตุผล: ${memo.description ?? "-"}`;
+  setRange(ws, 1, TOTAL_COLS, r, reasonText, { size: 10, wrap: true, valign: "top" });
+  fitRowHeight(ws, r, reasonText, 1, TOTAL_COLS, { minHeight: 32 }); r++;
 
   // ---- Request items table ----
   setRange(ws, 1, 1, r, "ลำดับ", { bold: true, align: "center", fill: "FFF1F5F9" });
@@ -206,6 +237,7 @@ export async function buildMemoExcelWorkbook(
       itemSubtotal += total;
       setRange(ws, 1, 1, r, i + 1, { align: "center" });
       setRange(ws, 2, 6, r, item.name, { wrap: true });
+      fitRowHeight(ws, r, item.name, 2, 6, { minHeight: 16 });
       setRange(ws, 7, 7, r, item.unit, { align: "center" });
       setRange(ws, 8, 8, r, item.qty, { align: "center" });
       setRange(ws, 9, 10, r, money(item.unitPrice), { align: "right" }).numFmt = "#,##0.00";
@@ -236,7 +268,8 @@ export async function buildMemoExcelWorkbook(
   const budgetUsed = memo.budgetUsed ?? 0;
   const remaining = budgetPlan !== undefined ? budgetPlan - budgetUsed - memo.amount : undefined;
   setRange(ws, 1, 1, r, 1, { align: "center" });
-  setRange(ws, 2, 4, r, memo.title, { wrap: true });
+  setRange(ws, 2, 4, r, memo.title, { wrap: true, valign: "top" });
+  fitRowHeight(ws, r, memo.title, 2, 4, { minHeight: 16 });
   setRange(ws, 5, 6, r, budgetPlan !== undefined ? money(budgetPlan) : "-", { align: "right" });
   setRange(ws, 7, 8, r, money(budgetUsed), { align: "right" });
   setRange(ws, 9, 10, r, money(memo.amount), { align: "right" });
@@ -260,11 +293,14 @@ export async function buildMemoExcelWorkbook(
     if (v) {
       const { netPrice } = computePriceRowTotals(v);
       const selected = v.isSelected ? " (เลือกใช้บริการ)" : "";
-      setRange(ws, 2, 5, r, `${v.vendorName}${selected}`, { bold: !!v.isSelected, wrap: true });
+      const vendorLabel = `${v.vendorName}${selected}`;
+      setRange(ws, 2, 5, r, vendorLabel, { bold: !!v.isSelected, wrap: true, valign: "top" });
       setRange(ws, 6, 7, r, money(v.offeredPrice), { align: "right" });
       setRange(ws, 8, 9, r, money(v.discount), { align: "right" });
       setRange(ws, 10, 11, r, money(netPrice), { align: "right" });
-      setRange(ws, 12, 12, r, v.remark ?? "", { wrap: true });
+      setRange(ws, 12, 12, r, v.remark ?? "", { wrap: true, valign: "top" });
+      fitRowHeight(ws, r, vendorLabel, 2, 5, { minHeight: 16 });
+      fitRowHeight(ws, r, v.remark ?? "", 12, 12, { minHeight: 16 });
     } else {
       setRange(ws, 2, 5, r, "", {});
       setRange(ws, 6, 7, r, "", {});
@@ -275,10 +311,24 @@ export async function buildMemoExcelWorkbook(
     r++;
   }
 
-  // ---- Closing line ----
+  // ---- Closing two-column block ----
+  // Matches the paper form (Form.jpg): a free-form note (หมายเหตุ / closing remark) on the
+  // left, parallel to the "ขอแสดงความนับถือ" + requester identity block on the right.
   r++;
-  setRange(ws, 1, TOTAL_COLS, r, "จึงเรียนมาเพื่อพิจารณาอนุมัติ", { align: "center", border: false }); r++;
-  setRange(ws, 1, TOTAL_COLS, r, `ชื่อ-นามสกุล: ${memo.requester} (${memo.department})`, { align: "center", border: false }); r++;
+  setRange(ws, 1, TOTAL_COLS, r, "จึงเรียนมาเพื่อทราบและโปรดพิจารณาอนุมัติ", { align: "center", border: false }); r++;
+
+  const blockTop = r;
+  // Right column: regards + requester name + department/position
+  setRange(ws, 7, 12, blockTop, "ขอแสดงความนับถือ", { align: "center", border: false });
+  setRange(ws, 7, 12, blockTop + 1, memo.requester, { align: "center", border: false });
+  setRange(ws, 7, 12, blockTop + 2, `(${memo.requester})`, { align: "center", border: false });
+  setRange(ws, 7, 12, blockTop + 3, memo.department, { align: "center", border: false, size: 9 });
+  // Left column: หมายเหตุ — one tall cell merged vertically across the 4 regards rows.
+  ws.mergeCells(blockTop, 1, blockTop + 3, 6);
+  const noteCell = ws.getCell(blockTop, 1);
+  noteCell.value = memo.closingRemark ? `หมายเหตุ: ${memo.closingRemark}` : "";
+  styleCell(noteCell, { align: "left", valign: "top", wrap: true, border: false, color: "FFB91C1C", bold: true });
+  r = blockTop + 4;
 
   // ---- Signature block: Supervisor / Dept Manager / GM / Sr.GM / MD ----
   // The prototype's approval engine only models 3 levels (Manager / Top Section, General

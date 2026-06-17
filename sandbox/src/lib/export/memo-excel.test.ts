@@ -88,6 +88,33 @@ describe("buildMemoExcelWorkbook", () => {
     expect(text).toContain("(...ชื่อ-สกุล...)"); // Supervisor / Sr.GM placeholder still present
   });
 
+  it("renders closingRemark as a หมายเหตุ note in the closing block", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ closingRemark: "ขออนุมัติเบิกเป็นเงินสด" }));
+    const ws = wb.getWorksheet("Memo")!;
+    let text = "";
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (typeof cell.value === "string") text += cell.value + "\n";
+      });
+    });
+    expect(text).toContain("หมายเหตุ: ขออนุมัติเบิกเป็นเงินสด");
+    expect(text).toContain("ขอแสดงความนับถือ");
+  });
+
+  it("grows the budget row height so a long title does not clip", async () => {
+    const longTitle =
+      "ขออนุมัติจัดซื้อสินทรัพย์ถาวร เครื่องคอมพิวเตอร์และอุปกรณ์ต่อพ่วงสำหรับแผนกไอที วงเงินรวม 70,000 บาท";
+    const wb = await buildMemoExcelWorkbook(makeMemo({ title: longTitle }));
+    const ws = wb.getWorksheet("Memo")!;
+    // The budget row holds the title merged across cols 2-4 (narrow) — it must wrap to
+    // multiple lines, so at least one row should be taller than a single default line.
+    let maxHeight = 0;
+    ws.eachRow((row) => {
+      if (typeof row.height === "number") maxHeight = Math.max(maxHeight, row.height);
+    });
+    expect(maxHeight).toBeGreaterThan(30);
+  });
+
   it("memoToExcelBuffer returns a non-empty xlsx buffer", async () => {
     const buffer = await memoToExcelBuffer(makeMemo());
     expect(buffer.length).toBeGreaterThan(0);
