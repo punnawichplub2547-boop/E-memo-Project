@@ -14,9 +14,12 @@ import type { PrototypeRole, PrototypeUser } from "@/lib/prototype-users";
 import type { ApprovalLevel, MemoStatus } from "@/lib/approval";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { DEPARTMENTS } from "@/lib/departments";
+import { FilterDropdown } from "@/components/filter-dropdown";
+import type { WorkflowAction } from "@/lib/db-memos";
 import {
   IconUsers, IconFileText, IconShield, IconTrash,
   IconPen, IconRefresh, IconX, IconCheck, IconKey, IconSettings, IconUserPlus, IconReturn,
+  IconHistory, IconFilter, IconArrowLeft, IconArrowRight,
 } from "@/components/icons";
 
 const ALL_ROLES: { value: PrototypeRole; label: string }[] = [
@@ -45,7 +48,24 @@ const statusColor: Record<MemoStatus, string> = {
   draft: "#6B7280",
 };
 
-type Tab = "db-users" | "users" | "memos" | "system";
+type Tab = "db-users" | "users" | "memos" | "audit" | "system";
+
+const AUDIT_ACTION_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "All actions" },
+  { value: "submit", label: "Submit" },
+  { value: "save_draft", label: "Save draft" },
+  { value: "check", label: "Check" },
+  { value: "approve", label: "Approve" },
+  { value: "return_for_revision", label: "Return" },
+  { value: "reject", label: "Reject" },
+  { value: "read", label: "Read" },
+  { value: "skip_read", label: "Skip read" },
+  { value: "resubmit", label: "Resubmit" },
+  { value: "void", label: "Void" },
+  { value: "restore", label: "Restore" },
+];
+
+const AUDIT_PAGE_SIZE = 50;
 
 type EditUserState = {
   name: string;
@@ -102,6 +122,21 @@ export default function AdminPage() {
   const [aiStatus, setAiStatus] = useState<{ thaillm: boolean; groq: boolean } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
+  // Audit log tab state
+  const [auditRows, setAuditRows] = useState<WorkflowAction[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState("");
+  const [auditMemo, setAuditMemo] = useState("");
+  const [auditActor, setAuditActor] = useState("");
+  const [auditAction, setAuditAction] = useState("");
+  const [auditFrom, setAuditFrom] = useState("");
+  const [auditTo, setAuditTo] = useState("");
+  const [auditPage, setAuditPage] = useState(0);
+  // Committed filter values — only updated when the user hits "Apply", so typing
+  // in the text boxes does not fire a request per keystroke.
+  const [auditQuery, setAuditQuery] = useState({ memo: "", actor: "", action: "", from: "", to: "" });
+
   useEffect(() => {
     if (tab !== "db-users") return;
     const timer = window.setTimeout(() => {
@@ -130,6 +165,51 @@ export default function AdminPage() {
     };
     void checkStatus();
   }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "audit") return;
+    const controller = new AbortController();
+    // Defer the loading-state reset off the synchronous effect path (runs next frame,
+    // well before any network response) to avoid cascading renders.
+    const raf = requestAnimationFrame(() => {
+      if (controller.signal.aborted) return;
+      setAuditLoading(true);
+      setAuditError("");
+    });
+    const params = new URLSearchParams();
+    if (auditQuery.memo) params.set("memo", auditQuery.memo);
+    if (auditQuery.actor) params.set("actor", auditQuery.actor);
+    if (auditQuery.action) params.set("action", auditQuery.action);
+    if (auditQuery.from) params.set("from", auditQuery.from);
+    if (auditQuery.to) params.set("to", auditQuery.to);
+    params.set("limit", String(AUDIT_PAGE_SIZE));
+    params.set("offset", String(auditPage * AUDIT_PAGE_SIZE));
+    fetch(`/api/admin/audit?${params.toString()}`, { cache: "no-store", signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then((data: { rows: WorkflowAction[]; total: number }) => {
+        setAuditRows(data.rows);
+        setAuditTotal(data.total);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setAuditError("Failed to load audit log. Check DB connection.");
+        setAuditRows([]);
+        setAuditTotal(0);
+      })
+      .finally(() => { if (!controller.signal.aborted) setAuditLoading(false); });
+    return () => { controller.abort(); cancelAnimationFrame(raf); };
+  }, [tab, auditQuery, auditPage]);
+
+  function applyAuditFilters() {
+    setAuditPage(0);
+    setAuditQuery({ memo: auditMemo.trim(), actor: auditActor.trim(), action: auditAction, from: auditFrom, to: auditTo });
+  }
+
+  function clearAuditFilters() {
+    setAuditMemo(""); setAuditActor(""); setAuditAction(""); setAuditFrom(""); setAuditTo("");
+    setAuditPage(0);
+    setAuditQuery({ memo: "", actor: "", action: "", from: "", to: "" });
+  }
 
   const isAdminAccess = authUser ? authUser.roles.includes("admin") : isPrototypeAdmin(user);
 
@@ -219,7 +299,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
-            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
+            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["audit", IconHistory, "Audit Log"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
               <button key={t} role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t as Tab)}
                 style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: tab === t ? "var(--accent)" : "var(--muted)", borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`, marginBottom: -1, transition: "color 150ms" }}
@@ -621,6 +701,113 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── AUDIT LOG TAB ──────────────────────────────────────── */}
+          {tab === "audit" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>Audit Log / ประวัติการดำเนินการ</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                  Every workflow action across all memos — including voided memos. Read-only. {auditTotal} total record{auditTotal === 1 ? "" : "s"}.
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, display: "block", marginBottom: 4 }}>Memo No.</label>
+                  <input style={{ ...fieldStyle, width: 150 }} placeholder="EM-2026-…" value={auditMemo}
+                    onChange={e => setAuditMemo(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") applyAuditFilters(); }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, display: "block", marginBottom: 4 }}>Actor</label>
+                  <input style={{ ...fieldStyle, width: 150 }} placeholder="ชื่อผู้ดำเนินการ" value={auditActor}
+                    onChange={e => setAuditActor(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") applyAuditFilters(); }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                  <FilterDropdown
+                    icon={<IconFilter size={13} />}
+                    label="Action"
+                    options={AUDIT_ACTION_OPTIONS}
+                    selected={auditAction}
+                    onSelect={setAuditAction}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, display: "block", marginBottom: 4 }}>From</label>
+                  <input type="date" style={{ ...fieldStyle, width: 150 }} value={auditFrom} onChange={e => setAuditFrom(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, display: "block", marginBottom: 4 }}>To</label>
+                  <input type="date" style={{ ...fieldStyle, width: 150 }} value={auditTo} onChange={e => setAuditTo(e.target.value)} />
+                </div>
+                <button className="em-btn primary" style={{ padding: "6px 14px", fontSize: 12.5 }} onClick={applyAuditFilters}>Apply</button>
+                <button className="em-btn" style={{ padding: "6px 14px", fontSize: 12.5 }} onClick={clearAuditFilters}>Clear</button>
+              </div>
+
+              {auditError && (
+                <div className="em-card" style={{ padding: 14, fontSize: 13, color: "#B91C1C", background: "rgba(239,68,68,0.06)" }}>{auditError}</div>
+              )}
+
+              <div className="em-card" style={{ padding: 0, overflowX: "auto", overflowY: "hidden" }}>
+                <table style={{ width: "100%", minWidth: 1000, borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
+                      {["Time", "Memo No.", "Action", "Step", "Actor", "Result", "Reason"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditRows.map((a, i) => (
+                      <tr key={`${a.memoNo}-${a.actedAt}-${i}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{a.actedAt}</td>
+                        <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 11.5, whiteSpace: "nowrap" }}>{a.memoNo}</td>
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 4, background: "var(--surface-2, rgba(148,163,184,0.16))", color: "var(--ink-2, var(--ink))", letterSpacing: "0.02em" }}>{a.actionType}</span>
+                        </td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{a.stepLabel ?? "—"}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>{a.actorName ?? "—"}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{a.result ?? "—"}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, maxWidth: 320 }}>
+                          <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.reason ?? undefined}>{a.reason ?? "—"}</span>
+                        </td>
+                      </tr>
+                    ))}
+                    {!auditLoading && auditRows.length === 0 && (
+                      <tr><td colSpan={7} style={{ padding: "32px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{auditError ? "—" : "No audit records match the current filters."}</td></tr>
+                    )}
+                    {auditLoading && (
+                      <tr><td colSpan={7} style={{ padding: "32px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Loading…</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                  {auditTotal === 0
+                    ? "0 records"
+                    : `Showing ${auditPage * AUDIT_PAGE_SIZE + 1}–${Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditTotal)} of ${auditTotal}`}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="em-btn" style={{ padding: "6px 12px", fontSize: 12.5 }}
+                    disabled={auditPage === 0 || auditLoading}
+                    onClick={() => setAuditPage(p => Math.max(0, p - 1))}>
+                    <IconArrowLeft size={13} /> Prev
+                  </button>
+                  <button className="em-btn" style={{ padding: "6px 12px", fontSize: 12.5 }}
+                    disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditTotal || auditLoading}
+                    onClick={() => setAuditPage(p => p + 1)}>
+                    Next <IconArrowRight size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
