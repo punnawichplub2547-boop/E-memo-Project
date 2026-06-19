@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     const memo = await request.json() as MemoRecord;
     // Never trust the client for identity — the creator is the session user.
     memo.requester = `${session.firstName} ${session.lastName}`;
+    memo.requesterUserId = session.userId;
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -121,7 +122,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
   const { row } = buildMemoWritePayload(memo);
   const [result] = await connection.execute<import("mysql2").ResultSetHeader>(
     `INSERT INTO memos (
-      memo_no, title, requester_name, department_name, category,
+      memo_no, title, requester_name, requester_user_id, department_name, category,
       amount, budget_status, account_code, budget_plan, budget_used, description, closing_remark,
       status, workflow_state, current_step, cycle_hours,
       recommended_final_approver, recommended_route_json, selected_route_json,
@@ -133,7 +134,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       request_items_json, read_recipients_json, attachments_json,
       created_at, updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?,
@@ -194,6 +195,7 @@ function memoRowParams(row: MemoSeedRow) {
     row.memo_no,
     row.title,
     row.requester_name,
+    row.requester_user_id,
     row.department_name,
     row.category,
     row.amount,

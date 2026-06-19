@@ -20,6 +20,7 @@ import type { RowDataPacket } from "mysql2";
 
 type MemoRow = RowDataPacket & {
   id: number; memo_no: string; title: string; requester_name: string;
+  requester_user_id: number | null;
   current_step: string; status: string; revision_no: number;
 };
 type ChatRow = RowDataPacket & { user_id: number; telegram_chat_id: string };
@@ -47,7 +48,7 @@ export function computeWatcherRecipients(input: {
 async function getMemo(memoNo: string): Promise<MemoRow | null> {
   const pool = getDbPool();
   const [rows] = await pool.query<MemoRow[]>(
-    "SELECT id, memo_no, title, requester_name, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1",
+    "SELECT id, memo_no, title, requester_name, requester_user_id, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1",
     [memoNo],
   );
   return rows[0] ?? null;
@@ -128,7 +129,7 @@ async function notifyWatchers(
   excludeIds: number[] = [],
 ): Promise<void> {
   const pool = getDbPool();
-  const requesterId = await resolveRequesterRecipient(memo.requester_name, pool);
+  const requesterId = await resolveRequesterRecipient(memo.requester_name, memo.requester_user_id, pool);
   const ccIds = await resolveMemoCcRecipients(memo.id, memo.revision_no, pool);
   const recipients = computeWatcherRecipients({ requesterId, ccIds, actorId: actorUserId, excludeActor, excludeIds });
   if (recipients.length === 0) return;

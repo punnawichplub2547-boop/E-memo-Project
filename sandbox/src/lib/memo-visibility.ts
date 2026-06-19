@@ -27,8 +27,19 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
 
   const fullName = `${session.firstName} ${session.lastName}`.trim();
 
-  // Requester: sees memos they submitted (exact name match — see temporary limitation above)
-  if (session.roles.includes("requester") && memo.requester === fullName) return true;
+  // Requester: sees memos they submitted.
+  //   - requesterUserId set (FK) → authoritative: visible only when it equals the
+  //     session userId. A FK pointing to another user is NOT theirs — never fall
+  //     back to name match here (this is the name-collision fix).
+  //   - requesterUserId null/undefined (legacy/seed/prototype) → fall back to the
+  //     exact name match (see temporary limitation above).
+  if (session.roles.includes("requester")) {
+    if (memo.requesterUserId != null) {
+      if (memo.requesterUserId === session.userId) return true;
+    } else if (memo.requester === fullName) {
+      return true;
+    }
+  }
 
   // Approver: sees memos where their approval level appears in any route source or is currentStep.
   // Manager / Top Section has an extra department filter — they only see memos from their own

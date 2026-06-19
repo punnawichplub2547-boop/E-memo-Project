@@ -35,11 +35,39 @@ describe("resolveApprovalStepRecipients", () => {
 });
 
 describe("resolveRequesterRecipient", () => {
-  it("returns id when name matches", async () => {
-    expect(await resolveRequesterRecipient("สมชาย รักษ์ดี", pool1([{ id: 5 }]))).toBe(5);
+  function trackingPool(rows: unknown[]) {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [rows, undefined];
+      },
+    } as unknown as Pool;
+    return { pool, calls };
+  }
+
+  it("(b) FK null → falls back to a name match", async () => {
+    expect(await resolveRequesterRecipient("สมชาย รักษ์ดี", null, pool1([{ id: 5 }]))).toBe(5);
   });
-  it("returns null when no match", async () => {
-    expect(await resolveRequesterRecipient("ไม่มี", pool1([]))).toBeNull();
+
+  it("(b) FK null + name not found → null", async () => {
+    expect(await resolveRequesterRecipient("ไม่มี", null, pool1([]))).toBeNull();
+  });
+
+  it("(a) FK set + user active → returns the FK id and queries by id (never by name)", async () => {
+    const { pool, calls } = trackingPool([{ id: 5 }]);
+    expect(await resolveRequesterRecipient("any name", 5, pool)).toBe(5);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toContain("WHERE id = ?");
+    expect(calls[0].sql).not.toContain("first_name");
+    expect(calls[0].params).toEqual([5]);
+  });
+
+  it("(c) FK set but user suspended/inactive → returns null and does NOT fall back to name", async () => {
+    const { pool, calls } = trackingPool([]); // active-status query finds nothing
+    expect(await resolveRequesterRecipient("สมชาย รักษ์ดี", 5, pool)).toBeNull();
+    expect(calls).toHaveLength(1); // no second name-fallback query
+    expect(calls[0].sql).toContain("status = 'active'");
   });
 });
 

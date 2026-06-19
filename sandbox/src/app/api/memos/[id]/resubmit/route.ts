@@ -6,12 +6,14 @@ import { buildResubmitMemoPayload, type ResubmitMemoBody } from "@/lib/db-memo-w
 import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
+import { isMemoOwner } from "@/lib/memo-ownership";
 
 export const dynamic = "force-dynamic";
 
 type MemoIdRow = RowDataPacket & {
   id: number;
   requester_name: string;
+  requester_user_id: number | null;
   status: string;
   reject_disposition: string | null;
   revision_no: number;
@@ -36,7 +38,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      `SELECT id, requester_name, status, reject_disposition, revision_no, selected_route_json
+      `SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, selected_route_json
        FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE`,
       [memoNo]
     );
@@ -48,8 +50,16 @@ export async function POST(
 
     const memo = rows[0];
 
+    // Ownership: FK is authoritative when set (a FK pointing to another user is
+    // NOT theirs — no name fallback); FK null falls back to the legacy name match.
     const isAdmin = session.roles.includes("admin");
-    if (!isAdmin && memo.requester_name !== `${session.firstName} ${session.lastName}`) {
+    const owns = isMemoOwner({
+      requesterUserId: memo.requester_user_id,
+      requesterName: memo.requester_name,
+      sessionUserId: session.userId,
+      sessionFullName: `${session.firstName} ${session.lastName}`,
+    });
+    if (!isAdmin && !owns) {
       await connection.rollback();
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

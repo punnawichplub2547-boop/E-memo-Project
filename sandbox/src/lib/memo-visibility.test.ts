@@ -110,6 +110,45 @@ describe("requester role — name matching (temporary limitation)", () => {
   });
 });
 
+// ── Requester role — requesterUserId FK (authoritative when set) ───────────────
+
+describe("requester role — requesterUserId FK", () => {
+  it("(a) sees own memo when FK matches session.userId (name irrelevant)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requesterUserId: 42, requester: "ชื่อเปลี่ยนไปแล้ว" }),
+      makeSession({ userId: 42, firstName: "นัดดา", lastName: "หาญกล้า", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("(b) does NOT see memo when FK points to another user even if the name matches (name-collision fix)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requesterUserId: 99, requester: "นัดดา หาญกล้า" }),
+      makeSession({ userId: 42, firstName: "นัดดา", lastName: "หาญกล้า", roles: ["requester"] }),
+    )).toBe(false);
+  });
+
+  it("(c) FK null → falls back to name match (legacy/seed)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requesterUserId: null, requester: "นัดดา หาญกล้า" }),
+      makeSession({ userId: 42, firstName: "นัดดา", lastName: "หาญกล้า", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("FK undefined (field absent) → falls back to name match (existing rows / tests)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requester: "นัดดา หาญกล้า" }),
+      makeSession({ userId: 42, firstName: "นัดดา", lastName: "หาญกล้า", roles: ["requester"] }),
+    )).toBe(true);
+  });
+
+  it("FK matches but role is not requester → no FK-based visibility", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ requesterUserId: 42, requester: "นัดดา หาญกล้า", selectedRoute: [], currentStep: "General Manager" }),
+      makeSession({ userId: 42, firstName: "นัดดา", lastName: "หาญกล้า", roles: ["read-recipient"], approvalLevel: null }),
+    )).toBe(false);
+  });
+});
+
 // ── Approver roles ───────────────────────────────────────────────────────────
 
 describe("approver roles", () => {

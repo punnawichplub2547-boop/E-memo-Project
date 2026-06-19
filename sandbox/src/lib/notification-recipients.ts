@@ -16,10 +16,26 @@ export async function resolveApprovalStepRecipients(
   return rows.map(r => r.id);
 }
 
+// Resolve the requester's notification target.
+//   - requesterUserId set (FK) → authoritative: look the user up by id. If that
+//     user is suspended/inactive, return null — NEVER fall back to a name match
+//     (the FK is the source of truth; falling back would reintroduce the
+//     name-collision bug this FK was added to fix).
+//   - requesterUserId null/undefined (legacy/seed/prototype) → fall back to the
+//     active full-name match (the original behaviour).
 export async function resolveRequesterRecipient(
   requesterName: string,
+  requesterUserId: number | null | undefined,
   pool: Pool,
 ): Promise<number | null> {
+  if (requesterUserId != null) {
+    const [rows] = await pool.query<IdRow[]>(
+      "SELECT id FROM users WHERE id = ? AND status = 'active' LIMIT 1",
+      [requesterUserId],
+    );
+    return rows[0]?.id ?? null;
+  }
+
   const [rows] = await pool.query<IdRow[]>(
     "SELECT id FROM users WHERE CONCAT(first_name, ' ', last_name) = ? AND status = 'active' LIMIT 1",
     [requesterName],
