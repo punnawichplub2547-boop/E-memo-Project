@@ -207,6 +207,55 @@ describe("DB memo serializer", () => {
       },
     ]);
   });
+
+  it("maps requester_user_id to requesterUserId when present", () => {
+    const memo = serializeMemoRecord({
+      id: 5,
+      memo_no: "EM-2026-FK",
+      title: "FK memo",
+      requester_name: "Requester",
+      requester_user_id: 77,
+      department_name: "HR&GA",
+      category: "general-purchase",
+      amount: 1000,
+      budget_status: null, account_code: null, budget_plan: null, budget_used: null,
+      description: null, status: "pending", workflow_state: "Issued",
+      current_step: "Manager / Top Section", cycle_hours: 0,
+      recommended_final_approver: null, recommended_route_json: null, selected_route_json: null,
+      route_mode: null, route_override_reason: null, notify_md: 0,
+      is_price_adjustment: 0, follows_production_plan: 0, is_dead_stock: 0,
+      dept_monthly_over_budget_total: null, return_reason: null, reject_reason: null,
+      reject_disposition: null, revision_no: 0, revision_submitted_at: null, revision_note: null,
+      price_comparisons_json: null, selected_vendor_id: null, selected_vendor_reason: null,
+      price_adjustment_reason: null, request_items_json: null, read_recipients_json: null,
+      created_at: "2026-06-01 07:00:00", updated_at: "2026-06-01 07:00:00",
+    }, []);
+    expect(memo.requesterUserId).toBe(77);
+  });
+
+  it("maps absent requester_user_id to undefined (legacy rows)", () => {
+    const memo = serializeMemoRecord({
+      id: 6,
+      memo_no: "EM-2026-LEGACY",
+      title: "Legacy memo",
+      requester_name: "Requester",
+      department_name: "HR&GA",
+      category: "general-purchase",
+      amount: 1000,
+      budget_status: null, account_code: null, budget_plan: null, budget_used: null,
+      description: null, status: "pending", workflow_state: "Issued",
+      current_step: "Manager / Top Section", cycle_hours: 0,
+      recommended_final_approver: null, recommended_route_json: null, selected_route_json: null,
+      route_mode: null, route_override_reason: null, notify_md: 0,
+      is_price_adjustment: 0, follows_production_plan: 0, is_dead_stock: 0,
+      dept_monthly_over_budget_total: null, return_reason: null, reject_reason: null,
+      reject_disposition: null, revision_no: 0, revision_submitted_at: null, revision_note: null,
+      price_comparisons_json: null, selected_vendor_id: null, selected_vendor_reason: null,
+      price_adjustment_reason: null, request_items_json: null, read_recipients_json: null,
+      created_at: "2026-06-01 07:00:00", updated_at: "2026-06-01 07:00:00",
+    }, []);
+    expect(memo.requesterUserId).toBeUndefined();
+  });
 });
 
 describe("serializeWorkflowAction", () => {

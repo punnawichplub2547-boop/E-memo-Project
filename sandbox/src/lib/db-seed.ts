@@ -6,6 +6,7 @@ export type MemoSeedRow = {
   memo_no: string;
   title: string;
   requester_name: string;
+  requester_user_id: Nullable<number>;
   department_name: string;
   category: string;
   amount: number;
@@ -117,6 +118,7 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     memo_no: memo.id,
     title: memo.title,
     requester_name: memo.requester,
+    requester_user_id: memo.requesterUserId ?? null,
     department_name: memo.department,
     category: memo.category,
     amount: memo.amount,

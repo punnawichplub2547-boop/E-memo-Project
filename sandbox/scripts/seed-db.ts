@@ -21,7 +21,7 @@ async function main() {
       const memoRow = memoToDbSeedRow(memo);
       const [result] = await connection.execute<mysql.ResultSetHeader>(
         `INSERT INTO memos (
-          memo_no, title, requester_name, department_name, category,
+          memo_no, title, requester_name, requester_user_id, department_name, category,
           amount, budget_status, account_code, budget_plan, budget_used, description,
           status, workflow_state, current_step, cycle_hours,
           recommended_final_approver, recommended_route_json, selected_route_json,
@@ -34,7 +34,7 @@ async function main() {
           attachments_json,
           created_at, updated_at
         ) VALUES (
-          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?, ?,
@@ -84,6 +84,7 @@ function memoSeedParams(row: MemoSeedRow): SqlValue[] {
     row.memo_no,
     row.title,
     row.requester_name,
+    row.requester_user_id,
     row.department_name,
     row.category,
     row.amount,

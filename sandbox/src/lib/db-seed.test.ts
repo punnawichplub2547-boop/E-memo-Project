@@ -63,6 +63,11 @@ describe("DB seed helpers", () => {
     expect(row.attachments_json).toContain("quote.pdf");
   });
 
+  it("maps requesterUserId to requester_user_id (null when absent for seed/free-text memos)", () => {
+    expect(memoToDbSeedRow(seedMemos[0]).requester_user_id).toBeNull();
+    expect(memoToDbSeedRow({ ...seedMemos[0], requesterUserId: 88 }).requester_user_id).toBe(88);
+  });
+
   it("builds one submit workflow action per seed memo", () => {
     const row = memoToDbSeedRow(seedMemos[0]);
     const action = buildSeedWorkflowAction(row);

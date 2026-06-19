@@ -26,6 +26,8 @@ export type MemoDbRow = {
   memo_no: string;
   title: string;
   requester_name: string;
+  // Optional: absent on legacy DBs that predate the requester_user_id migration.
+  requester_user_id?: number | null;
   department_name: string;
   category: string;
   amount: DbNumber;
@@ -94,6 +96,7 @@ export function serializeMemoRecord(
     id: row.memo_no,
     title: row.title,
     requester: row.requester_name,
+    requesterUserId: row.requester_user_id ?? undefined,
     department: row.department_name,
     category: row.category as ApprovalCategory,
     amount: toNumber(row.amount) ?? 0,

@@ -144,6 +144,10 @@ export type MemoRecord = {
   id: string;
   title: string;
   requester: string;
+  /** Stable FK to the creating user (users.id). Optional: legacy/seed/prototype
+   *  rows have no real user → identity paths fall back to requester name match.
+   *  When set, it is authoritative — never fall back to the name. */
+  requesterUserId?: number | null;
   department: string;
   category: ApprovalCategory;
   amount: number;
