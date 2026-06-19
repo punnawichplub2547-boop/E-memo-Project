@@ -52,10 +52,12 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
   // Managing Director: also sees notifyMD memos (awareness only — not approval permission)
   if (session.roles.includes("managing-director") && memo.notifyMD === true) return true;
 
-  // CC visibility: any user whose name, department, or email appears in read recipients
-  // can see the memo — no read-recipient role required.
+  // CC visibility: individual-only. A user sees a CC'd memo only when their exact
+  // name or email appears in read recipients — a department label alone never grants
+  // visibility (secrecy: employees must be named individually). This mirrors the
+  // notification fan-out, which also skips department labels (computeWatcherRecipients).
   const labels = new Set<string>(
-    [fullName, session.department, session.email].filter((s): s is string => Boolean(s))
+    [fullName, session.email].filter((s): s is string => Boolean(s))
   );
   const recipients: string[] = [
     ...(memo.readRecipients ?? []),

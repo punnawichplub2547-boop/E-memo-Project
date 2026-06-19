@@ -275,7 +275,7 @@ describe("read-recipient role", () => {
     )).toBe(true);
   });
 
-  it("sees memo with their department in readRecipients", () => {
+  it("does NOT see memo where only their department is in readRecipients (individual-only CC)", () => {
     expect(isMemoVisibleTo(
       makeMemo({ readRecipients: ["ACC/FIN"] }),
       makeSession({
@@ -283,7 +283,7 @@ describe("read-recipient role", () => {
         department: "ACC/FIN",
         roles: ["read-recipient"], approvalLevel: null,
       }),
-    )).toBe(true);
+    )).toBe(false);
   });
 
   it("sees memo with their name in readActions recipients", () => {
@@ -335,14 +335,14 @@ describe("CC visibility is role-independent (no read-recipient role needed)", ()
     )).toBe(true);
   });
 
-  it("requester-only user sees memo they are CC'd on by department", () => {
+  it("requester-only user does NOT see memo CC'd only to their department (individual-only CC)", () => {
     expect(isMemoVisibleTo(
       makeMemo({
         requester: "สุภาพร เจริญสุข",
         readRecipients: ["HR&GA"],
       }),
       makeSession({ firstName: "นัดดา", lastName: "หาญกล้า", department: "HR&GA", roles: ["requester"] }),
-    )).toBe(true);
+    )).toBe(false);
   });
 
   it("user with empty roles sees memo they are CC'd on by email", () => {
@@ -376,7 +376,21 @@ describe("multi-role users", () => {
     )).toBe(true);
   });
 
-  it("requester+read-recipient sees memo they are a read recipient on (not their memo)", () => {
+  it("requester+read-recipient sees memo they are individually CC'd on (not their memo)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({
+        requester: "สุภาพร เจริญสุข",
+        readRecipients: ["นัดดา หาญกล้า"],
+      }),
+      makeSession({
+        firstName: "นัดดา", lastName: "หาญกล้า",
+        department: "HR&GA",
+        roles: ["requester", "read-recipient"],
+      }),
+    )).toBe(true);
+  });
+
+  it("requester+read-recipient does NOT see memo CC'd only to their department", () => {
     expect(isMemoVisibleTo(
       makeMemo({
         requester: "สุภาพร เจริญสุข",
@@ -387,7 +401,7 @@ describe("multi-role users", () => {
         department: "HR&GA",
         roles: ["requester", "read-recipient"],
       }),
-    )).toBe(true);
+    )).toBe(false);
   });
 });
 
@@ -467,11 +481,11 @@ describe("email-based CC visibility", () => {
     )).toBe(false);
   });
 
-  it("old-style name/dept CC still works alongside email CC (backward compat)", () => {
+  it("department-label CC no longer grants visibility (individual-only)", () => {
     expect(isMemoVisibleTo(
       makeMemo({ requester: "สุภาพร เจริญสุข", readRecipients: ["ACC/FIN"] }),
       makeSession({ email: "other@car-1996.com", department: "ACC/FIN", roles: ["requester"] }),
-    )).toBe(true);
+    )).toBe(false);
   });
 
   it("email match is exact — partial email does not match", () => {
