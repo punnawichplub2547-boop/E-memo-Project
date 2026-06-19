@@ -34,10 +34,15 @@ describe("buildAuditQuery", () => {
     expect(q.params).toEqual(["2026-06-01"]);
   });
 
-  it("(b) to filter → acted_at <= param", () => {
+  it("(b) date-only to filter → acted_at <= end-of-day (inclusive)", () => {
     const q = buildAuditQuery({ to: "2026-06-30" });
     expect(q.whereSql).toBe("WHERE w.acted_at <= ?");
-    expect(q.params).toEqual(["2026-06-30"]);
+    expect(q.params).toEqual(["2026-06-30 23:59:59"]);
+  });
+
+  it("(b) to filter with explicit time is passed through unchanged", () => {
+    const q = buildAuditQuery({ to: "2026-06-30 12:00:00" });
+    expect(q.params).toEqual(["2026-06-30 12:00:00"]);
   });
 
   it("(c) limit over 100 → clamped to 100", () => {
@@ -94,7 +99,7 @@ describe("buildAuditQuery", () => {
     expect(q.whereSql).toBe(
       "WHERE m.memo_no LIKE ? AND w.action_type = ? AND w.actor_name LIKE ? AND w.acted_at >= ? AND w.acted_at <= ?",
     );
-    expect(q.params).toEqual(["%EM-1%", "reject", "%Jane%", "2026-06-01", "2026-06-30"]);
+    expect(q.params).toEqual(["%EM-1%", "reject", "%Jane%", "2026-06-01", "2026-06-30 23:59:59"]);
     expect(q.limit).toBe(10);
     expect(q.offset).toBe(20);
   });

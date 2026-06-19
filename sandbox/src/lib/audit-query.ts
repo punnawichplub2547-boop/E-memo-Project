@@ -120,8 +120,12 @@ export function buildAuditQuery(filters: AuditQueryFilters): AuditQuery {
 
   const to = cleanText(filters.to);
   if (to) {
+    // acted_at is DATETIME; a date-only upper bound like "2026-06-30" expands to
+    // 00:00:00, which would drop every action recorded later that day. Extend a
+    // bare date to end-of-day so the "to" day is inclusive.
+    const upperBound = /^\d{4}-\d{2}-\d{2}$/.test(to) ? `${to} 23:59:59` : to;
     clauses.push("w.acted_at <= ?");
-    params.push(to);
+    params.push(upperBound);
   }
 
   return {
