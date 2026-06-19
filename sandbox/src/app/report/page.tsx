@@ -32,8 +32,11 @@ function formatMonthLabel(p: string) {
 function useCounter(target: number, active: boolean) {
   const [v, setV] = useState(0);
   useEffect(() => {
-    if (!active || target === 0) { setV(0); return; }
     let raf: number;
+    if (!active || target === 0) {
+      raf = requestAnimationFrame(() => setV(0));
+      return () => cancelAnimationFrame(raf);
+    }
     const start = performance.now();
     const dur = 900;
     const tick = (now: number) => {
@@ -90,17 +93,18 @@ function DonutChart({ data }: { data: { label: string; value: number; color: str
     );
   }
 
-  let cumFrac = -0.25;
+  // Pure prefix-sum of fractions (start at -0.25 to put the first segment at 12 o'clock);
+  // avoids mutating a render-scope variable inside .map().
+  const fracs = data.map(d => d.value / total);
+  const rotations = fracs.map((_, i) => (fracs.slice(0, i).reduce((s, f) => s + f, -0.25)) * 360);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
       <svg width={140} height={140} viewBox="0 0 140 140" style={{ flexShrink: 0, overflow: "visible" }}>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface-2,#F1F5F9)" strokeWidth={22} />
         {data.map((d, i) => {
-          const frac = d.value / total;
-          const dash = frac * circ;
+          const dash = fracs[i] * circ;
           const gap = circ - dash;
-          const rot = cumFrac * 360;
-          cumFrac += frac;
+          const rot = rotations[i];
           return (
             <circle key={i} cx={cx} cy={cy} r={r} fill="none"
               stroke={d.color} strokeWidth={22} strokeLinecap="butt"
@@ -251,13 +255,18 @@ export default function ReportPage() {
   useEffect(() => {
     if (!canAccess) return;
     let cancelled = false;
-    setFetching(true);
-    setData(null);
+    // Defer the loading-state reset off the synchronous effect path (runs next frame,
+    // well before any network response) to avoid cascading renders.
+    const raf = requestAnimationFrame(() => {
+      if (cancelled) return;
+      setFetching(true);
+      setData(null);
+    });
     fetch(`/api/report?month=${month}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (!cancelled && d) setData(d); })
       .finally(() => { if (!cancelled) setFetching(false); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; cancelAnimationFrame(raf); };
   }, [month, canAccess]);
 
   const shiftMonth = (delta: number) => {
