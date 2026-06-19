@@ -1,38 +1,53 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
-import { serializeWorkflowAction, type WorkflowActionDbRow } from "@/lib/db-memos";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
+import {
+  serializeWorkflowAction,
+  loadMemoRecord,
+  type WorkflowActionDbRow,
+} from "@/lib/db-memos";
+import { isMemoVisibleTo } from "@/lib/memo-visibility";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number };
 type WorkflowActionRow = RowDataPacket & WorkflowActionDbRow;
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
-  try {
-    const pool = getDbPool();
 
-    // Check memo exists — return 404 for unknown memo_no (e.g. in-memory-only seed memos)
-    const [memoRows] = await pool.query<MemoIdRow[]>(
-      "SELECT id FROM memos WHERE memo_no = ? LIMIT 1",
-      [memoNo]
-    );
-    if (memoRows.length === 0) {
+  // Auth: must be signed in, and the memo must be visible to this session.
+  // Mirrors the attachment-access control theme — audit trail is per-memo
+  // sensitive, so list visibility governs who can read its action history.
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(token);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const memo = await loadMemoRecord(memoNo);
+    if (!memo) {
       return NextResponse.json({ error: "Memo not found" }, { status: 404 });
     }
+    if (!isMemoVisibleTo(memo, session)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-    const memoDbId = memoRows[0].id;
+    // Join through memos by memo_no so we don't re-resolve the numeric id
+    // separately (loadMemoRecord already confirmed the memo exists above).
+    const pool = getDbPool();
     const [actionRows] = await pool.query<WorkflowActionRow[]>(
-      `SELECT revision_no, action_type, step_label, actor_name,
-              result, reason, acted_at, metadata_json
-       FROM workflow_step_actions
-       WHERE memo_id = ?
-       ORDER BY acted_at ASC, id ASC`,
-      [memoDbId]
+      `SELECT w.revision_no, w.action_type, w.step_label, w.actor_name,
+              w.result, w.reason, w.acted_at, w.metadata_json
+       FROM workflow_step_actions w
+       JOIN memos m ON m.id = w.memo_id
+       WHERE m.memo_no = ?
+       ORDER BY w.acted_at ASC, w.id ASC`,
+      [memoNo]
     );
 
     return NextResponse.json(
