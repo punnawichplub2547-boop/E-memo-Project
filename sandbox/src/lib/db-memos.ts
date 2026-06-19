@@ -1,3 +1,5 @@
+import type { RowDataPacket } from "mysql2";
+import { getDbPool } from "./db";
 import type {
   ApprovalCategory,
   ApprovalLevel,
@@ -253,4 +255,33 @@ function toBoolean(value: DbBoolean): boolean {
 
 function optional(value: string | null): string | undefined {
   return value ?? undefined;
+}
+
+/**
+ * Loads a single memo by its memo_no (e.g. "EM-2026-001") and serializes it,
+ * including its read actions and revisions. Returns null when no row matches.
+ *
+ * Shared by the attachment routes for per-memo authorization. Mirrors the
+ * single-memo load pattern in the export-excel route (SELECT * + read_actions +
+ * revisions for the current revision_no), reusing serializeMemoRecord.
+ */
+export async function loadMemoRecord(memoNo: string): Promise<MemoRecord | null> {
+  const pool = getDbPool();
+  const [memoRows] = await pool.query<(RowDataPacket & MemoDbRow)[]>(
+    "SELECT * FROM memos WHERE memo_no = ? LIMIT 1",
+    [memoNo],
+  );
+  if (memoRows.length === 0) return null;
+  const memoRow = memoRows[0];
+
+  const [readRows] = await pool.query<(RowDataPacket & ReadActionDbRow)[]>(
+    "SELECT recipient_name, status, acted_at, skip_reason FROM read_actions WHERE memo_id = ? AND revision_no = ? ORDER BY id ASC",
+    [memoRow.id, memoRow.revision_no],
+  );
+  const [revisionRows] = await pool.query<(RowDataPacket & MemoRevisionDbRow)[]>(
+    "SELECT revision_no, source, return_reason, reject_reason, revision_note, submitted_at, snapshot_json FROM memo_revisions WHERE memo_id = ? ORDER BY revision_no ASC, id ASC",
+    [memoRow.id],
+  );
+
+  return serializeMemoRecord(memoRow, readRows, revisionRows);
 }
