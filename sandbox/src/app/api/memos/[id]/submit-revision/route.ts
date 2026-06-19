@@ -104,7 +104,8 @@ export async function POST(
     );
 
     // Update all mutable content and workflow fields. Identity fields are explicitly
-    // excluded: memo_no (business key), requester_name (set at creation), created_at (immutable).
+    // excluded: memo_no (business key), requester_name + requester_user_id (set at
+    // creation), created_at (immutable).
     await connection.execute(
       `UPDATE memos SET
          title = ?,
@@ -197,7 +198,7 @@ export async function POST(
 }
 
 // All 36 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
-// minus the 3 immutable identity fields: memo_no, requester_name, created_at.
+// minus the immutable identity fields: memo_no, requester_name, requester_user_id, created_at.
 // Append memoDbId last for the WHERE id = ? clause.
 function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
   return [
