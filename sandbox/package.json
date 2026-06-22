@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "screenshots": "node ./scripts/capture-screenshots.mjs",
+    "audit:overflow": "node ./scripts/audit-overflow.mjs",
     "test": "vitest run",
     "db:seed": "tsx scripts/seed-db.ts"
   },
