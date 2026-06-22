@@ -1,5 +1,11 @@
 -- Add users table for real authentication.
--- Run: docker exec -i hr-ememo-db mysql -uhr_ememo -phr_ememo_dev_password hr_ememo < db/migrations/2026-06-09-add-users-table.sql
+-- Run: docker exec -i hr-ememo-db mysql --default-character-set=utf8mb4 \
+--        -uhr_ememo -phr_ememo_dev_password hr_ememo < db/migrations/2026-06-09-add-users-table.sql
+
+-- Force utf8mb4 so the Thai seed name below ("ปุณณวิช ภูประเสริฐ") is stored
+-- correctly even if the mysql CLI is invoked without --default-character-set.
+-- Without this, the latin1-default connection double-encodes Thai into mojibake.
+SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (
   id                BIGINT        NOT NULL AUTO_INCREMENT,
