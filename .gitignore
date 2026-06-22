@@ -9,6 +9,7 @@ coverage/
 sandbox/storage/attachments/*
 !sandbox/storage/attachments/.gitkeep
 sandbox/verify-shots/
+sandbox/screenshots/
 sandbox/dashboard-screenshot.png
 sandbox/dashboard-mobile-screenshot.png
 sandbox/design-concept.png

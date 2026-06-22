@@ -9,7 +9,6 @@ import { ApprovalLevel, approvalLabels } from "@/lib/approval";
 import {
   IconPlus, IconSearch, IconSort,
   IconCrown, IconUsers, IconCalendar,
-  IconDots,
 } from "@/components/icons";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -185,6 +184,7 @@ function QueuePageContent() {
         <div className="em-content">
           <div className="em-card em-filter-card" style={{ padding: 14 }}>
             <div
+              className="em-filter-row"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -206,7 +206,7 @@ function QueuePageContent() {
                 ))}
               </div>
 
-              <div style={{ width: 1, height: 26, background: "var(--line)" }} />
+              <div className="em-queue-divider" style={{ width: 1, height: 26, background: "var(--line)" }} />
 
               <FilterDropdown
                 icon={<IconUsers size={13} />}
@@ -225,6 +225,7 @@ function QueuePageContent() {
               />
 
               <div
+                className="em-queue-search"
                 style={{
                   flex: 1,
                   minWidth: 200,
@@ -279,7 +280,6 @@ function QueuePageContent() {
                       {!useCompactColumns && <col style={{ width: 136 }} />}
                       {!useCompactColumns && <col style={{ width: 156 }} />}
                       <col style={{ width: 104 }} />
-                      <col style={{ width: 40 }} />
                     </colgroup>
                     <thead>
                       <tr>
@@ -311,14 +311,13 @@ function QueuePageContent() {
                         )}
                         {!useCompactColumns && <th>Approver Tier</th>}
                         <th>Status</th>
-                        <th style={{ width: 40, textAlign: "right" }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 && (
                         <tr>
                           <td
-                            colSpan={useCompactColumns ? 4 : 7}
+                            colSpan={useCompactColumns ? 3 : 6}
                             style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}
                           >
                             {tier
@@ -485,12 +484,6 @@ function QueuePageContent() {
                                 <span className="dot" />
                                 {memo.status.charAt(0).toUpperCase() + memo.status.slice(1)}
                               </span>
-                            </td>
-                            <td
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ textAlign: "right" }}
-                            >
-                              <IconDots size={15} style={{ color: "var(--muted)" }} />
                             </td>
                           </tr>
                         );

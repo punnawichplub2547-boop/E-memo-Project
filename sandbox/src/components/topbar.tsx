@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconSearch } from "./icons";
 import { NotificationBell } from "./notification-bell";
+import { useAuth } from "@/lib/auth-context";
 
 interface TopbarProps {
   crumbs?: string[];
@@ -14,6 +16,16 @@ interface TopbarProps {
 
 export function Topbar({ crumbs = [], title, actions, showSearch = true }: TopbarProps) {
   const router = useRouter();
+  const { user: authUser } = useAuth();
+  const profileInitials = authUser
+    ? `${authUser.firstName} ${authUser.lastName}`
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "";
 
   useEffect(() => {
     if (!showSearch) return;
@@ -63,6 +75,16 @@ export function Topbar({ crumbs = [], title, actions, showSearch = true }: Topba
 
       <div className="em-top-actions">
         {actions}
+        {authUser && (
+          <Link
+            href="/profile"
+            className="em-topbar-profile"
+            aria-label="โปรไฟล์ของฉัน"
+            title="โปรไฟล์ของฉัน"
+          >
+            {profileInitials || "?"}
+          </Link>
+        )}
         <NotificationBell />
       </div>
     </header>

@@ -96,7 +96,7 @@ export default function DashboardPage() {
         <div className="em-content">
 
           {/* Hero greeting */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, alignItems: "stretch" }}>
+          <div className="em-dash-hero-grid">
             <div className="em-card" style={{ padding: 0, position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#0A0F1E 0%,#1A2547 65%,#1E3A8A 110%)", color: "#fff", border: "1px solid #060A17" }}>
               <div style={{ position: "absolute", inset: 0, background: "radial-gradient(60% 100% at 100% 0%,rgba(59,130,246,0.25),transparent 60%),radial-gradient(50% 100% at 0% 100%,rgba(201,168,76,0.10),transparent 60%)", pointerEvents: "none" }} />
               <div style={{ position: "relative", padding: "28px 28px 26px", display: "flex", flexDirection: "column", gap: 20, minHeight: 200, justifyContent: "space-between" }}>
@@ -149,7 +149,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Metrics */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
+          <div className="em-dash-kpi-grid">
             <MetricCard label="Total Memo" icon={<IconFileText size={15} />} value={String(metrics.total)} unit="documents" trendDir="up" trendVal="+12.5%" foot="vs last week" />
             <MetricCard label="Pending Approval" tone="amber" icon={<IconClock size={15} />} value={String(metrics.pending)} unit="waiting" trendDir="down" trendVal={`-${metrics.pending}`} foot="2 over SLA" />
             <MetricCard label="Approved" tone="emerald" icon={<IconCheckCircle size={15} />} value={String(metrics.approved)} unit="this cycle" trendDir="up" trendVal="+18%" foot="vs last week" />
@@ -157,7 +157,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Workflow Status + Recent Activity */}
-          <div style={{ display: "grid", gridTemplateColumns: hasMemos ? "1fr 380px" : "1fr", gap: 16 }}>
+          <div className={`em-dash-work-grid${hasMemos ? "" : " single"}`}>
             {hasMemos ? (
               <>
                 {/* Workflow Status — live from most recent pending memo */}
@@ -243,6 +243,7 @@ export default function DashboardPage() {
                 <Link href="/queue" className="em-btn sm">View all <IconArrowRight size={13} /></Link>
               </div>
             </div>
+            <div className="em-table-scroll">
             <table className="em-table">
               <thead>
                 <tr>
@@ -288,6 +289,7 @@ export default function DashboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>

@@ -130,7 +130,7 @@ export function MemoDetailsCard({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="em-pair-grid" style={{ gap: 12 }}>
           <div className="em-field">
             <label className="em-label">หมวดรายการ <span className="req">*</span></label>
             <div className="em-input-prefix" style={{ paddingLeft: 12 }}>
@@ -153,7 +153,7 @@ export function MemoDetailsCard({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="em-pair-grid" style={{ gap: 12 }}>
           <div className="em-field">
             <label className="em-label">จำนวนเงิน (THB) <span className="req">*</span></label>
             <div className="em-input-prefix">

@@ -894,7 +894,7 @@ function CreatePageContent() {
             />
 
             {/* Budget + Attachments — paired 2-col */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="em-pair-grid">
 
               {/* Budget card */}
               <BudgetCard

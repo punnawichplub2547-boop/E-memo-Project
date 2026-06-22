@@ -137,7 +137,7 @@ export function DrawerPanel({
           >
             <IconDownload size={14} />
           </a>
-          <button className="em-btn sm ghost icon-only" onClick={onClose}>
+          <button className="em-btn sm ghost icon-only" onClick={onClose} aria-label="ปิด">
             <IconX size={14} />
           </button>
         </div>

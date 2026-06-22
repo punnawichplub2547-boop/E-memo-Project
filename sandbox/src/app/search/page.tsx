@@ -162,7 +162,7 @@ export default function SearchPage() {
               {aiError && (
                 <div style={{ fontSize: 12, color: "rgba(251,191,36,0.9)", marginTop: 6 }}>{aiError}</div>
               )}
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <div className="em-hero-examples" style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
                 {EXAMPLE_QUERIES.map(q => (
                   <span
                     key={q}
@@ -191,7 +191,7 @@ export default function SearchPage() {
           </div>
 
           {/* Results */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
+          <div className="em-search-grid" style={{ gap: 16, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>

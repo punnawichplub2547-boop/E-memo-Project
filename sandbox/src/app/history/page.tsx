@@ -66,7 +66,7 @@ export default function HistoryPage() {
           title="Memo History & Audit"
           actions={
             <>
-              <button className="em-btn"><IconDownload size={15} /> Export CSV</button>
+              <button className="em-btn" disabled title="Export CSV — coming soon"><IconDownload size={15} /> Export CSV</button>
               <Link href="/create" className="em-btn primary"><IconPlus size={15} /> New Memo</Link>
             </>
           }
@@ -76,9 +76,9 @@ export default function HistoryPage() {
           {/* Summary bar */}
           <div className="em-card em-kpi-bar" style={{ padding: 0, display: "grid", gridTemplateColumns: "repeat(5,1fr)", overflow: "hidden" }}>
             <SummaryBlock label="Total processed" value={String(totalProcessed)} sub="all memos" icon={<IconFileText size={16} />} accent="primary" active={tabFilter === "all"} onClick={() => setTabFilter("all")} />
-            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" trendDir="up" active={tabFilter === "approved"} onClick={() => setTabFilter(tabFilter === "approved" ? "all" : "approved")} />
+            <SummaryBlock label="Approval rate" value={`${approvalRate}%`} sub={`${approvedCount} of ${totalProcessed}`} icon={<IconCheckCircle size={16} />} accent="emerald" active={tabFilter === "approved"} onClick={() => setTabFilter(tabFilter === "approved" ? "all" : "approved")} />
             <SummaryBlock label="Rejected" value={String(rejectedCount)} sub={`${totalProcessed ? Math.round(rejectedCount/totalProcessed*100) : 0}% rate`} icon={<IconSlash size={16} />} accent="rose" active={tabFilter === "rejected"} onClick={() => setTabFilter(tabFilter === "rejected" ? "all" : "rejected")} />
-            <SummaryBlock label="Avg. cycle" value={`${avgCycle}h`} sub="target < 24h" icon={<IconClock size={16} />} accent="gold" trendDir="down" active={tabFilter === "slow"} onClick={() => setTabFilter(tabFilter === "slow" ? "all" : "slow")} />
+            <SummaryBlock label="Avg. cycle" value={`${avgCycle}h`} sub="target < 24h" icon={<IconClock size={16} />} accent="gold" active={tabFilter === "slow"} onClick={() => setTabFilter(tabFilter === "slow" ? "all" : "slow")} />
             <SummaryBlock label="MD-tier" value={String(mdCount)} sub="executive reviews" icon={<IconCrown size={16} />} accent="md" last active={tabFilter === "md"} onClick={() => setTabFilter(tabFilter === "md" ? "all" : "md")} />
           </div>
 
@@ -116,7 +116,7 @@ export default function HistoryPage() {
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
+          <div className="em-history-grid" style={{ gap: 20, alignItems: "start" }}>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               {groups.length === 0 && (
@@ -192,7 +192,7 @@ export default function HistoryPage() {
                 </div>
               ))}
 
-              <button className="em-btn ghost" style={{ alignSelf: "center", marginTop: 4 }}>
+              <button className="em-btn ghost" style={{ alignSelf: "center", marginTop: 4 }} disabled title="Pagination — coming soon">
                 Load earlier history <IconChevDown size={13} />
               </button>
             </div>

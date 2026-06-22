@@ -1114,27 +1114,52 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-kv dd { margin: 0; color: var(--ink); font-weight: 500; }
 
 @media (max-width: 900px) {
+  /* Full-screen overlay on phones/small tablets: the floating card sat under
+     the sticky topbar (z5) and bottom nav (z20). Make it a true page-takeover
+     above all chrome so the memo detail is fully readable. */
   .em-drawer {
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    position: fixed;
+    inset: 0;
     width: auto;
-    border: 1px solid var(--line);
-    border-radius: var(--r-xl);
-    box-shadow: 0 18px 40px -16px rgba(15,27,60,0.24);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: 60;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
-  .em-drawer-head { padding: 16px 18px 12px; }
-  .em-drawer-body { padding: 16px 18px; }
+  /* Keep close (X) and the approve/return/reject actions reachable while
+     scrolling a long memo. */
+  .em-drawer-head {
+    padding: 16px 18px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .em-drawer-body {
+    padding: 16px 18px;
+    flex: 1;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
   .em-drawer-foot {
     padding: 12px 18px;
     flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
   }
 
   .em-drawer-foot > * {
     min-width: 140px;
   }
+
+  /* The full-screen drawer lives inside .em-work (position:relative;z-index:1 =
+     its own stacking context), so its z-index:60 can't beat the fixed nav
+     (.em-side, z-20) which sits in the root context. Hide the nav while the
+     overlay drawer is open — the drawer's X button is the way back. */
+  body:has(.em-drawer) .em-side { display: none; }
 }
 
 /* ===== Search hero ===== */
@@ -1276,6 +1301,38 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-summary-block.is-active.gold::before,
 .em-summary-block.is-active.md::before { box-shadow: 0 0 14px rgba(201,168,76,0.55); }
 
+/* ── Dashboard / create layout grids ─────────────────────────
+   Values mirror the prior inline styles exactly so desktop (>=769px)
+   renders pixel-identical. Mobile overrides live in the 768px block. */
+.em-dash-hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: stretch; }
+.em-dash-kpi-grid  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.em-dash-work-grid { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+.em-dash-work-grid.single { grid-template-columns: 1fr; }
+.em-pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.em-history-grid { display: grid; grid-template-columns: 1fr 320px; }
+.em-search-grid { display: grid; grid-template-columns: 1fr 320px; }
+/* Table scroll wrapper — desktop: transparent width:100% passthrough (no visual change) */
+.em-table-scroll { width: 100%; }
+
+/* Mobile-only profile entry in topbar (desktop uses the sidebar footer).
+   Hidden by default so desktop is unchanged; revealed in the 768px block. */
+.em-topbar-profile {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1E3A8A, #60A5FA);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+
 @media (max-width: 1100px) {
   .em-side { width: 72px; padding: 22px 8px 18px; border-radius: 0 20px 20px 0; }
   .em-work { margin-left: 72px; }
@@ -1380,6 +1437,91 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   .em-form-grid {
     grid-template-columns: 1fr !important;
   }
+
+  /* ── Dashboard / create grids → stack on phone ──────────── */
+  .em-dash-hero-grid,
+  .em-dash-work-grid,
+  .em-pair-grid { grid-template-columns: 1fr; }
+  .em-dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* ── History page: stack timeline + right rail to one column ── */
+  .em-history-grid { grid-template-columns: 1fr; }
+  .em-history-grid > div:last-child { position: static !important; }
+
+  /* ── Profile entry: reveal the topbar avatar (footer is hidden here) ── */
+  .em-topbar-profile { display: inline-flex; }
+
+  /* ── Queue filter card: search on its own row, drop the divider ─── */
+  .em-filter-card { padding: 12px !important; }
+  .em-filter-row { gap: 10px !important; }
+  .em-queue-divider { display: none !important; }
+  .em-queue-search { order: 3; flex: 1 1 100% !important; min-width: 0 !important; }
+
+  /* ── AI Search: compact hero + stack results (no oversized hero) ── */
+  .em-hero { padding: 18px 16px 16px; }
+  .em-hero-eyebrow { font-size: 10px; }
+  .em-hero h2 { font-size: 19px; margin: 10px 0 4px; }
+  .em-hero p { font-size: 12.5px; }
+  .em-hero-search { flex-wrap: wrap; }
+  .em-hero-search input { font-size: 16px; min-height: 38px; } /* 16px stops iOS zoom */
+  .em-hero-search .em-btn.primary {
+    flex: 1 1 100%;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    justify-content: center;
+  }
+  /* Example-query chips: one scrollable row instead of wrapping tall */
+  .em-hero-examples {
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .em-hero-examples::-webkit-scrollbar { display: none; }
+  .em-hero-examples > span { flex: 0 0 auto; }
+  /* Results: stack list + right rail, un-stick the rail */
+  .em-search-grid { grid-template-columns: 1fr; }
+  .em-search-grid > div:last-child { position: static !important; }
+
+  /* ============================================================
+     MOBILE OVERFLOW SAFETY NET + ROOT-CAUSE FIXES (≤768px only)
+     Desktop ≥769px untouched — every rule scoped to this block.
+     ============================================================ */
+
+  /* (1) Page-level safety net. Use clip (not hidden): hidden would promote
+     overflow-y to auto and make body a scroll container → sticky topbar breaks.
+     Internal scrollers (.em-tabs, .em-table-scroll, .em-hero-examples) keep
+     their own overflow-x:auto and are NOT clipped. */
+  html, body { overflow-x: clip; }
+  .em-work, .em-content { max-width: 100%; min-width: 0; }
+
+  /* (2) Tables scroll inside their own box, never widen the page */
+  .em-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    min-width: 0;
+    scrollbar-width: thin;
+  }
+  .em-table-scroll > .em-table { min-width: max-content; }
+
+  /* (3) Topbar title truncates so the action cluster is never pushed off-screen */
+  .em-page-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .em-top-actions { flex-shrink: 0; }
+
+  /* (4) Search hero: let the chip row scroll inside the hero, not widen it */
+  .em-hero-inner { min-width: 0; max-width: 100%; }
+  .em-hero-examples { min-width: 0; max-width: 100%; }
+
+  /* (5) Bottom nav: pin to viewport width (belt-and-suspenders) */
+  .em-side { max-width: 100vw; min-width: 0; }
 
   /* ── Create page ────────────────────────────────────────── */
   .em-create-content { padding: 12px; gap: 10px; }
