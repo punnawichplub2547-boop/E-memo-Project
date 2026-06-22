@@ -25,7 +25,10 @@ services:
       - hr-ememo-attachments-data:/app/storage/attachments
 
   hr-ememo-db:
-    image: mysql:8.4
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    image: hr-ememo-db:8.4
     container_name: hr-ememo-db
     restart: unless-stopped
     environment:

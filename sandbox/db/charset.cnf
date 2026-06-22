@@ -1,0 +1,9 @@
+# Default the in-container mysql client to utf8mb4 (baked into the db image via
+# db/Dockerfile). Without this the CLI defaults to latin1 and any Thai piped in
+# (migrations/imports) double-encodes into mojibake. Only [client]/[mysql]
+# sections — mysqld ignores them, so it still starts fine.
+[client]
+default-character-set=utf8mb4
+
+[mysql]
+default-character-set=utf8mb4

@@ -26,6 +26,13 @@ re-inserts the name with `ON DUPLICATE KEY UPDATE`, so every re-run via the old
    `SET NAMES utf8mb4;` as its first statement, so it's correct even if someone runs
    it with the old command. (Migrations whose only Thai is in `--` comments don't need
    this — comments are never stored.)
+3. **Image-level default (the real safety net)** — the DB image (`db/Dockerfile`)
+   bakes in `db/charset.cnf` so the in-container `mysql` client defaults to utf8mb4.
+   This image's CLI used to default to **latin1**, which was the root cause. Now even
+   `docker exec hr-ememo-db mysql ...` / a piped migration **with no charset flag**
+   connects as utf8mb4 and can't mojibake Thai. (MySQL 8.4 removed
+   `--skip-character-set-client-handshake`, so fixing the client default is the way.)
+   The flag in (1) and the guard in (2) are now belt-and-suspenders on top of this.
 
 ### Repairing an already-corrupted row
 
