@@ -298,7 +298,7 @@ export default function AdminPage() {
         <div className="em-content">
 
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
+          <div className="em-admin-tabs" style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
             {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["audit", IconHistory, "Audit Log"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
               <button key={t} role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t as Tab)}
@@ -333,8 +333,8 @@ export default function AdminPage() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
                     Pending Approval ({dbUsers.filter(u => u.status === "pending").length})
                   </div>
-                  <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <div className="em-card em-admin-table-card" style={{ padding: 0, overflow: "hidden" }}>
+                    <table className="em-admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
                           {["Employee ID", "Name", "Email", "Department", "Registered", "Actions"].map(h => (
@@ -408,8 +408,8 @@ export default function AdminPage() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
                     Active Users ({dbUsers.filter(u => u.status === "active").length})
                   </div>
-                  <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <div className="em-card em-admin-table-card" style={{ padding: 0, overflow: "hidden" }}>
+                    <table className="em-admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
                           {["Employee ID", "Name", "Email", "Dept", "Roles", "Status", "Actions"].map(h => (
@@ -538,8 +538,8 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <div className="em-card em-admin-table-card" style={{ padding: 0, overflow: "hidden" }}>
+                <table className="em-admin-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
                       {["Name", "Department", "Role Label", "Approval Level", "Roles", "Actions"].map(h => (

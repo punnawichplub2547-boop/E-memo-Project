@@ -3,8 +3,8 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconSearch } from "./icons";
 import { NotificationBell } from "./notification-bell";
+import { TopbarSearch } from "./topbar-search";
 import { useAuth } from "@/lib/auth-context";
 
 interface TopbarProps {
@@ -59,19 +59,7 @@ export function Topbar({ crumbs = [], title, actions, showSearch = true }: Topba
         {title && <div className="em-page-title">{title}</div>}
       </div>
 
-      {showSearch && (
-        <button
-          type="button"
-          className="em-top-search"
-          onClick={() => router.push("/search")}
-          title="ค้นหา memo (Ctrl+K)"
-          style={{ cursor: "pointer", font: "inherit", textAlign: "left" }}
-        >
-          <IconSearch size={15} />
-          <span>ค้นหา memo, ผู้อนุมัติ, แผนก…</span>
-          <span className="em-kbd">⌘K</span>
-        </button>
-      )}
+      {showSearch && <TopbarSearch />}
 
       <div className="em-top-actions">
         {actions}

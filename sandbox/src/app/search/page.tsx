@@ -30,7 +30,14 @@ const EXAMPLE_QUERIES = [
 
 export default function SearchPage() {
   const { memos } = useMemos();
-  const [query, setQuery] = useState("");
+  // Prefill from ?q= (set by the topbar quick-search "see all" / Enter). Read
+  // from the URL directly to avoid a Suspense boundary for useSearchParams;
+  // this is a client-only page so window is available on first render. Stays in
+  // keyword mode — AI only fires on explicit Enter/button on this page.
+  const [query, setQuery] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("q") ?? "";
+  });
   const [catFilter, setCatFilter] = useState("all");
   const [approvedOnly, setApprovedOnly] = useState(false);
   const [aiIds, setAiIds] = useState<string[] | null>(null);
