@@ -8,7 +8,7 @@ import { getDashboardMetrics, approvalLabels } from "@/lib/approval";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { useAuth } from "@/lib/auth-context";
 import {
-  IconDownload, IconPlus, IconRoute, IconCrown,
+  IconPlus, IconRoute, IconCrown,
   IconSparkles, IconFileText, IconClock, IconCheckCircle, IconRefresh,
   IconArrowUp, IconArrowDown, IconFilter, IconArrowRight,
   IconCheck, IconUsers, IconReturn, IconSlash, IconPen,
@@ -87,10 +87,7 @@ export default function DashboardPage() {
           crumbs={["Dashboard"]}
           title="Approval Center Overview"
           actions={
-            <>
-              <button className="em-btn"><IconDownload size={15} /> Export</button>
-              <Link href="/create" className="em-btn primary"><IconPlus size={15} /> New Memo</Link>
-            </>
+            <Link href="/create" className="em-btn primary"><IconPlus size={15} /> New Memo</Link>
           }
         />
         <div className="em-content">

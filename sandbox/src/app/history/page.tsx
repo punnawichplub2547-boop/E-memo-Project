@@ -15,6 +15,7 @@ import { groupMemosByDate } from "@/lib/group-memos";
 import Link from "next/link";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
+import { memosToCsv } from "@/lib/export/memo-csv";
 
 const routeSummary = (memo: MemoRecord) =>
   memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
@@ -54,6 +55,20 @@ export default function HistoryPage() {
 
   const groups = groupMemosByDate(filtered);
 
+  // Export the currently filtered rows as CSV. A UTF-8 BOM is prepended so Excel
+  // detects the encoding and renders Thai text correctly instead of mojibake.
+  function handleExportCsv() {
+    if (filtered.length === 0) return;
+    const csv = memosToCsv(filtered);
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `memo-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const managerCount = memos.filter(m => m.currentStep === "Manager / Top Section").length;
   const gmCount = memos.filter(m => m.currentStep === "General Manager").length;
 
@@ -66,7 +81,14 @@ export default function HistoryPage() {
           title="Memo History & Audit"
           actions={
             <>
-              <button className="em-btn" disabled title="Export CSV — coming soon"><IconDownload size={15} /> Export CSV</button>
+              <button
+                className="em-btn"
+                onClick={handleExportCsv}
+                disabled={filtered.length === 0}
+                title={filtered.length === 0 ? "ไม่มีรายการให้ส่งออก" : `ส่งออก ${filtered.length} รายการเป็น CSV`}
+              >
+                <IconDownload size={15} /> Export CSV
+              </button>
               <Link href="/create" className="em-btn primary"><IconPlus size={15} /> New Memo</Link>
             </>
           }
