@@ -21,7 +21,7 @@ const mainItems = [
 
 const execItems = [
   { id: "exec", href: "/queue?tier=md", label: "Executive Review", Icon: IconCrown, gold: true },
-  { id: "audit", href: "/history",      label: "Audit Trail",      Icon: IconShield },
+  { id: "audit", href: "/audit",        label: "Audit Trail",      Icon: IconShield },
 ];
 
 export function Sidebar() {
@@ -111,7 +111,7 @@ export function Sidebar() {
               <Link
                 key={id}
                 href={href}
-                className={`em-nav-item${gold ? " gold" : ""}${isActive(href) && id !== "audit" ? " active" : ""}`}
+                className={`em-nav-item${gold ? " gold" : ""}${isActive(href) ? " active" : ""}`}
               >
                 <Icon size={17} />
                 <span>{label}</span>
