@@ -92,6 +92,34 @@ p { margin: 0; }
 h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 button, input, select, textarea { font: inherit; cursor: pointer; }
 
+/* ── Custom scrollbar ───────────────────────────────────────────────────────
+   Cosmetic-only, design-token driven. Applies to every scroll container
+   (page, tables, drawer, dropdown menus). Track is transparent to blend with
+   the surface; the thumb uses the line tone and brightens to brand colour on
+   hover. The 3px transparent border gives the thumb visual padding so it reads
+   as a slim floating bar. Width kept at 10/8px so it stays comfortably
+   grab-able (accessibility) rather than a hard-to-hit hairline.
+   Firefox gets the coarser standard properties (no radius/hover control). */
+* {
+  scrollbar-width: thin;                        /* Firefox */
+  scrollbar-color: var(--line-strong) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;                 /* keeps the transparent border visible */
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  border: 2px solid transparent;                /* thumb fills out slightly on hover */
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:active { background: var(--primary-2); background-clip: padding-box; }
+
 /* ===== App shell ===== */
 .em-art {
   min-height: 100vh;
