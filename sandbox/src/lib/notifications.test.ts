@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
 import {
+  buildIssueReportNotification,
   buildMemoNotificationText,
   buildMemoNotificationHtml,
   buildMemoNotificationTitle,
@@ -24,6 +25,40 @@ function makeFakePool(results: unknown[]) {
 }
 
 const memo = { memoNo: "EM-2026-042", title: "ซื้อวัตถุดิบ", requesterName: "สมชาย", currentStep: "Managing Director" };
+
+describe("buildIssueReportNotification", () => {
+  const input = {
+    reporterName: "สมหญิง ใจดี",
+    department: "IT",
+    email: "somying@car-1996.com",
+    description: "หน้า /queue กดอนุมัติแล้ว error 500",
+  };
+
+  it("title includes the reporter name", () => {
+    const { title } = buildIssueReportNotification(input);
+    expect(title).toContain("แจ้งปัญหา");
+    expect(title).toContain("สมหญิง ใจดี");
+  });
+
+  it("body includes reporter, department, email and description", () => {
+    const { body } = buildIssueReportNotification(input);
+    expect(body).toContain("สมหญิง ใจดี");
+    expect(body).toContain("IT");
+    expect(body).toContain("somying@car-1996.com");
+    expect(body).toContain("หน้า /queue กดอนุมัติแล้ว error 500");
+  });
+
+  it("preserves multi-line descriptions", () => {
+    const { body } = buildIssueReportNotification({ ...input, description: "บรรทัด 1\nบรรทัด 2" });
+    expect(body).toContain("บรรทัด 1\nบรรทัด 2");
+  });
+
+  it("falls back when reporter name is blank", () => {
+    const { title, body } = buildIssueReportNotification({ ...input, reporterName: "   " });
+    expect(title).toContain("ไม่ระบุชื่อ");
+    expect(body).toContain("ไม่ระบุชื่อ");
+  });
+});
 
 describe("buildMemoNotificationText", () => {
   it("pending approval includes all fields", () => {

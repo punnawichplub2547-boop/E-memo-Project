@@ -18,7 +18,30 @@ const TYPE_LABELS: Record<string, string> = {
   memo_approved:         "อนุมัติแล้ว",
   memo_submitted:        "ส่งเข้าระบบแล้ว",
   memo_status_update:    "อัปเดตสถานะ",
+  user_issue_report:     "แจ้งปัญหาจากผู้ใช้",
 };
+
+// Builds the in-app notification shown to every admin when a user reports a usage
+// problem from their profile page. There is no detail page for reports, so the
+// full context (reporter + description) lives in the body.
+export function buildIssueReportNotification(input: {
+  reporterName: string;
+  department: string;
+  email: string;
+  description: string;
+}): { title: string; body: string } {
+  const reporterName = input.reporterName.trim() || "ไม่ระบุชื่อ";
+  const title = `แจ้งปัญหา: ${reporterName}`;
+  const body = [
+    "ผู้ใช้แจ้งปัญหาการใช้งาน",
+    `ผู้แจ้ง: ${reporterName}`,
+    `แผนก: ${input.department}`,
+    `อีเมล: ${input.email}`,
+    "รายละเอียด:",
+    input.description.trim(),
+  ].join("\n");
+  return { title, body };
+}
 
 export function buildMemoNotificationTitle(type: string, memoNo: string): string {
   return `${TYPE_LABELS[type] ?? type}: ${memoNo}`;

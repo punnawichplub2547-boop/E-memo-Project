@@ -35,6 +35,29 @@ export default function ProfilePage() {
   type TelegramStatus = { linked: false } | { linked: true; username: string | null; linkedAt: string };
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
 
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportStatus, setReportStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function handleSubmitReport() {
+    const description = reportText.trim();
+    if (!description || reportStatus === "sending") return;
+    setReportStatus("sending");
+    try {
+      const res = await fetch("/api/profile/report-issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      setReportText("");
+      setReportStatus("sent");
+      setReportOpen(false);
+    } catch {
+      setReportStatus("error");
+    }
+  }
+
   useEffect(() => {
     fetch("/api/profile/telegram-account")
       .then(r => r.json())
@@ -401,6 +424,75 @@ export default function ProfilePage() {
                 <button onClick={handleRevokeTelegram} style={{ padding: "6px 14px", borderRadius: 6, background: "var(--surface)", color: "var(--ink-muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 14 }}>
                   ยกเลิกการเชื่อมต่อ
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Report-issue card */}
+          <div style={{ marginTop: 14, padding: "16px 20px", background: "var(--surface-raised)", borderRadius: 10, border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontWeight: 600, color: "var(--ink)" }}>แจ้งปัญหาถึงแอดมิน</div>
+                <div style={{ fontSize: 13, color: "var(--ink-muted)", marginTop: 2 }}>พบปัญหาการใช้งาน? แจ้งให้แอดมินทราบได้ที่นี่</div>
+              </div>
+              {!reportOpen && (
+                <button
+                  onClick={() => { setReportOpen(true); setReportStatus("idle"); }}
+                  style={{ padding: "6px 14px", borderRadius: 6, background: "#2563EB", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, fontFamily: "inherit" }}
+                >
+                  แจ้งปัญหา
+                </button>
+              )}
+            </div>
+
+            {reportStatus === "sent" && !reportOpen && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+                ส่งให้แอดมินแล้ว ✓
+              </div>
+            )}
+
+            {reportOpen && (
+              <div style={{ marginTop: 12 }}>
+                <textarea
+                  value={reportText}
+                  onChange={e => setReportText(e.target.value)}
+                  placeholder="อธิบายปัญหาที่พบ เช่น หน้าไหน กดอะไรแล้วเกิดอะไรขึ้น…"
+                  maxLength={2000}
+                  rows={4}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                    border: "1px solid var(--border)", background: "var(--surface)",
+                    color: "var(--ink)", fontSize: 14, fontFamily: "inherit", resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {reportStatus === "error" && (
+                  <div style={{ marginTop: 6, fontSize: 13, color: "#DC2626" }}>
+                    ส่งไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                  <button
+                    onClick={() => { setReportOpen(false); setReportStatus("idle"); }}
+                    disabled={reportStatus === "sending"}
+                    style={{ padding: "7px 14px", borderRadius: 6, background: "var(--surface)", color: "var(--ink-muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleSubmitReport}
+                    disabled={!reportText.trim() || reportStatus === "sending"}
+                    style={{
+                      padding: "7px 16px", borderRadius: 6,
+                      background: (!reportText.trim() || reportStatus === "sending") ? "rgba(37,99,235,0.45)" : "#2563EB",
+                      color: "#fff", border: "none",
+                      cursor: (!reportText.trim() || reportStatus === "sending") ? "not-allowed" : "pointer",
+                      fontSize: 14, fontWeight: 600, fontFamily: "inherit",
+                    }}
+                  >
+                    {reportStatus === "sending" ? "กำลังส่ง…" : "ส่งให้แอดมิน"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -9,17 +9,17 @@ import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { isPrototypeAdmin } from "@/lib/prototype-users";
 import { useAuth } from "@/lib/auth-context";
 import type { PublicUser } from "@/lib/db-users";
-import { PROTOTYPE_USERS } from "@/lib/prototype-users";
 import type { PrototypeRole, PrototypeUser } from "@/lib/prototype-users";
 import type { ApprovalLevel, MemoStatus } from "@/lib/approval";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { DEPARTMENTS } from "@/lib/departments";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import type { WorkflowAction } from "@/lib/db-memos";
+import type { IssueReport, IssueStatus } from "@/lib/issue-reports";
 import {
   IconUsers, IconFileText, IconShield, IconTrash,
   IconPen, IconRefresh, IconX, IconCheck, IconKey, IconSettings, IconUserPlus, IconReturn,
-  IconHistory, IconFilter, IconArrowLeft, IconArrowRight,
+  IconHistory, IconFilter, IconArrowLeft, IconArrowRight, IconBell,
 } from "@/components/icons";
 
 const ALL_ROLES: { value: PrototypeRole; label: string }[] = [
@@ -48,7 +48,7 @@ const statusColor: Record<MemoStatus, string> = {
   draft: "#6B7280",
 };
 
-type Tab = "db-users" | "users" | "memos" | "audit" | "system";
+type Tab = "db-users" | "users" | "memos" | "audit" | "issues" | "system";
 
 const AUDIT_ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "All actions" },
@@ -66,6 +66,7 @@ const AUDIT_ACTION_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const AUDIT_PAGE_SIZE = 50;
+const ISSUES_PAGE_SIZE = 50;
 
 type EditUserState = {
   name: string;
@@ -84,7 +85,7 @@ const emptyNewUser = (): NewUserState => ({
 });
 
 export default function AdminPage() {
-  const { user, userId: protoUserId, setUserId: setProtoUserId } = usePrototypeUser();
+  const { user } = usePrototypeUser();
   const { user: authUser } = useAuth();
   const { users, addUser, updateUser, deleteUser, resetToDefaults } = useAdminUsers();
   const { allMemos, dispatch } = useMemos();
@@ -136,6 +137,60 @@ export default function AdminPage() {
   // Committed filter values — only updated when the user hits "Apply", so typing
   // in the text boxes does not fire a request per keystroke.
   const [auditQuery, setAuditQuery] = useState({ memo: "", actor: "", action: "", from: "", to: "" });
+
+  // Issue-reports tab state
+  const [issueRows, setIssueRows] = useState<IssueReport[]>([]);
+  const [issueTotal, setIssueTotal] = useState(0);
+  const [issueLoading, setIssueLoading] = useState(false);
+  const [issueError, setIssueError] = useState("");
+  const [issueStatusFilter, setIssueStatusFilter] = useState<"" | IssueStatus>("");
+  const [issuePage, setIssuePage] = useState(0);
+  // Bumped to force a refetch (e.g. after toggling a report's status).
+  const [issueRefresh, setIssueRefresh] = useState(0);
+
+  useEffect(() => {
+    if (tab !== "issues") return;
+    const controller = new AbortController();
+    // Defer the loading-state reset off the synchronous effect path (mirrors the
+    // audit effect) to avoid cascading renders / the set-state-in-effect lint.
+    const raf = requestAnimationFrame(() => {
+      if (controller.signal.aborted) return;
+      setIssueLoading(true);
+      setIssueError("");
+    });
+    const params = new URLSearchParams();
+    if (issueStatusFilter) params.set("status", issueStatusFilter);
+    params.set("limit", String(ISSUES_PAGE_SIZE));
+    params.set("offset", String(issuePage * ISSUES_PAGE_SIZE));
+    fetch(`/api/admin/issues?${params.toString()}`, { cache: "no-store", signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then((data: { rows: IssueReport[]; total: number }) => {
+        setIssueRows(data.rows);
+        setIssueTotal(data.total);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setIssueError("โหลดรายการแจ้งปัญหาไม่สำเร็จ ตรวจสอบการเชื่อมต่อ DB");
+        setIssueRows([]);
+        setIssueTotal(0);
+      })
+      .finally(() => { if (!controller.signal.aborted) setIssueLoading(false); });
+    return () => { controller.abort(); cancelAnimationFrame(raf); };
+  }, [tab, issueStatusFilter, issuePage, issueRefresh]);
+
+  async function toggleIssueStatus(id: number, next: IssueStatus) {
+    try {
+      const res = await fetch(`/api/admin/issues/${id}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      setIssueRefresh(n => n + 1);
+    } catch {
+      setIssueError("อัปเดตสถานะไม่สำเร็จ กรุณาลองใหม่");
+    }
+  }
 
   useEffect(() => {
     if (tab !== "db-users") return;
@@ -299,7 +354,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <div className="em-admin-tabs" style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
-            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["audit", IconHistory, "Audit Log"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
+            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["audit", IconHistory, "Audit Log"], ["issues", IconBell, "แจ้งปัญหา"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
               <button key={t} role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t as Tab)}
                 style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: tab === t ? "var(--accent)" : "var(--muted)", borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`, marginBottom: -1, transition: "color 150ms" }}
@@ -812,6 +867,105 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── ISSUE REPORTS TAB ──────────────────────────────────── */}
+          {tab === "issues" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>แจ้งปัญหาจากผู้ใช้ / User Issue Reports</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                  ปัญหาการใช้งานที่ผู้ใช้ส่งมาจากหน้าโปรไฟล์ — {issueTotal} รายการ
+                </div>
+              </div>
+
+              {/* Status filter */}
+              <div style={{ display: "flex", gap: 8 }}>
+                {([ ["", "ทั้งหมด"], ["open", "ยังไม่จัดการ"], ["resolved", "จัดการแล้ว"] ] as const).map(([val, label]) => (
+                  <button key={val || "all"} className={`em-btn${issueStatusFilter === val ? " primary" : ""}`}
+                    style={{ padding: "6px 14px", fontSize: 12.5 }}
+                    onClick={() => { setIssueStatusFilter(val); setIssuePage(0); }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {issueError && (
+                <div className="em-card" style={{ padding: 14, fontSize: 13, color: "#B91C1C", background: "rgba(239,68,68,0.06)" }}>{issueError}</div>
+              )}
+
+              <div className="em-card" style={{ padding: 0, overflowX: "auto", overflowY: "hidden" }}>
+                <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.03)" }}>
+                      {["เวลา", "ผู้แจ้ง", "แผนก", "รายละเอียด", "สถานะ", ""].map((h, i) => (
+                        <th key={i} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11.5, color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {issueRows.map(r => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{r.createdAt}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>
+                          <div style={{ fontWeight: 600 }}>{r.reporterName}</div>
+                          <div style={{ fontSize: 11, color: "var(--muted)" }}>{r.reporterEmail}</div>
+                        </td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{r.reporterDepartment}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12, maxWidth: 380, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{r.description}</td>
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
+                            background: r.status === "resolved" ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.16)",
+                            color: r.status === "resolved" ? "#16A34A" : "#D97706" }}>
+                            {r.status === "resolved" ? "จัดการแล้ว" : "ยังไม่จัดการ"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          {r.status === "open" ? (
+                            <button className="em-btn" style={{ padding: "5px 10px", fontSize: 12, color: "#16A34A" }}
+                              onClick={() => toggleIssueStatus(r.id, "resolved")}>
+                              <IconCheck size={12} /> จัดการแล้ว
+                            </button>
+                          ) : (
+                            <button className="em-btn" style={{ padding: "5px 10px", fontSize: 12 }}
+                              onClick={() => toggleIssueStatus(r.id, "open")}>
+                              <IconReturn size={12} /> เปิดใหม่
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {!issueLoading && issueRows.length === 0 && (
+                      <tr><td colSpan={6} style={{ padding: "32px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{issueError ? "—" : "ยังไม่มีรายการแจ้งปัญหา"}</td></tr>
+                    )}
+                    {issueLoading && (
+                      <tr><td colSpan={6} style={{ padding: "32px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>กำลังโหลด…</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                  {issueTotal === 0
+                    ? "0 รายการ"
+                    : `แสดง ${issuePage * ISSUES_PAGE_SIZE + 1}–${Math.min((issuePage + 1) * ISSUES_PAGE_SIZE, issueTotal)} จาก ${issueTotal}`}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="em-btn" style={{ padding: "6px 12px", fontSize: 12.5 }}
+                    disabled={issuePage === 0 || issueLoading}
+                    onClick={() => setIssuePage(p => Math.max(0, p - 1))}>
+                    <IconArrowLeft size={13} /> ก่อนหน้า
+                  </button>
+                  <button className="em-btn" style={{ padding: "6px 12px", fontSize: 12.5 }}
+                    disabled={(issuePage + 1) * ISSUES_PAGE_SIZE >= issueTotal || issueLoading}
+                    onClick={() => setIssuePage(p => p + 1)}>
+                    ถัดไป <IconArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── SYSTEM TAB ─────────────────────────────────────────── */}
           {tab === "system" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -839,33 +993,6 @@ export default function AdminPage() {
                     <button className="em-btn" onClick={() => setConfirmReset(false)}><IconX size={13} /> Cancel</button>
                   </div>
                 )}
-              </div>
-
-              <div className="em-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>View Perspective</div>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>
-                  Switch how the prototype sidebar and navigation appear — simulates another role&apos;s view without logging out.
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {PROTOTYPE_USERS.map(u => (
-                    <button
-                      key={u.id}
-                      className="em-btn"
-                      onClick={() => setProtoUserId(u.id)}
-                      style={{
-                        fontWeight: protoUserId === u.id ? 700 : 500,
-                        background: protoUserId === u.id ? "rgba(37,99,235,0.12)" : undefined,
-                        color: protoUserId === u.id ? "var(--primary)" : undefined,
-                        border: protoUserId === u.id ? "1px solid rgba(37,99,235,0.3)" : undefined,
-                      }}
-                    >
-                      {u.name} <span style={{ opacity: 0.55, fontSize: 11 }}>({u.roleLabel})</span>
-                    </button>
-                  ))}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>
-                  Current: <strong>{PROTOTYPE_USERS.find(u => u.id === protoUserId)?.name ?? "—"}</strong> · {PROTOTYPE_USERS.find(u => u.id === protoUserId)?.roleLabel}
-                </div>
               </div>
 
               <div className="em-card" style={{ padding: 20 }}>
