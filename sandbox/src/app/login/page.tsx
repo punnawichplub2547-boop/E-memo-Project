@@ -198,7 +198,7 @@ export default function LoginPage() {
           }
 
           /* Form card → glass panel on the dark brand background */
-          .em-card {
+          .em-login-card {
             background: rgba(255,255,255,0.97) !important;
             border: 1px solid rgba(255,255,255,0.5);
             border-radius: 20px;
@@ -387,7 +387,7 @@ export default function LoginPage() {
               <span className="em-mb-co">Complete Auto Rubber Mfg. Co.,Ltd.</span>
             </div>
 
-            <div className="em-card">
+            <div className="em-login-card">
 
             {/* Heading */}
             <div style={{ marginBottom: 34 }}>
@@ -507,7 +507,7 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            </div>{/* /em-card */}
+            </div>{/* /em-login-card */}
 
             {/* Footer */}
             <div className="em-mobile-footer" style={{ marginTop: 44, textAlign: "center", fontSize: 11.5, color: "#CBD5E1" }}>
