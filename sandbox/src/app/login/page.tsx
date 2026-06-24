@@ -120,12 +120,109 @@ export default function LoginPage() {
 
         .em-form-wrap { animation: em-fade-up 0.45s 0.05s ease both; }
 
+        /* Mobile-only brand header — hidden on desktop */
+        .em-mobile-brand { display: none; }
+
+        /* ── Mobile / tablet (≤820px): immersive brand background + glass card ── */
         @media (max-width: 820px) {
+          /* Desktop split panel hidden; its atmosphere moves to the full screen */
           .em-login-left { display: none !important; }
+
+          .em-login-root {
+            display: block !important;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(158deg, #060C1F 0%, #0B1735 46%, #102060 100%) !important;
+          }
+
+          /* Brand atmosphere layers fill the whole mobile screen */
+          .em-mobile-atmos {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+          }
+          .em-mobile-atmos .em-orb-top {
+            position: absolute; top: -130px; right: -110px;
+            width: 320px; height: 320px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(37,99,235,0.30) 0%, transparent 68%);
+            animation: em-float-a 9s ease-in-out infinite;
+          }
+          .em-mobile-atmos .em-orb-bottom {
+            position: absolute; bottom: -90px; left: -90px;
+            width: 300px; height: 300px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(59,130,246,0.22) 0%, transparent 68%);
+            animation: em-float-b 12s ease-in-out infinite; animation-delay: -4s;
+          }
+          .em-mobile-atmos .em-dotgrid {
+            position: absolute; inset: 0;
+            background-image: radial-gradient(rgba(147,197,253,0.08) 1px, transparent 1px);
+            background-size: 26px 26px;
+            mask-image: linear-gradient(180deg, transparent 2%, rgba(0,0,0,0.5) 22%, rgba(0,0,0,0.5) 78%, transparent 98%);
+            -webkit-mask-image: linear-gradient(180deg, transparent 2%, rgba(0,0,0,0.5) 22%, rgba(0,0,0,0.5) 78%, transparent 98%);
+          }
+
+          /* Right pane becomes a transparent full-screen scroll container */
+          .em-form-pane {
+            background: transparent !important;
+            position: relative; z-index: 1;
+            min-height: 100dvh;
+            padding: 34px 22px calc(28px + env(safe-area-inset-bottom)) !important;
+            align-items: flex-start !important;
+          }
+          .em-form-wrap {
+            margin: auto;
+            max-width: 380px !important;
+          }
+
+          /* Mobile brand header — logo + wordmark above the card */
+          .em-mobile-brand {
+            display: flex; flex-direction: column; align-items: center;
+            text-align: center; margin-bottom: 22px;
+            padding-top: calc(env(safe-area-inset-top) * 0.5);
+          }
+          .em-mobile-brand .em-mb-logo {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 76px; height: 64px; border-radius: 16px; padding: 8px 10px;
+            background: rgba(255,255,255,0.95);
+            animation: em-logo-pulse 3.2s ease-in-out infinite;
+            margin-bottom: 16px;
+          }
+          .em-mobile-brand .em-mb-title {
+            font-size: 30px; font-weight: 800; color: #EDF4FF;
+            font-family: 'Syne', sans-serif; letter-spacing: -0.5px; line-height: 1.1;
+          }
+          .em-mobile-brand .em-mb-sub {
+            font-size: 13px; color: rgba(147,197,253,0.78); font-weight: 500; margin-top: 5px;
+          }
+          .em-mobile-brand .em-mb-co {
+            font-size: 10px; color: rgba(147,197,253,0.42); font-weight: 500;
+            letter-spacing: 0.07em; text-transform: uppercase; margin-top: 7px;
+          }
+
+          /* Form card → glass panel on the dark brand background */
+          .em-card {
+            background: rgba(255,255,255,0.97) !important;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 20px;
+            padding: 28px 22px 26px !important;
+            box-shadow: 0 24px 60px -20px rgba(3,8,24,0.7), 0 0 0 1px rgba(59,130,246,0.06);
+          }
+          /* Footer reads on dark bg outside the card */
+          .em-mobile-footer { color: rgba(147,197,253,0.42) !important; margin-top: 26px !important; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .em-login-streak, .em-mobile-atmos .em-orb-top, .em-mobile-atmos .em-orb-bottom,
+          .em-mb-logo, .em-feat, .em-form-wrap { animation: none !important; }
         }
       `}</style>
 
-      <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Sarabun', 'Inter', system-ui, sans-serif" }}>
+      <div className="em-login-root" style={{ minHeight: "100vh", display: "flex", fontFamily: "'Sarabun', 'Inter', system-ui, sans-serif" }}>
+
+        {/* Mobile-only brand atmosphere (orbs + dot grid) — invisible on desktop */}
+        <div className="em-mobile-atmos" aria-hidden="true">
+          <div className="em-orb-top" />
+          <div className="em-orb-bottom" />
+          <div className="em-dotgrid" />
+        </div>
 
         {/* ── LEFT brand panel ─────────────────────────────────── */}
         <div className="em-login-left" style={{
@@ -273,11 +370,24 @@ export default function LoginPage() {
         </div>
 
         {/* ── RIGHT form panel ─────────────────────────────────── */}
-        <div style={{
+        <div className="em-form-pane" style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
           padding: "40px 24px", background: "#FFFFFF",
         }}>
           <div className="em-form-wrap" style={{ width: "100%", maxWidth: 400 }}>
+
+            {/* Mobile-only brand header (logo + wordmark) — hidden ≥820px */}
+            <div className="em-mobile-brand">
+              <span className="em-mb-logo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 54, height: "auto", display: "block" }} />
+              </span>
+              <span className="em-mb-title">E-Memo</span>
+              <span className="em-mb-sub">ระบบบันทึกข้อความภายใน</span>
+              <span className="em-mb-co">Complete Auto Rubber Mfg. Co.,Ltd.</span>
+            </div>
+
+            <div className="em-card">
 
             {/* Heading */}
             <div style={{ marginBottom: 34 }}>
@@ -397,8 +507,10 @@ export default function LoginPage() {
               </Link>
             </div>
 
+            </div>{/* /em-card */}
+
             {/* Footer */}
-            <div style={{ marginTop: 44, textAlign: "center", fontSize: 11.5, color: "#CBD5E1" }}>
+            <div className="em-mobile-footer" style={{ marginTop: 44, textAlign: "center", fontSize: 11.5, color: "#CBD5E1" }}>
               Complete Auto Rubber Co., Ltd. · HR&amp;GA Workflow System
             </div>
           </div>
