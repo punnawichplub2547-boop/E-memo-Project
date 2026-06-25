@@ -10,7 +10,8 @@
     "screenshots": "node ./scripts/capture-screenshots.mjs",
     "audit:overflow": "node ./scripts/audit-overflow.mjs",
     "test": "vitest run",
-    "db:seed": "tsx scripts/seed-db.ts"
+    "db:seed": "tsx scripts/seed-db.ts",
+    "telegram:set-webhook": "node ./scripts/set-telegram-webhook.mjs"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -21,6 +22,7 @@
     "lucide-react": "^0.468.0",
     "mysql2": "^3.22.4",
     "next": "16.2.6",
+    "nodemailer": "^9.0.1",
     "pdf-parse": "^1.1.1",
     "react": "19.2.6",
     "react-dom": "19.2.6"
@@ -29,6 +31,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
