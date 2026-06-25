@@ -20,6 +20,7 @@
 |---|---|
 | Domain | `car-1996.com` อยู่บน Cloudflare แล้ว, คุณพลับเป็น **admin** |
 | Subdomain เป้าหมาย | `memo.car-1996.com` |
+| Cloudflare plan | **Free** (DNS Setup: Full = CF authoritative). พอสำหรับเฟส 1 — ดู §10 ข้อจำกัด free-tier |
 | เครื่อง prod | **Windows + Docker @ `10.255.255.173`** (แอปรันใน container, map port `3000`) |
 | เครื่อง dev/test | เครื่อง trainee (ที่รัน Claude Code) — **test เท่านั้น ไม่ใช่ prod** |
 | Server หลัง NAT | เข้าจากเน็ตตรงๆ ไม่ได้ → ต้องใช้ tunnel (outbound-only) |
@@ -121,9 +122,11 @@ cloudflared service install                            # รันถาวร a
 
 ### 6.4 Cloudflare dashboard (ทำที่ไหนก็ได้ที่ login admin ได้)
 1. **Security → Bots → Bot Fight Mode: On**
-2. **Security → WAF → Rate limiting rules** เพิ่ม rule:
-   - path ขึ้นต้น `/login` หรือ `/register` หรือ `/api/auth/` → จำกัด เช่น 10 req/นาที/IP → action: Block/Managed Challenge
-3. **Security → WAF → Custom rules** เพิ่ม rule (webhook IP gate):
+2. **Security → WAF → Rate limiting rules** เพิ่ม **1 rule** (Free plan ได้ rule เดียว — รวมทุก path เข้า rule เดียว):
+   - Expression: `(http.request.uri.path contains "/login") or (http.request.uri.path contains "/register") or (starts_with(http.request.uri.path, "/api/auth/"))`
+   - เช่น 20 requests / 10s ต่อ IP → action: **Managed Challenge** (หรือ Block)
+   - หมายเหตุ free-tier: ปรับ characteristic ได้จำกัด (นับตาม IP) — พอสำหรับเฟส 1; อยากแยกหลาย rule/เงื่อนไขละเอียด → Pro
+3. **Security → WAF → Custom rules** เพิ่ม rule (webhook IP gate; Free ได้ถึง 5 custom rules):
    - `(http.request.uri.path eq "/api/telegram/webhook") and not (ip.src in {149.154.160.0/20 91.108.4.0/22})` → **Block**
 
 ### 6.5 setWebhook (ครั้งเดียว)
@@ -165,3 +168,18 @@ npm.cmd run telegram:set-webhook      # ใช้ APP_PUBLIC_BASE_URL=https://me
 - **สิทธิ์เข้าเครื่อง `10.255.255.173`** — ใครรัน Runbook §6 (คุณพลับเอง / ประสาน IT)
 - **รายชื่อพนักงานชุดแรก** ที่จะให้ admin อนุมัติเข้าใช้ (เริ่มกลุ่มเล็ก)
 - **อนาคต:** เพิ่ม Cloudflare Access/SSO เป็นชั้นนอกถ้าต้องการความปลอดภัยสูงขึ้น (design รองรับ — แค่เพิ่ม ไม่ต้องรื้อ)
+
+---
+
+## 10. ข้อจำกัด Cloudflare Free tier (ตรวจแล้ว — ไม่บล็อก design)
+
+| สิ่งที่ design ใช้ | Free? | หมายเหตุ |
+|---|---|---|
+| Named Tunnel + DNS CNAME + Universal SSL | ✅ | ต้องเป็น **proxied (orange cloud)** ถึงได้ WAF/SSL/Bot-fight |
+| Bot Fight Mode (basic) | ✅ | "Super Bot Fight Mode" เท่านั้นที่ต้อง Pro |
+| WAF Custom rules | ✅ | Free สูงสุด **5 rules**; ใช้ 1 (webhook IP gate) |
+| Rate limiting | ⚠️ | Free ได้ **1 rule** + characteristic จำกัด (นับตาม IP) → รวม login/register/auth เป็น rule เดียว (§6.4.2) |
+| Upload limit 100 MB | ✅ | แอตเทชเมนต์จำกัด 10 MB อยู่แล้ว ไม่ติด |
+| DDoS protection (unmetered) | ✅ | auto |
+
+**สรุป:** Free tier เพียงพอสำหรับเฟส 1 (ผู้ใช้น้อย). ข้อจำกัดเดียวที่ต้องปรับคือ rate-limit รวมเป็น 1 rule. อยากได้ rate-limit หลาย rule/granular หรือ Super Bot Fight → upgrade Pro ($20/เดือน) ภายหลังได้
