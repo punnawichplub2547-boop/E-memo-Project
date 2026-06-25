@@ -5,6 +5,7 @@ import { findUserById } from "@/lib/db-users";
 import { sendTelegramMessage, answerCallbackQuery, escHtml } from "@/lib/telegram/client";
 import { consumeLinkToken, upsertTelegramAccount } from "@/lib/telegram/linking";
 import { consumeApproveActionToken } from "@/lib/telegram/actions";
+import { isFromTelegramIp } from "@/lib/telegram/ip-allowlist";
 import { approveMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,10 @@ async function handleApproveCallback(cqId: string, tokenDbId: number, telegramUs
 }
 
 export async function POST(request: NextRequest) {
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp && !isFromTelegramIp(cfIp)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (!verifySecret(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let update: TelegramUpdate;

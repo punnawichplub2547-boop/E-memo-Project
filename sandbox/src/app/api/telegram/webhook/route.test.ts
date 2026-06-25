@@ -30,12 +30,13 @@ import { answerCallbackQuery } from "@/lib/telegram/client";
 
 const SECRET = "test-webhook-secret-32-chars-xxxx";
 
-function makeReq(body: unknown, secret?: string): NextRequest {
+function makeReq(body: unknown, secret?: string, extraHeaders?: Record<string, string>): NextRequest {
   return new NextRequest("http://localhost/api/telegram/webhook", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(secret !== undefined ? { "x-telegram-bot-api-secret-token": secret } : {}),
+      ...(extraHeaders ?? {}),
     },
     body: JSON.stringify(body),
   });
@@ -62,6 +63,23 @@ describe("secret verification", () => {
 
   it("returns 200 with correct secret", async () => {
     expect((await POST(makeReq({}, SECRET))).status).toBe(200);
+  });
+});
+
+describe("CF-Connecting-IP allowlist", () => {
+  it("returns 403 when CF-Connecting-IP is not a Telegram IP (even with valid secret)", async () => {
+    const res = await POST(makeReq({}, SECRET, { "cf-connecting-ip": "8.8.8.8" }));
+    expect(res.status).toBe(403);
+  });
+
+  it("allows a request from a Telegram IP with a valid secret", async () => {
+    const res = await POST(makeReq({}, SECRET, { "cf-connecting-ip": "149.154.167.41" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("skips the IP check when CF-Connecting-IP is absent (dev/local)", async () => {
+    const res = await POST(makeReq({}, SECRET));
+    expect(res.status).toBe(200);
   });
 });
 
