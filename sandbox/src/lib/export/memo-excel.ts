@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { ApprovalLevel, MemoRecord } from "../approval";
-import { computePriceRowTotals } from "../approval";
+import { approvalLabels, computePriceRowTotals } from "../approval";
 
 export type MemoSignature = {
   stepLabel: ApprovalLevel;
@@ -182,6 +182,8 @@ export async function buildMemoExcelWorkbook(
     ["From (ผู้จัดทำเอกสาร)", memo.requester],
     ["To (ผู้บังคับบัญชา)", memo.currentStep],
     ["Subject", memo.title],
+    ["Category", approvalLabels[memo.category] ?? memo.category],
+    ["Subcategory", memo.itemSubcategoryLabel ?? "-"],
     ["Attachment", memo.attachments && memo.attachments.length > 0 ? `${memo.attachments.length} ไฟล์` : "-"],
   ];
   metaRows.forEach(([label, value], i) => {
@@ -204,7 +206,7 @@ export async function buildMemoExcelWorkbook(
   });
 
   // ---- Body narrative ----
-  let r = gridStartRow + DEPT_GRID.length;
+  let r = gridStartRow + Math.max(DEPT_GRID.length, metaRows.length + 1);
   setRange(ws, 1, TOTAL_COLS, r, "เรียน ผู้บังคับบัญชาตามสายงานอนุมัติ", { size: 10 }); r++;
   setRange(ws, 1, TOTAL_COLS, r, `เรื่อง: ${memo.title}`, { bold: true, size: 10.5 }); r++;
   const reasonText = `เนื่องจาก/เหตุผล: ${memo.description ?? "-"}`;

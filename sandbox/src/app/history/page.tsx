@@ -191,7 +191,9 @@ export default function HistoryPage() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>{approvalLabels[m.category]} · {routeSummary(m)}</div>
+                            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>
+                              {[approvalLabels[m.category], m.itemSubcategoryLabel, routeSummary(m)].filter(Boolean).join(" · ")}
+                            </div>
                             {m.routeOverrideReason && (
                               <div style={{ fontSize: 11.5, color: "#7C5E0F", marginTop: 3, fontWeight: 600 }}>Exception reason: {m.routeOverrideReason}</div>
                             )}

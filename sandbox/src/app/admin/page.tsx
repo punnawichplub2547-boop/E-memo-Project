@@ -16,10 +16,11 @@ import { DEPARTMENTS } from "@/lib/departments";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import type { WorkflowAction } from "@/lib/db-memos";
 import type { IssueReport, IssueStatus } from "@/lib/issue-reports";
+import { ItemSubcategoryPanel } from "./_components/ItemSubcategoryPanel";
 import {
   IconUsers, IconFileText, IconShield, IconTrash,
   IconPen, IconRefresh, IconX, IconCheck, IconKey, IconSettings, IconUserPlus, IconReturn,
-  IconHistory, IconFilter, IconArrowLeft, IconArrowRight, IconBell,
+  IconHistory, IconFilter, IconArrowLeft, IconArrowRight, IconBell, IconTag,
 } from "@/components/icons";
 
 const ALL_ROLES: { value: PrototypeRole; label: string }[] = [
@@ -48,7 +49,7 @@ const statusColor: Record<MemoStatus, string> = {
   draft: "#6B7280",
 };
 
-type Tab = "db-users" | "users" | "memos" | "audit" | "issues" | "system";
+type Tab = "db-users" | "users" | "memos" | "master-data" | "audit" | "issues" | "system";
 
 const AUDIT_ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "All actions" },
@@ -354,7 +355,7 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <div className="em-admin-tabs" style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
-            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["audit", IconHistory, "Audit Log"], ["issues", IconBell, "แจ้งปัญหา"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
+            {([ ["db-users", IconUsers, "Registered Users"], ["users", IconUsers, "Prototype Users"], ["memos", IconFileText, "Memos"], ["master-data", IconTag, "Master Data"], ["audit", IconHistory, "Audit Log"], ["issues", IconBell, "แจ้งปัญหา"], ["system", IconSettings, "System"] ] as const).map(([t, Icon, label]) => (
               <button key={t} role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t as Tab)}
                 style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: tab === t ? "var(--accent)" : "var(--muted)", borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`, marginBottom: -1, transition: "color 150ms" }}
@@ -761,6 +762,10 @@ export default function AdminPage() {
           )}
 
           {/* ── AUDIT LOG TAB ──────────────────────────────────────── */}
+          {tab === "master-data" && (
+            <ItemSubcategoryPanel />
+          )}
+
           {tab === "audit" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>

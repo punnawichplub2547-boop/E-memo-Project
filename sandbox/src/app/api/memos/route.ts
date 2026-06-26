@@ -123,6 +123,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
   const [result] = await connection.execute<import("mysql2").ResultSetHeader>(
     `INSERT INTO memos (
       memo_no, title, requester_name, requester_user_id, department_name, category,
+      item_subcategory_id, item_subcategory_label,
       amount, budget_status, account_code, budget_plan, budget_used, description, closing_remark,
       status, workflow_state, current_step, cycle_hours,
       recommended_final_approver, recommended_route_json, selected_route_json,
@@ -135,6 +136,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       created_at, updated_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?,
+      ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?,
@@ -198,6 +200,8 @@ function memoRowParams(row: MemoSeedRow) {
     row.requester_user_id,
     row.department_name,
     row.category,
+    row.item_subcategory_id,
+    row.item_subcategory_label,
     row.amount,
     row.budget_status,
     row.account_code,

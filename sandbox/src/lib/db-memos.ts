@@ -32,6 +32,8 @@ export type MemoDbRow = {
   requester_user_id?: number | null;
   department_name: string;
   category: string;
+  item_subcategory_id?: number | null;
+  item_subcategory_label?: string | null;
   amount: DbNumber;
   budget_status: string | null;
   account_code: string | null;
@@ -101,6 +103,8 @@ export function serializeMemoRecord(
     requesterUserId: row.requester_user_id ?? undefined,
     department: row.department_name,
     category: row.category as ApprovalCategory,
+    itemSubcategoryId: row.item_subcategory_id ?? undefined,
+    itemSubcategoryLabel: optional(row.item_subcategory_label ?? null),
     amount: toNumber(row.amount) ?? 0,
     budgetStatus: optional(row.budget_status) as BudgetStatus | undefined,
     accountCode: optional(row.account_code),

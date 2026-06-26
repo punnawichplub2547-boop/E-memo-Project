@@ -41,6 +41,7 @@ import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { canResubmitMemo } from "@/lib/prototype-users";
 import { ReadRecipientPicker } from "./_components/ReadRecipientPicker";
+import type { ItemSubcategory } from "@/lib/item-subcategories";
 
 
 function getEffectiveRequestQty(qty: number) {
@@ -77,6 +78,11 @@ function CreatePageContent() {
   const [category, setCategory] = useState<ApprovalCategory>(() =>
     isRevisionMode ? (reviseMemo!.category ?? "general-purchase") : "general-purchase"
   );
+  const [itemSubcategoryId, setItemSubcategoryId] = useState<number | undefined>(() =>
+    isRevisionMode ? reviseMemo!.itemSubcategoryId : undefined
+  );
+  const [itemSubcategories, setItemSubcategories] = useState<ItemSubcategory[]>([]);
+  const [itemSubcategoriesError, setItemSubcategoriesError] = useState("");
   const [department, setDepartment] = useState(() =>
     isRevisionMode ? (reviseMemo!.department ?? issuer.department) : issuer.department
   );
@@ -235,6 +241,27 @@ function CreatePageContent() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/item-subcategories?category=${encodeURIComponent(category)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
+      .then((body: { items: ItemSubcategory[] }) => {
+        if (!controller.signal.aborted) {
+          setItemSubcategories(body.items);
+          setItemSubcategoriesError("");
+        }
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setItemSubcategories([]);
+        setItemSubcategoriesError("โหลดหมวดรายการย่อยไม่สำเร็จ");
+      });
+    return () => controller.abort();
+  }, [category]);
+
   const supportsPriceAdjustment = category === "raw-material" || category === "fixed-asset";
   const supportsProductionPlan = category === "raw-material";
   const supportsDeadStock = category === "raw-material";
@@ -281,6 +308,10 @@ function CreatePageContent() {
   const orderedReadRecipients = readRecipients;
   const firstCheckingStep = selectedRoute[0] ?? "Manager / Top Section";
   const selectedVendor = priceComparisons.find(r => r.isSelected) ?? priceComparisons[0];
+  const selectedItemSubcategory = itemSubcategories.find(item => item.id === itemSubcategoryId);
+  const itemSubcategoryLabel =
+    selectedItemSubcategory?.labelTh ??
+    (itemSubcategoryId === reviseMemo?.itemSubcategoryId ? reviseMemo?.itemSubcategoryLabel : undefined);
   const hasPricedVendor = priceComparisons.some(r => r.offeredPrice > 0);
   const validPrices = priceComparisons.filter(r => r.offeredPrice > 0).map(r => r.netPrice);
   const lowestNetPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
@@ -490,6 +521,8 @@ function CreatePageContent() {
         id: reviseMemo!.id,
         title: subject,
         category,
+        itemSubcategoryId,
+        itemSubcategoryLabel,
         department,
         amount,
         description: description.trim() || undefined,
@@ -538,6 +571,8 @@ function CreatePageContent() {
       type: "ADD_MEMO",
       memo: {
         id, title: subject, requester: user.name, department, category, amount, status,
+        itemSubcategoryId,
+        itemSubcategoryLabel,
         currentStep: firstCheckingStep,
         workflowState: "Issued",
         recommendedFinalApprover: recommendation.recommendedFinalApprover,
@@ -673,6 +708,9 @@ function CreatePageContent() {
               <MemoDetailsCard
                 subject={subject}
                 category={category}
+                itemSubcategoryId={itemSubcategoryId}
+                itemSubcategories={itemSubcategories}
+                itemSubcategoriesError={itemSubcategoriesError}
                 department={department}
                 amount={amount}
                 budgetStatus={budgetStatus}
@@ -691,7 +729,8 @@ function CreatePageContent() {
                 showDeptMonthly={showDeptMonthly}
                 effectiveIsPriceAdjustment={effectiveIsPriceAdjustment}
                 onSubjectChange={setSubject}
-                onCategoryChange={(v) => { setCategory(v); setChosenApprover(null); }}
+                onCategoryChange={(v) => { setCategory(v); setItemSubcategoryId(undefined); setChosenApprover(null); }}
+                onItemSubcategoryChange={setItemSubcategoryId}
                 onDepartmentChange={setDepartment}
                 onAmountChange={(v) => { setAmount(v); setChosenApprover(null); }}
                 onBudgetStatusChange={(v) => { setBudgetStatus(v); setChosenApprover(null); }}

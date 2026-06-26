@@ -9,6 +9,8 @@ export type MemoSeedRow = {
   requester_user_id: Nullable<number>;
   department_name: string;
   category: string;
+  item_subcategory_id: Nullable<number>;
+  item_subcategory_label: Nullable<string>;
   amount: number;
   budget_status: Nullable<string>;
   account_code: Nullable<string>;
@@ -121,6 +123,8 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     requester_user_id: memo.requesterUserId ?? null,
     department_name: memo.department,
     category: memo.category,
+    item_subcategory_id: memo.itemSubcategoryId ?? null,
+    item_subcategory_label: memo.itemSubcategoryLabel ?? null,
     amount: memo.amount,
     budget_status: memo.budgetStatus ?? null,
     account_code: memo.accountCode ?? null,

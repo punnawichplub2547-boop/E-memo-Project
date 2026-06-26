@@ -987,6 +987,8 @@ REMARK: As of prototype Stage 5B, `readActions` blocks Approve for memos created
 
 Use Book1 as default recommendation source.
 
+REMARK: In `Book1.xlsx` Table 2, the indented dash (`- ...`) entries under each numbered `รายการ` category are item subcategories. Examples include raw material subitems (`วัตถุดิบ และ ชิ้นงาน`, `วัสดุประกอบ`, `วัสดุสิ้นเปลือง`, `วัสดุโรงงาน`, `ซื้อเพื่อทดลอง หรือ งานตัวอย่าง`), fixed asset subitems (`เครื่องจักร และ อุปกรณ์การผลิต`, `เครื่องมือเครื่องใช้โรงงาน`, `เครื่องมือเครื่องใช้สำนักงาน`, `รถยนต์`, `สินทรัพย์อื่น ๆ`), service/job subitems (`ระบบสาธารณูปโภค`, `การซ่อมแซมบำรุงรักษาโรงงาน`, `สำนักงาน และ โรงงาน`, `อื่น ๆ`), and general purchase subitems (`สวัสดิการพนักงาน`, `ซื้ออุปกรณ์เครื่องมือเครื่องใช้ / ซ่อมบำรุง`, `ซื้อของทั่วไปสำนักงาน - โรงงาน`, `อื่น ๆ`). Treat these as selectable/detail master data under the parent category for UI, reporting, and search. In the UI, use them only after the user has selected the main category, as a secondary refinement choice that supports description, reporting, and search. They should not become separate approval-rule categories unless confirmed by the business.
+
 High-level rules:
 - Mold: MD every time.
 - Raw material / production material:

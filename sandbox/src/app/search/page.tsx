@@ -62,6 +62,7 @@ export default function SearchPage() {
             title: m.title,
             department: m.department,
             category: m.category,
+            itemSubcategoryLabel: m.itemSubcategoryLabel,
             amount: m.amount,
             status: m.status,
             requester: m.requester,
@@ -117,7 +118,14 @@ export default function SearchPage() {
     // Keyword mode
     const q = query.trim().toLowerCase();
     return filtered.filter(m =>
-      !q || [m.title, m.id, m.requester, m.department, approvalLabels[m.category]].join(" ").toLowerCase().includes(q)
+      !q || [
+        m.title,
+        m.id,
+        m.requester,
+        m.department,
+        approvalLabels[m.category],
+        m.itemSubcategoryLabel,
+      ].filter(Boolean).join(" ").toLowerCase().includes(q)
     );
   }, [memos, query, catFilter, approvedOnly, aiIds]);
 
@@ -234,6 +242,9 @@ export default function SearchPage() {
                           {isMd ? "MD" : m.currentStep === "General Manager" ? "GM" : "Manager"}
                         </span>
                         <span className="em-dept">{approvalLabels[m.category]}</span>
+                        {m.itemSubcategoryLabel && (
+                          <span className="em-dept">{m.itemSubcategoryLabel}</span>
+                        )}
                         {isAiMode && (
                           <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(37,99,235,0.12)", color: "var(--primary)", border: "1px solid rgba(37,99,235,0.2)" }}>
                             #{idx + 1}

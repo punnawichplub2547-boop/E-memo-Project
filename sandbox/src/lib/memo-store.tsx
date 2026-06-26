@@ -35,6 +35,8 @@ type Action =
       id: string;
       title: string;
       category: ApprovalCategory;
+      itemSubcategoryId?: number;
+      itemSubcategoryLabel?: string;
       department: string;
       amount: number;
       description?: string;
@@ -75,6 +77,8 @@ export function buildMemoSnapshot(m: MemoRecord): MemoSnapshot {
   return {
     title: m.title,
     category: m.category,
+    itemSubcategoryId: m.itemSubcategoryId,
+    itemSubcategoryLabel: m.itemSubcategoryLabel,
     department: m.department,
     amount: m.amount,
     description: m.description,
@@ -218,6 +222,8 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           // New content from the revision form (overwrites old content):
           title: action.title,
           category: action.category,
+          itemSubcategoryId: action.itemSubcategoryId,
+          itemSubcategoryLabel: action.itemSubcategoryLabel,
           department: action.department,
           amount: action.amount,
           description: action.description,

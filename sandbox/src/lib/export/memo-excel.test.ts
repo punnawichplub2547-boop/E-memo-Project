@@ -40,6 +40,19 @@ describe("buildMemoExcelWorkbook", () => {
     expect(foundChecked).toBe("☑ IT");
   });
 
+  it("renders main category and item subcategory in the memo metadata", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ itemSubcategoryLabel: "office supplies" }));
+    const ws = wb.getWorksheet("Memo")!;
+    let text = "";
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (typeof cell.value === "string") text += cell.value + "\n";
+      });
+    });
+    expect(text).toContain("Category:");
+    expect(text).toContain("Subcategory: office supplies");
+  });
+
   it("sums request item totals into the subtotal row", async () => {
     const memo = makeMemo({
       requestItems: [

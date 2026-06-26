@@ -48,6 +48,13 @@ describe("quickSearchMemos", () => {
     expect(r.map((m) => m.id)).toEqual(["EM-2026-003"]);
   });
 
+  it("matches by item subcategory label", () => {
+    const r = quickSearchMemos([
+      memo({ id: "EM-2026-010", itemSubcategoryLabel: "office supplies" }),
+    ], "office supplies");
+    expect(r.map((m) => m.id)).toEqual(["EM-2026-010"]);
+  });
+
   it("matches by requester", () => {
     const r = quickSearchMemos(sample, "วิชาญ");
     expect(r.map((m) => m.id)).toEqual(["EM-2026-002"]);
@@ -81,11 +88,12 @@ describe("quickSearchMemos", () => {
 });
 
 describe("memoSearchHaystack", () => {
-  it("includes id, title, requester, department, category label, and route, lowercased", () => {
-    const hay = memoSearchHaystack(sample[1]);
+  it("includes id, title, requester, department, category/subcategory label, and route, lowercased", () => {
+    const hay = memoSearchHaystack({ ...sample[1], itemSubcategoryLabel: "machine parts" });
     expect(hay).toContain("em-2026-002");
     expect(hay).toContain("อะไหล่");
     expect(hay).toContain("en");
+    expect(hay).toContain("machine parts");
     expect(hay).toContain("managing director");
     expect(hay).toContain("general manager"); // from route
     expect(hay).toBe(hay.toLowerCase());

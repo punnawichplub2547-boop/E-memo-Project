@@ -152,6 +152,9 @@ export function DrawerPanel({
             <SummaryRow label="Requester" value={memo.requester} />
             <SummaryRow label="Department" value={memo.department} />
             <SummaryRow label="Category" value={approvalLabels[memo.category]} />
+            {memo.itemSubcategoryLabel && (
+              <SummaryRow label="Subcategory" value={memo.itemSubcategoryLabel} />
+            )}
             <SummaryRow
               label="Amount"
               value={

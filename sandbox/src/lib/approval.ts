@@ -103,6 +103,8 @@ export type RevisionSource = "initial" | "return" | "rejection-allowed";
 export type MemoSnapshot = {
   title: string;
   category: ApprovalCategory;
+  itemSubcategoryId?: number;
+  itemSubcategoryLabel?: string;
   department: string;
   amount: number;
   description?: string;
@@ -150,6 +152,8 @@ export type MemoRecord = {
   requesterUserId?: number | null;
   department: string;
   category: ApprovalCategory;
+  itemSubcategoryId?: number;
+  itemSubcategoryLabel?: string;
   amount: number;
   status: MemoStatus;
   currentStep: ApprovalLevel;

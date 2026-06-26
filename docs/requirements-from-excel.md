@@ -53,6 +53,12 @@ Source workbook: `D:\Hrproject\Book1.xlsx`
 ## Approval Matrix Summary
 
 - Follow `Book1.xlsx` as the source of truth before inventing new approval rules.
+- Table 2 item subcategories are the indented dash (`- ...`) entries under each numbered category. They should be treated as selectable/detail master data under the parent category, not as separate approval-rule categories unless confirmed later.
+  - Use these subcategories as supporting choices after the user has already selected the main category. Example: user selects `สินทรัพย์ถาวร` first, then the UI can offer `เครื่องจักร และ อุปกรณ์การผลิต`, `รถยนต์`, or other fixed-asset subcategories to refine the request.
+  - Raw material / production material: `วัตถุดิบ และ ชิ้นงาน`, `วัสดุประกอบ`, `วัสดุสิ้นเปลือง`, `วัสดุโรงงาน`, `ซื้อเพื่อทดลอง หรือ งานตัวอย่าง`.
+  - Fixed assets: `เครื่องจักร และ อุปกรณ์การผลิต`, `เครื่องมือเครื่องใช้โรงงาน`, `เครื่องมือเครื่องใช้สำนักงาน`, `รถยนต์`, `สินทรัพย์อื่น ๆ`.
+  - Service contract / job service: `ระบบสาธารณูปโภค`, `การซ่อมแซมบำรุงรักษาโรงงาน`, `สำนักงาน และ โรงงาน`, `อื่น ๆ`.
+  - General purchase: `สวัสดิการพนักงาน`, `ซื้ออุปกรณ์เครื่องมือเครื่องใช้ / ซ่อมบำรุง`, `ซื้อของทั่วไปสำนักงาน - โรงงาน`, `อื่น ๆ`.
 - General purchases and service contracts:
   - Up to 10,000 THB: Manager / Top Section.
   - 10,001-50,000 THB: General Manager.

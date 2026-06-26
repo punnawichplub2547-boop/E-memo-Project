@@ -10,6 +10,8 @@ describe("DB memo serializer", () => {
       requester_name: "Requester",
       department_name: "HR&GA",
       category: "general-purchase",
+      item_subcategory_id: 4003,
+      item_subcategory_label: "ซื้อของทั่วไปสำนักงาน - โรงงาน",
       amount: "9200.00",
       budget_status: null,
       account_code: null,
@@ -51,6 +53,8 @@ describe("DB memo serializer", () => {
     expect(memo.createdAt).toBe("17 May 2026 17:00");
     expect(memo.updatedAt).toBe("18 May 2026 09:20");
     expect(memo.cycleHours).toBe(0);
+    expect(memo.itemSubcategoryId).toBe(4003);
+    expect(memo.itemSubcategoryLabel).toBe("ซื้อของทั่วไปสำนักงาน - โรงงาน");
   });
 
   it("decodes JSON columns and read action rows", () => {

@@ -30,6 +30,8 @@ describe("DB memo write helpers", () => {
     requester: ACTOR,
     department: "HR&GA",
     category: "general-purchase",
+    itemSubcategoryId: 4003,
+    itemSubcategoryLabel: "ซื้อของทั่วไปสำนักงาน - โรงงาน",
     amount: 12000,
     status: "pending",
     currentStep: "Manager / Top Section",
@@ -49,6 +51,8 @@ describe("DB memo write helpers", () => {
     expect(payload.row.created_at).toBe("2026-06-01 07:30:00");
     expect(payload.row.updated_at).toBe("2026-06-01 07:30:00");
     expect(payload.row.selected_route_json).toBe(JSON.stringify(["Manager / Top Section", "General Manager"]));
+    expect(payload.row.item_subcategory_id).toBe(4003);
+    expect(payload.row.item_subcategory_label).toBe("ซื้อของทั่วไปสำนักงาน - โรงงาน");
   });
 
   it("builds submit workflow action for pending memos", () => {

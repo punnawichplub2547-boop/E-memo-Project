@@ -10,7 +10,7 @@ import { approvalLabels } from "./approval";
 /**
  * The lowercased text blob a memo is matched against. Covers what the topbar
  * placeholder promises — memo title, doc number, requester, department,
- * category label — PLUS the approver route (current step + full selected
+ * category/subcategory label — PLUS the approver route (current step + full selected
  * route) so searching "MD" / "General Manager" finds memos at that tier.
  */
 export function memoSearchHaystack(m: MemoRecord): string {
@@ -20,6 +20,7 @@ export function memoSearchHaystack(m: MemoRecord): string {
     m.requester,
     m.department,
     approvalLabels[m.category],
+    m.itemSubcategoryLabel,
     m.currentStep,
     m.selectedRoute?.join(" ") ?? "",
   ]

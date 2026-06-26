@@ -7,10 +7,14 @@ import {
 import { IconSparkles, IconTag, IconBuilding } from "@/components/icons";
 import { DEPARTMENTS } from "@/lib/departments";
 import { FlagCheckbox } from "./FlagCheckbox";
+import type { ItemSubcategory } from "@/lib/item-subcategories";
 
 interface MemoDetailsCardProps {
   subject: string;
   category: ApprovalCategory;
+  itemSubcategoryId?: number;
+  itemSubcategories: ItemSubcategory[];
+  itemSubcategoriesError: string;
   department: string;
   amount: number;
   budgetStatus: BudgetStatus;
@@ -33,6 +37,7 @@ interface MemoDetailsCardProps {
 
   onSubjectChange: (v: string) => void;
   onCategoryChange: (v: ApprovalCategory) => void;
+  onItemSubcategoryChange: (v: number | undefined) => void;
   onDepartmentChange: (v: string) => void;
   onAmountChange: (v: number) => void;
   onBudgetStatusChange: (v: BudgetStatus) => void;
@@ -47,6 +52,9 @@ interface MemoDetailsCardProps {
 export function MemoDetailsCard({
   subject,
   category,
+  itemSubcategoryId,
+  itemSubcategories,
+  itemSubcategoriesError,
   department,
   amount,
   budgetStatus,
@@ -66,6 +74,7 @@ export function MemoDetailsCard({
   effectiveIsPriceAdjustment,
   onSubjectChange,
   onCategoryChange,
+  onItemSubcategoryChange,
   onDepartmentChange,
   onAmountChange,
   onBudgetStatusChange,
@@ -141,6 +150,29 @@ export function MemoDetailsCard({
               </select>
             </div>
           </div>
+          <div className="em-field">
+            <label className="em-label">หมวดรายการย่อย</label>
+            <div className="em-input-prefix" style={{ paddingLeft: 12 }}>
+              <IconTag size={14} style={{ color: "var(--muted)" }} />
+              <select
+                style={{ border: 0, padding: 0, height: 32, background: "transparent", flex: 1, outline: "none", fontSize: 13 }}
+                value={itemSubcategoryId ?? ""}
+                disabled={itemSubcategories.length === 0}
+                onChange={e => onItemSubcategoryChange(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">{itemSubcategories.length === 0 ? "ไม่มีรายการย่อยที่ตั้งไว้" : "เลือกรายการย่อย"}</option>
+                {itemSubcategories.map(item => (
+                  <option key={item.id} value={item.id}>{item.labelTh}</option>
+                ))}
+              </select>
+            </div>
+            <div className="em-help">
+              {itemSubcategoriesError || "ใช้เสริมหลังเลือกหมวดหลัก ไม่เปลี่ยนเส้นทางอนุมัติ"}
+            </div>
+          </div>
+        </div>
+
+        <div className="em-pair-grid" style={{ gap: 12 }}>
           <div className="em-field">
             <label className="em-label">แผนก <span className="req">*</span></label>
             <div className="em-input-prefix" style={{ paddingLeft: 12 }}>

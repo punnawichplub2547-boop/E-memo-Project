@@ -64,6 +64,13 @@ describe("memosToCsv", () => {
     expect(row).not.toContain("general-purchase");
   });
 
+  it("includes the item subcategory after the main category", () => {
+    const row = memoToCsvRow(memo({ itemSubcategoryLabel: "office supplies" }));
+    const cells = row.split(",");
+    expect(MEMO_CSV_HEADERS).toContain("หมวดรายการย่อย");
+    expect(cells[5]).toBe("office supplies");
+  });
+
   it("joins the approval route with arrows", () => {
     const row = memoToCsvRow(
       memo({ selectedRoute: ["Manager / Top Section", "General Manager", "Managing Director"] }),
