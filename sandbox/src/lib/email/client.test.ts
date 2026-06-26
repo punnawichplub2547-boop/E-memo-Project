@@ -42,6 +42,29 @@ describe("getEmailConfig", () => {
       SMTP_HOST: "smtp.example.com",
     })).toBeNull();
   });
+
+  it("reads TLS servername and rejectUnauthorized overrides when set", () => {
+    expect(getEmailConfig({
+      EMAIL_NOTIFICATIONS_ENABLED: "true",
+      SMTP_HOST: "mail.example.com",
+      EMAIL_FROM: "E-Memo <x@example.com>",
+      SMTP_TLS_SERVERNAME: "real-host.provider.cloud",
+      SMTP_TLS_REJECT_UNAUTHORIZED: "false",
+    })).toMatchObject({
+      tlsServername: "real-host.provider.cloud",
+      tlsRejectUnauthorized: false,
+    });
+  });
+
+  it("omits TLS overrides when env vars are not set", () => {
+    const c = getEmailConfig({
+      EMAIL_NOTIFICATIONS_ENABLED: "true",
+      SMTP_HOST: "mail.example.com",
+      EMAIL_FROM: "E-Memo <x@example.com>",
+    });
+    expect(c).not.toHaveProperty("tlsServername");
+    expect(c).not.toHaveProperty("tlsRejectUnauthorized");
+  });
 });
 
 describe("sendEmailMessage", () => {

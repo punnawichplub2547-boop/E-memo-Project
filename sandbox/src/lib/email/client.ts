@@ -8,6 +8,10 @@ export type EmailConfig = {
   pass?: string;
   from: string;
   replyTo?: string;
+  // TLS overrides for mail servers whose cert CN/SAN differs from SMTP_HOST
+  // (e.g. a vanity host mail.car-1996.com fronting hmail02.readyidc.cloud).
+  tlsServername?: string;
+  tlsRejectUnauthorized?: boolean;
 };
 
 export type EmailAttachment = { filename: string; content: Buffer };
@@ -60,6 +64,10 @@ export function getEmailConfig(env: NodeJS.ProcessEnv = process.env): EmailConfi
   const user = env.SMTP_USER?.trim();
   const pass = env.SMTP_PASS;
   const replyTo = env.EMAIL_REPLY_TO?.trim();
+  const tlsServername = env.SMTP_TLS_SERVERNAME?.trim();
+  const tlsRejectUnauthorized = env.SMTP_TLS_REJECT_UNAUTHORIZED == null
+    ? undefined
+    : envEnabled(env.SMTP_TLS_REJECT_UNAUTHORIZED);
 
   return {
     host,
@@ -69,10 +77,15 @@ export function getEmailConfig(env: NodeJS.ProcessEnv = process.env): EmailConfi
     ...(pass ? { pass } : {}),
     from,
     ...(replyTo ? { replyTo } : {}),
+    ...(tlsServername ? { tlsServername } : {}),
+    ...(tlsRejectUnauthorized !== undefined ? { tlsRejectUnauthorized } : {}),
   };
 }
 
 function defaultTransport(config: EmailConfig): EmailTransport {
+  const tls: { servername?: string; rejectUnauthorized?: boolean } = {};
+  if (config.tlsServername) tls.servername = config.tlsServername;
+  if (config.tlsRejectUnauthorized === false) tls.rejectUnauthorized = false;
   return nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -80,6 +93,7 @@ function defaultTransport(config: EmailConfig): EmailTransport {
     ...(config.user || config.pass
       ? { auth: { user: config.user ?? "", pass: config.pass ?? "" } }
       : {}),
+    ...(Object.keys(tls).length > 0 ? { tls } : {}),
   });
 }
 
