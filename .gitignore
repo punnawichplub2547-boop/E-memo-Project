@@ -18,6 +18,11 @@ docs/superpowers/plans/
 sandbox/PROJECT-CONTEXT.md
 ~$*.xlsx
 .DS_Store
+# local artifacts — screenshots, presentation exports, session handoffs (not part of the app)
+shots/
+HR-GA-E-Memo-Presentation.pdf
+HR-GA-E-Memo-Presentation.pptx
+docs/claude-code-handoff-*.md
 AGENTS.md
 Book1.xlsx
 CLAUDE.md
