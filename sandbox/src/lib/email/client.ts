@@ -10,11 +10,14 @@ export type EmailConfig = {
   replyTo?: string;
 };
 
+export type EmailAttachment = { filename: string; content: Buffer };
+
 type EmailMessage = {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
 };
 
 type EmailTransport = {
@@ -25,6 +28,7 @@ type EmailTransport = {
     text: string;
     html?: string;
     replyTo?: string;
+    attachments?: EmailAttachment[];
   }) => Promise<{ messageId?: string }>;
 };
 
@@ -95,6 +99,9 @@ export async function sendEmailMessage(
       text: message.text,
       ...(message.html ? { html: message.html } : {}),
       ...(config.replyTo ? { replyTo: config.replyTo } : {}),
+      ...(message.attachments && message.attachments.length > 0
+        ? { attachments: message.attachments }
+        : {}),
     });
     return { messageId: result.messageId ?? "" };
   } catch {

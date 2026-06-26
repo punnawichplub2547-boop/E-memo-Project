@@ -8,6 +8,7 @@ import {
 } from "@/components/icons";
 import { DrawerFooter } from "./drawer-footer";
 import { AuditLogSection } from "./audit-log-section";
+import { EmailExcelButton } from "./email-excel-button";
 import { canMarkReadRecipient, type PrototypeUser } from "@/lib/prototype-users";
 import { formatAttachmentSize } from "@/lib/attachments";
 
@@ -137,6 +138,7 @@ export function DrawerPanel({
           >
             <IconDownload size={14} />
           </a>
+          <EmailExcelButton memoId={memo.id} />
           <button className="em-btn sm ghost icon-only" onClick={onClose} aria-label="ปิด">
             <IconX size={14} />
           </button>

@@ -79,6 +79,26 @@ describe("sendEmailMessage", () => {
     });
   });
 
+  it("passes attachments through to the transport", async () => {
+    const sendMail = vi.fn().mockResolvedValue({ messageId: "att-1" });
+    const content = Buffer.from("xlsx-bytes");
+    await sendEmailMessage(
+      {
+        to: "recipient@example.com",
+        subject: "Memo EM-1",
+        text: "See attached",
+        attachments: [{ filename: "memo-EM-1.xlsx", content }],
+      },
+      { getConfig: () => config, createTransport: () => ({ sendMail }) },
+    );
+
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [{ filename: "memo-EM-1.xlsx", content }],
+      }),
+    );
+  });
+
   it("returns null when email delivery is not configured", async () => {
     const sendMail = vi.fn();
     vi.stubEnv("EMAIL_NOTIFICATIONS_ENABLED", "true");
