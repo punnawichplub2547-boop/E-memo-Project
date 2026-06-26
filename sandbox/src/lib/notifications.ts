@@ -210,6 +210,17 @@ export async function createTelegramDelivery(
   );
 }
 
+export async function createEmailDelivery(
+  pool: Pool,
+  notificationId: number,
+): Promise<void> {
+  const now = nowMysqlUtcDateTime();
+  await pool.query(
+    `INSERT INTO notification_deliveries (notification_id, channel, status, created_at) VALUES (?, 'email', 'pending', ?)`,
+    [notificationId, now],
+  );
+}
+
 export async function markDeliveryStatus(
   pool: Pool,
   notificationId: number,

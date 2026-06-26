@@ -5,6 +5,8 @@ import {
   buildMemoNotificationText,
   buildMemoNotificationHtml,
   buildMemoNotificationTitle,
+  createEmailDelivery,
+  createTelegramDelivery,
   listNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -205,5 +207,29 @@ describe("markAllNotificationsRead", () => {
     const n = await markAllNotificationsRead(pool, 42);
     expect(n).toBe(4);
     expect(calls[0].params).toEqual([expect.any(String), 42]);
+  });
+});
+
+describe("notification delivery rows", () => {
+  it("creates a telegram delivery row with channel telegram", async () => {
+    const { pool, calls } = makeFakePool([{ insertId: 1 }]);
+
+    await createTelegramDelivery(pool, 99);
+
+    expect(calls[0].sql).toContain("notification_deliveries");
+    expect(calls[0].sql).toContain("'telegram'");
+    expect(calls[0].params[0]).toBe(99);
+    expect(calls[0].params[1]).toEqual(expect.any(String));
+  });
+
+  it("creates an email delivery row with channel email", async () => {
+    const { pool, calls } = makeFakePool([{ insertId: 1 }]);
+
+    await createEmailDelivery(pool, 100);
+
+    expect(calls[0].sql).toContain("notification_deliveries");
+    expect(calls[0].sql).toContain("'email'");
+    expect(calls[0].params[0]).toBe(100);
+    expect(calls[0].params[1]).toEqual(expect.any(String));
   });
 });

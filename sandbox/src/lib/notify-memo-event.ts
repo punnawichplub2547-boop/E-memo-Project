@@ -5,6 +5,7 @@ import {
   buildMemoNotificationText,
   buildMemoNotificationHtml,
   buildMemoNotificationTitle,
+  createEmailDelivery,
   createNotification,
   createTelegramDelivery,
   markDeliveryStatus,
@@ -16,6 +17,7 @@ import {
 } from "./notification-recipients";
 import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
 import { createApproveActionToken } from "./telegram/actions";
+import { getEmailConfig, sendEmailMessage } from "./email/client";
 import type { RowDataPacket } from "mysql2";
 
 type MemoRow = RowDataPacket & {
@@ -24,6 +26,8 @@ type MemoRow = RowDataPacket & {
   current_step: string; status: string; revision_no: number;
 };
 type ChatRow = RowDataPacket & { user_id: number; telegram_chat_id: string };
+type EmailRow = RowDataPacket & { id: number; email: string };
+type SendEmailFn = typeof sendEmailMessage;
 
 export type MemoEventType = "submitted" | "resubmitted" | "advanced" | "returned" | "rejected";
 
@@ -74,6 +78,19 @@ export async function getChatIds(pool: Pool, userIds: number[]): Promise<Map<num
   return map;
 }
 
+export async function getUserEmails(pool: Pool, userIds: number[]): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  if (userIds.length === 0) return map;
+  const [rows] = await pool.query<EmailRow[]>(
+    "SELECT id, email FROM users WHERE id IN (?) AND status = 'active'",
+    [userIds],
+  );
+  for (const row of rows) {
+    if (row.email) map.set(row.id, row.email);
+  }
+  return map;
+}
+
 async function sendAndTrack(
   pool: ReturnType<typeof getDbPool>,
   notifId: number,
@@ -88,6 +105,35 @@ async function sendAndTrack(
   });
 }
 
+export async function sendEmailAndTrack(
+  pool: ReturnType<typeof getDbPool> | Pool,
+  notifId: number,
+  to: string,
+  subject: string,
+  text: string,
+  html?: string,
+  sendEmail: SendEmailFn = sendEmailMessage,
+) {
+  await createEmailDelivery(pool, notifId);
+  const sent = await sendEmail({ to, subject, text, html });
+  await markDeliveryStatus(pool, notifId, "email", sent ? "sent" : "failed", {
+    providerId: sent?.messageId,
+  });
+}
+
+function addOpenLinkText(body: string, queueUrl: string): string {
+  return `${body}\n\nเปิดใน E-Memo: ${queueUrl}`;
+}
+
+function addOpenLinkHtml(body: string, queueUrl: string): string {
+  const escapedUrl = queueUrl
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  return `${body.replace(/\n/g, "<br>")}<br><br><a href="${escapedUrl}">เปิดใน E-Memo</a>`;
+}
+
 // Actionable: notify the approvers at the memo's current step, with an approve button.
 // Returns the approver user ids so the caller can exclude them from the watcher fan-out.
 async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string): Promise<number[]> {
@@ -95,13 +141,16 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
   const recipientIds = await resolveApprovalStepRecipients(memo.current_step, pool);
   if (recipientIds.length === 0) return [];
   const chatIds = await getChatIds(pool, recipientIds);
+  const emailEnabled = getEmailConfig() !== null;
+  const emails = emailEnabled ? await getUserEmails(pool, recipientIds) : new Map<number, string>();
   const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
   const body = buildMemoNotificationText("memo_pending_approval", ctx);
   const tgHtml = buildMemoNotificationHtml("memo_pending_approval", ctx);
+  const title = buildMemoNotificationTitle("memo_pending_approval", memo.memo_no);
   for (const recipientUserId of recipientIds) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId, type: "memo_pending_approval",
-      title: buildMemoNotificationTitle("memo_pending_approval", memo.memo_no), body, actionUrl: queuePath,
+      title, body, actionUrl: queuePath,
     });
     const chatId = chatIds.get(recipientUserId);
     if (chatId) {
@@ -110,6 +159,10 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
         { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
         { text: "เปิดใน E-Memo", url: queueUrl },
       ]]));
+    }
+    const email = emails.get(recipientUserId);
+    if (email) {
+      await sendEmailAndTrack(pool, notifId, email, title, addOpenLinkText(body, queueUrl), addOpenLinkHtml(tgHtml, queueUrl));
     }
   }
   return recipientIds;
@@ -134,16 +187,23 @@ async function notifyWatchers(
   const recipients = computeWatcherRecipients({ requesterId, ccIds, actorId: actorUserId, excludeActor, excludeIds });
   if (recipients.length === 0) return;
   const chatIds = await getChatIds(pool, recipients);
+  const emailEnabled = getEmailConfig() !== null;
+  const emails = emailEnabled ? await getUserEmails(pool, recipients) : new Map<number, string>();
   const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
   for (const userId of recipients) {
     const type = userId === requesterId ? types.requesterType : types.ccType;
     const body = buildMemoNotificationText(type, ctx);
     const tgHtml = buildMemoNotificationHtml(type, ctx);
+    const title = buildMemoNotificationTitle(type, memo.memo_no);
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type,
-      title: buildMemoNotificationTitle(type, memo.memo_no), body, actionUrl: queuePath,
+      title, body, actionUrl: queuePath,
     });
     const chatId = chatIds.get(userId);
+    const email = emails.get(userId);
+    if (email) {
+      await sendEmailAndTrack(pool, notifId, email, title, addOpenLinkText(body, queueUrl), addOpenLinkHtml(tgHtml, queueUrl));
+    }
     if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
   }
 }

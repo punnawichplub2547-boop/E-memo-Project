@@ -106,7 +106,27 @@ Remove-Item Env:\CONFIRM_DB_SEED
 - DB-2 complete: all eight write actions are persisted to MySQL — new memo creation (`ADD_MEMO`), approval advancement (`ADVANCE_STEP`), return-for-revision (`RETURN_MEMO`), rejection (`REJECT_MEMO`), read acknowledgement actions (`MARK_READ`, `SKIP_ALL_READS`), quick resubmit (`RESUBMIT_MEMO`), and edit-and-resubmit (`SUBMIT_REVISION`).
 - Empty DB Trial Mode is supported: when `GET /api/memos` returns an empty array, the app shows an intentionally empty workspace instead of falling back to demo seeds.
 - If the DB/API is unavailable, the app falls back to static `seedMemos` so the prototype remains usable.
-- No authentication, email delivery, or production AI integration yet.
+- Email notification delivery is available through SMTP when `EMAIL_NOTIFICATIONS_ENABLED=true` and the SMTP env vars are configured; in-app notifications remain the default/fallback.
+- No production AI integration yet.
+
+## Email Notifications
+
+Email delivery reuses the existing notification fan-out. The app always writes in-app notifications first; then it sends email best-effort to the same resolved user recipients when SMTP is enabled.
+
+Required env vars:
+
+```bash
+EMAIL_NOTIFICATIONS_ENABLED=true
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=mailer@example.com
+SMTP_PASS=change-me
+EMAIL_FROM="HR&GA E-Memo <no-reply@example.com>"
+EMAIL_REPLY_TO=hr@example.com
+```
+
+If any required email setting is missing, workflow actions continue normally and no email delivery row is created.
 
 ## Confirmed Prototype Direction
 

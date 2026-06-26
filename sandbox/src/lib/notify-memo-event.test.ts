@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { computeWatcherRecipients, getChatIds } from "./notify-memo-event";
+import { computeWatcherRecipients, getChatIds, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
 
 function chatPool(rows: unknown[]): Pool {
   return {
@@ -52,5 +52,80 @@ describe("getChatIds", () => {
     expect(map.has(2)).toBe(false);
     expect(map.has(3)).toBe(false);
     expect(map.has(4)).toBe(false);
+  });
+});
+
+describe("getUserEmails", () => {
+  it("returns active user email addresses and skips missing ids", async () => {
+    const map = await getUserEmails(
+      chatPool([
+        { id: 1, email: "a@car-1996.com" },
+        { id: 3, email: "c@car-1996.com" },
+      ]),
+      [1, 2, 3],
+    );
+    expect(map.get(1)).toBe("a@car-1996.com");
+    expect(map.has(2)).toBe(false);
+    expect(map.get(3)).toBe("c@car-1996.com");
+  });
+
+  it("returns an empty map for no user ids without querying", async () => {
+    const pool = {
+      query: async () => {
+        throw new Error("should not query");
+      },
+    } as unknown as Pool;
+    await expect(getUserEmails(pool, [])).resolves.toEqual(new Map());
+  });
+});
+
+describe("sendEmailAndTrack", () => {
+  function trackingPool() {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [{ affectedRows: 1 }, undefined];
+      },
+    } as unknown as Pool;
+    return { pool, calls };
+  }
+
+  it("creates an email delivery row and marks it sent when SMTP succeeds", async () => {
+    const { pool, calls } = trackingPool();
+    await sendEmailAndTrack(
+      pool,
+      77,
+      "approver@car-1996.com",
+      "Subject",
+      "Body",
+      undefined,
+      async () => ({ messageId: "email-1" }),
+    );
+
+    expect(calls[0].sql).toContain("notification_deliveries");
+    expect(calls[0].sql).toContain("'email'");
+    expect(calls[1].sql).toContain("UPDATE notification_deliveries");
+    expect(calls[1].params[0]).toBe("sent");
+    expect(calls[1].params[1]).toBe("email-1");
+    expect(calls[1].params[5]).toBe(77);
+    expect(calls[1].params[6]).toBe("email");
+  });
+
+  it("marks email delivery failed when SMTP does not return a result", async () => {
+    const { pool, calls } = trackingPool();
+    await sendEmailAndTrack(
+      pool,
+      78,
+      "approver@car-1996.com",
+      "Subject",
+      "Body",
+      undefined,
+      async () => null,
+    );
+
+    expect(calls[1].params[0]).toBe("failed");
+    expect(calls[1].params[1]).toBeNull();
+    expect(calls[1].params[6]).toBe("email");
   });
 });
