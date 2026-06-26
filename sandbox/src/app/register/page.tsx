@@ -139,6 +139,25 @@ export default function RegisterPage() {
           0%,100% { box-shadow: 0 0 28px rgba(59,130,246,0.55), 0 0 56px rgba(59,130,246,0.22); }
           50%     { box-shadow: 0 0 44px rgba(59,130,246,0.85), 0 0 88px rgba(59,130,246,0.38); }
         }
+        @keyframes rg-car-square-breathe {
+          0%,100% {
+            transform: translateY(0) scale(1);
+            box-shadow: 0 18px 48px rgba(15,23,42,0.26), 0 0 34px rgba(59,130,246,0.38), 0 0 0 1px rgba(255,255,255,0.78) inset;
+          }
+          50% {
+            transform: translateY(-3px) scale(1.035);
+            box-shadow: 0 24px 58px rgba(15,23,42,0.34), 0 0 52px rgba(59,130,246,0.62), 0 0 0 1px rgba(255,255,255,0.92) inset;
+          }
+        }
+        @keyframes rg-car-square-sheen {
+          0%,18% { transform: translateX(-155%) rotate(18deg); opacity: 0; }
+          34% { opacity: 0.9; }
+          58%,100% { transform: translateX(150%) rotate(18deg); opacity: 0; }
+        }
+        @keyframes rg-car-logo-drift {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-1.5px); }
+        }
         @keyframes rg-ring-cw  { to { transform: rotate(360deg); } }
         @keyframes rg-ring-ccw { to { transform: rotate(-360deg); } }
         @keyframes rg-streak {
@@ -209,6 +228,69 @@ export default function RegisterPage() {
           box-shadow: 0 10px 28px rgba(37,99,235,0.4) !important;
         }
         .rg-submit-btn:active:not(:disabled) { transform: translateY(0); }
+        .rg-car-logo-square {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 72px;
+          height: 72px;
+          padding: 11px;
+          border-radius: 18px;
+          overflow: hidden;
+          isolation: isolate;
+          background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.98), rgba(248,251,255,0.88) 38%, rgba(219,234,254,0.96) 100%);
+          border: 1px solid rgba(255,255,255,0.7);
+          animation: rg-car-square-breathe 4.2s ease-in-out infinite;
+        }
+        .rg-car-logo-square::before {
+          content: "";
+          position: absolute;
+          inset: 6px;
+          border-radius: 14px;
+          border: 1px solid rgba(37,99,235,0.14);
+          background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.10), transparent 62%);
+          z-index: 0;
+        }
+        .rg-car-logo-square::after {
+          content: "";
+          position: absolute;
+          top: -25%;
+          bottom: -25%;
+          left: 0;
+          width: 42%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.88), transparent);
+          filter: blur(0.5px);
+          animation: rg-car-square-sheen 4.8s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .rg-car-logo-square img {
+          position: relative;
+          z-index: 1;
+          width: 54px;
+          height: auto;
+          display: block;
+          filter: drop-shadow(0 7px 12px rgba(15,23,42,0.12));
+          animation: rg-car-logo-drift 4.2s ease-in-out infinite;
+        }
+        /* Backup old logo treatment: add this class to restore the previous rounded-rectangle pulse. */
+        .rg-car-logo-square--legacy {
+          width: 80px;
+          height: 60px;
+          border-radius: 16px;
+          padding: 8px 10px;
+          background: rgba(255,255,255,0.94);
+          border: none;
+          animation: rg-logo-pulse 3.2s ease-in-out infinite;
+        }
+        .rg-car-logo-square--legacy::before,
+        .rg-car-logo-square--legacy::after { display: none; }
+        .rg-car-logo-square--legacy img {
+          width: 56px;
+          animation: none;
+          filter: none;
+        }
         .rg-eye-btn {
           position: absolute; top: 50%; right: 9px;
           transform: translateY(-50%);
@@ -216,6 +298,11 @@ export default function RegisterPage() {
           background: transparent; color: #94A3B8;
           display: inline-flex; align-items: center; justify-content: center;
           cursor: pointer;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .rg-streak, .rg-car-logo-square, .rg-car-logo-square::after,
+          .rg-car-logo-square img, .rg-step, .rg-form-wrap { animation: none !important; }
         }
 
         @media (max-width: 820px) { .rg-left { display: none !important; } }
@@ -277,16 +364,9 @@ export default function RegisterPage() {
           <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
             {/* Logo */}
             <div style={{ marginBottom: 44 }}>
-              <div style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 80, height: 60, borderRadius: 16,
-                background: "rgba(255,255,255,0.94)",
-                animation: "rg-logo-pulse 3.2s ease-in-out infinite",
-                marginBottom: 24,
-                padding: "8px 10px",
-              }}>
+              <div className="rg-car-logo-square" style={{ marginBottom: 24 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 56, height: "auto", display: "block" }} />
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" />
               </div>
 
               <div style={{

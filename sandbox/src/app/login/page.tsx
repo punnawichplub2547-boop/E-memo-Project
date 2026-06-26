@@ -55,6 +55,25 @@ export default function LoginPage() {
           0%,100% { box-shadow: 0 0 28px rgba(59,130,246,0.55), 0 0 56px rgba(59,130,246,0.22); }
           50%      { box-shadow: 0 0 44px rgba(59,130,246,0.85), 0 0 88px rgba(59,130,246,0.38), 0 0 120px rgba(147,197,253,0.16); }
         }
+        @keyframes em-car-square-breathe {
+          0%,100% {
+            transform: translateY(0) scale(1);
+            box-shadow: 0 18px 48px rgba(15,23,42,0.26), 0 0 34px rgba(59,130,246,0.38), 0 0 0 1px rgba(255,255,255,0.78) inset;
+          }
+          50% {
+            transform: translateY(-3px) scale(1.035);
+            box-shadow: 0 24px 58px rgba(15,23,42,0.34), 0 0 52px rgba(59,130,246,0.62), 0 0 0 1px rgba(255,255,255,0.92) inset;
+          }
+        }
+        @keyframes em-car-square-sheen {
+          0%,18% { transform: translateX(-155%) rotate(18deg); opacity: 0; }
+          34% { opacity: 0.9; }
+          58%,100% { transform: translateX(150%) rotate(18deg); opacity: 0; }
+        }
+        @keyframes em-car-logo-drift {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-1.5px); }
+        }
         @keyframes em-ring-cw  { to { transform: rotate(360deg); } }
         @keyframes em-ring-ccw { to { transform: rotate(-360deg); } }
         @keyframes em-fade-up {
@@ -120,6 +139,114 @@ export default function LoginPage() {
 
         .em-form-wrap { animation: em-fade-up 0.45s 0.05s ease both; }
 
+        .em-form-pane {
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+        }
+        .em-form-pane::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          background-image: url('/login-building-bg.jpg');
+          background-size: cover;
+          background-position: center right;
+          opacity: 0.38;
+          filter: saturate(1.02) contrast(1);
+          transform: scale(1.02);
+        }
+        .em-form-pane::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          background:
+            linear-gradient(112deg,
+              #FFFFFF 0%,
+              #FFFFFF 38%,
+              rgba(255,255,255,0.86) 53%,
+              rgba(255,255,255,0.50) 72%,
+              rgba(255,255,255,0.18) 100%),
+            linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.88) 100%);
+        }
+        .em-form-wrap {
+          position: relative;
+          z-index: 1;
+        }
+
+        .em-car-logo-square {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 72px;
+          height: 72px;
+          padding: 11px;
+          border-radius: 18px;
+          overflow: hidden;
+          isolation: isolate;
+          background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.98), rgba(248,251,255,0.88) 38%, rgba(219,234,254,0.96) 100%);
+          border: 1px solid rgba(255,255,255,0.7);
+          animation: em-car-square-breathe 4.2s ease-in-out infinite;
+        }
+        .em-car-logo-square::before {
+          content: "";
+          position: absolute;
+          inset: 6px;
+          border-radius: 14px;
+          border: 1px solid rgba(37,99,235,0.14);
+          background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.10), transparent 62%);
+          z-index: 0;
+        }
+        .em-car-logo-square::after {
+          content: "";
+          position: absolute;
+          top: -25%;
+          bottom: -25%;
+          left: 0;
+          width: 42%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.88), transparent);
+          filter: blur(0.5px);
+          animation: em-car-square-sheen 4.8s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .em-car-logo-square img {
+          position: relative;
+          z-index: 1;
+          width: 54px;
+          height: auto;
+          display: block;
+          filter: drop-shadow(0 7px 12px rgba(15,23,42,0.12));
+          animation: em-car-logo-drift 4.2s ease-in-out infinite;
+        }
+        .em-car-logo-square--mobile {
+          width: 74px;
+          height: 74px;
+          margin-bottom: 16px;
+        }
+        .em-car-logo-square--mobile img { width: 55px; }
+        /* Backup old logo treatment: add this class to restore the previous rounded-rectangle pulse. */
+        .em-car-logo-square--legacy {
+          width: 80px;
+          height: 66px;
+          border-radius: 16px;
+          padding: 8px 10px;
+          background: rgba(255,255,255,0.94);
+          border: none;
+          animation: em-logo-pulse 3.2s ease-in-out infinite;
+        }
+        .em-car-logo-square--legacy::before,
+        .em-car-logo-square--legacy::after { display: none; }
+        .em-car-logo-square--legacy img {
+          width: 56px;
+          animation: none;
+          filter: none;
+        }
+
         /* Mobile-only brand header — hidden on desktop */
         .em-mobile-brand { display: none; }
 
@@ -132,28 +259,49 @@ export default function LoginPage() {
             display: block !important;
             position: relative;
             overflow: hidden;
-            background: linear-gradient(158deg, #060C1F 0%, #0B1735 46%, #102060 100%) !important;
+            background: linear-gradient(180deg, #F7FAFF 0%, #FFFFFF 58%, #F8FBFF 100%) !important;
           }
 
           /* Brand atmosphere layers fill the whole mobile screen */
           .em-mobile-atmos {
             position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
           }
+          .em-mobile-atmos::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 52%;
+            background-image: url('/login-building-bg.jpg');
+            background-size: cover;
+            background-position: center top;
+            opacity: 0.42;
+            filter: saturate(1.02) contrast(1);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.72) 54%, transparent 100%);
+            -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.72) 54%, transparent 100%);
+          }
+          .em-mobile-atmos::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+              linear-gradient(164deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.58) 38%, transparent 39%),
+              linear-gradient(180deg, rgba(255,255,255,0.06) 0%, #FFFFFF 60%, rgba(248,251,255,0.92) 100%);
+          }
           .em-mobile-atmos .em-orb-top {
             position: absolute; top: -130px; right: -110px;
             width: 320px; height: 320px; border-radius: 50%;
-            background: radial-gradient(circle, rgba(37,99,235,0.30) 0%, transparent 68%);
+            background: radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 68%);
             animation: em-float-a 9s ease-in-out infinite;
           }
           .em-mobile-atmos .em-orb-bottom {
             position: absolute; bottom: -90px; left: -90px;
             width: 300px; height: 300px; border-radius: 50%;
-            background: radial-gradient(circle, rgba(59,130,246,0.22) 0%, transparent 68%);
+            background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 68%);
             animation: em-float-b 12s ease-in-out infinite; animation-delay: -4s;
           }
           .em-mobile-atmos .em-dotgrid {
             position: absolute; inset: 0;
-            background-image: radial-gradient(rgba(147,197,253,0.08) 1px, transparent 1px);
+            background-image: radial-gradient(rgba(37,99,235,0.07) 1px, transparent 1px);
             background-size: 26px 26px;
             mask-image: linear-gradient(180deg, transparent 2%, rgba(0,0,0,0.5) 22%, rgba(0,0,0,0.5) 78%, transparent 98%);
             -webkit-mask-image: linear-gradient(180deg, transparent 2%, rgba(0,0,0,0.5) 22%, rgba(0,0,0,0.5) 78%, transparent 98%);
@@ -166,6 +314,10 @@ export default function LoginPage() {
             min-height: 100dvh;
             padding: 34px 22px calc(28px + env(safe-area-inset-bottom)) !important;
             align-items: flex-start !important;
+          }
+          .em-form-pane::before,
+          .em-form-pane::after {
+            display: none;
           }
           .em-form-wrap {
             margin: auto;
@@ -185,33 +337,42 @@ export default function LoginPage() {
             animation: em-logo-pulse 3.2s ease-in-out infinite;
             margin-bottom: 16px;
           }
+          .em-mobile-brand .em-mb-logo.em-car-logo-square {
+            width: 74px;
+            height: 74px;
+            border-radius: 18px;
+            padding: 11px;
+            background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.98), rgba(248,251,255,0.88) 38%, rgba(219,234,254,0.96) 100%);
+            animation: em-car-square-breathe 4.2s ease-in-out infinite;
+          }
           .em-mobile-brand .em-mb-title {
-            font-size: 30px; font-weight: 800; color: #EDF4FF;
+            font-size: 30px; font-weight: 800; color: #0F255C;
             font-family: 'Syne', sans-serif; letter-spacing: -0.5px; line-height: 1.1;
           }
           .em-mobile-brand .em-mb-sub {
-            font-size: 13px; color: rgba(147,197,253,0.78); font-weight: 500; margin-top: 5px;
+            font-size: 13px; color: rgba(30,64,175,0.72); font-weight: 500; margin-top: 5px;
           }
           .em-mobile-brand .em-mb-co {
-            font-size: 10px; color: rgba(147,197,253,0.42); font-weight: 500;
+            font-size: 10px; color: rgba(30,64,175,0.42); font-weight: 500;
             letter-spacing: 0.07em; text-transform: uppercase; margin-top: 7px;
           }
 
           /* Form card → glass panel on the dark brand background */
           .em-login-card {
             background: rgba(255,255,255,0.97) !important;
-            border: 1px solid rgba(255,255,255,0.5);
+            border: 1px solid rgba(219,234,254,0.92);
             border-radius: 20px;
             padding: 28px 22px 26px !important;
-            box-shadow: 0 24px 60px -20px rgba(3,8,24,0.7), 0 0 0 1px rgba(59,130,246,0.06);
+            box-shadow: 0 24px 60px -24px rgba(30,58,138,0.26), 0 0 0 1px rgba(59,130,246,0.06);
           }
           /* Footer reads on dark bg outside the card */
-          .em-mobile-footer { color: rgba(147,197,253,0.42) !important; margin-top: 26px !important; }
+          .em-mobile-footer { color: rgba(71,85,105,0.54) !important; margin-top: 26px !important; }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .em-login-streak, .em-mobile-atmos .em-orb-top, .em-mobile-atmos .em-orb-bottom,
-          .em-mb-logo, .em-feat, .em-form-wrap { animation: none !important; }
+          .em-mb-logo, .em-car-logo-square, .em-car-logo-square::after,
+          .em-car-logo-square img, .em-feat, .em-form-wrap { animation: none !important; }
         }
       `}</style>
 
@@ -289,16 +450,9 @@ export default function LoginPage() {
 
             {/* Logo + brand */}
             <div style={{ marginBottom: 44 }}>
-              <div style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 80, height: 66, borderRadius: 16,
-                background: "rgba(255,255,255,0.94)",
-                animation: "em-logo-pulse 3.2s ease-in-out infinite",
-                marginBottom: 26,
-                padding: "8px 10px",
-              }}>
+              <div className="em-car-logo-square" style={{ marginBottom: 26 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 56, height: "auto", display: "block" }} />
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" />
               </div>
 
               <div style={{
@@ -378,9 +532,9 @@ export default function LoginPage() {
 
             {/* Mobile-only brand header (logo + wordmark) — hidden ≥820px */}
             <div className="em-mobile-brand">
-              <span className="em-mb-logo">
+              <span className="em-mb-logo em-car-logo-square em-car-logo-square--mobile">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/CARLOGO.png" alt="Complete Auto Rubber" style={{ width: 54, height: "auto", display: "block" }} />
+                <img src="/CARLOGO.png" alt="Complete Auto Rubber" />
               </span>
               <span className="em-mb-title">E-Memo</span>
               <span className="em-mb-sub">ระบบบันทึกข้อความภายใน</span>
