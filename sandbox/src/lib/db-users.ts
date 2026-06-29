@@ -110,6 +110,14 @@ export async function updateUserStatus(
   );
 }
 
+export async function updateUserPassword(id: number, passwordHash: string): Promise<void> {
+  const pool = getDbPool();
+  await pool.query(
+    "UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?",
+    [passwordHash, id]
+  );
+}
+
 export function parseRoles(rolesJson: string): string[] {
   try { return JSON.parse(rolesJson) as string[]; } catch { return ["requester"]; }
 }

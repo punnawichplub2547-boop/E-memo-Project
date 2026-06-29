@@ -620,6 +620,11 @@ export default function LoginPage() {
                     {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
                   </button>
                 </div>
+                <div style={{ marginTop: 9, textAlign: "right" }}>
+                  <Link href="/forgot-password" style={{ fontSize: 12.5, color: "#2563EB", textDecoration: "none", fontWeight: 600 }}>
+                    ลืมรหัสผ่าน?
+                  </Link>
+                </div>
               </div>
 
               {/* Error */}
