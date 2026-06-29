@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByEmail } from "@/lib/db-users";
-import { createPasswordResetToken } from "@/lib/password-reset";
+import { createPasswordResetToken, hasRecentResetToken } from "@/lib/password-reset";
 import { sendEmailMessage } from "@/lib/email/client";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,9 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await findUserByEmail(email);
-    if (user && user.status === "active") {
+    // Skip silently if an account already got a reset link inside the cooldown
+    // window — throttles spam without changing the response (no enumeration).
+    if (user && user.status === "active" && !(await hasRecentResetToken(user.id))) {
       const rawToken = await createPasswordResetToken(user.id);
       const base = (process.env.APP_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
       const link = `${base}/reset-password?token=${rawToken}`;

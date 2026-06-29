@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { isResetTokenUsable, type ResetTokenRow } from "./password-reset";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { isResetTokenUsable, hasRecentResetToken, type ResetTokenRow } from "./password-reset";
+
+vi.mock("@/lib/db", () => ({ getDbPool: vi.fn() }));
+import { getDbPool } from "@/lib/db";
 
 const NOW = new Date("2026-06-29T12:00:00Z");
 
@@ -27,5 +30,35 @@ describe("isResetTokenUsable", () => {
   it("rejects a missing row", () => {
     expect(isResetTokenUsable(null, NOW)).toBe(false);
     expect(isResetTokenUsable(undefined, NOW)).toBe(false);
+  });
+});
+
+describe("hasRecentResetToken", () => {
+  let query: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    query = vi.fn();
+    vi.mocked(getDbPool).mockReturnValue({ query } as never);
+  });
+
+  it("returns true when a token for the user exists inside the cooldown window", async () => {
+    query.mockResolvedValue([[{ "1": 1 }]]);
+    const result = await hasRecentResetToken(42);
+    expect(result).toBe(true);
+    const params = query.mock.calls[0][1] as unknown[];
+    expect(params[0]).toBe(42);
+  });
+
+  it("returns false when there is no recent token for the user", async () => {
+    query.mockResolvedValue([[]]);
+    expect(await hasRecentResetToken(42)).toBe(false);
+  });
+
+  it("passes the requested cooldown window to the query", async () => {
+    query.mockResolvedValue([[]]);
+    await hasRecentResetToken(42, 5);
+    const params = query.mock.calls[0][1] as unknown[];
+    expect(params[1]).toBe(5);
   });
 });

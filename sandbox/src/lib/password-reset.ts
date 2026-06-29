@@ -5,6 +5,10 @@ import { generateRawToken, hashToken, createTokenExpiry } from "./telegram/token
 // Reset tokens live ~60 minutes; single-use.
 export const RESET_TOKEN_TTL_MINUTES = 60;
 
+// Minimum gap between reset requests for the same account. Defense-in-depth
+// against forgot-password spam (Cloudflare WAF rate-limit is the edge primary).
+export const RESET_COOLDOWN_MINUTES = 2;
+
 export type ResetTokenRow = {
   expires_at: string | Date;
   used_at: string | Date | null;
@@ -43,6 +47,20 @@ export async function createPasswordResetToken(userId: number): Promise<string> 
     [userId, tokenHash, expiresAt],
   );
   return rawToken;
+}
+
+// True if the user already has a reset token issued within the cooldown window.
+// Used to throttle repeated forgot-password requests for the same account.
+export async function hasRecentResetToken(
+  userId: number,
+  withinMinutes: number = RESET_COOLDOWN_MINUTES,
+): Promise<boolean> {
+  const pool = getDbPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT 1 FROM password_reset_tokens WHERE user_id = ? AND created_at >= (NOW() - INTERVAL ? MINUTE) LIMIT 1",
+    [userId, withinMinutes],
+  );
+  return rows.length > 0;
 }
 
 export async function findResetTokenByRaw(

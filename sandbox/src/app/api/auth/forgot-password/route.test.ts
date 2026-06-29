@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/db-users", () => ({ findUserByEmail: vi.fn() }));
-vi.mock("@/lib/password-reset", () => ({ createPasswordResetToken: vi.fn() }));
+vi.mock("@/lib/password-reset", () => ({
+  createPasswordResetToken: vi.fn(),
+  hasRecentResetToken: vi.fn(),
+}));
 vi.mock("@/lib/email/client", () => ({ sendEmailMessage: vi.fn() }));
 
 import { POST } from "./route";
 import { findUserByEmail } from "@/lib/db-users";
-import { createPasswordResetToken } from "@/lib/password-reset";
+import { createPasswordResetToken, hasRecentResetToken } from "@/lib/password-reset";
 import { sendEmailMessage } from "@/lib/email/client";
 
 const ACTIVE_USER = {
@@ -29,6 +32,7 @@ function makeReq(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(findUserByEmail).mockResolvedValue(ACTIVE_USER as never);
+  vi.mocked(hasRecentResetToken).mockResolvedValue(false);
   vi.mocked(createPasswordResetToken).mockResolvedValue("RAWTOKEN");
   vi.mocked(sendEmailMessage).mockResolvedValue({ messageId: "m1" });
 });
@@ -50,6 +54,14 @@ describe("POST /api/auth/forgot-password", () => {
 
   it("returns 200 without issuing a token when the account is not active", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue({ ...ACTIVE_USER, status: "pending" } as never);
+    const res = await POST(makeReq({ email: ACTIVE_USER.email }));
+    expect(res.status).toBe(200);
+    expect(vi.mocked(createPasswordResetToken)).not.toHaveBeenCalled();
+    expect(vi.mocked(sendEmailMessage)).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 without issuing a new token when one was requested inside the cooldown window", async () => {
+    vi.mocked(hasRecentResetToken).mockResolvedValue(true);
     const res = await POST(makeReq({ email: ACTIVE_USER.email }));
     expect(res.status).toBe(200);
     expect(vi.mocked(createPasswordResetToken)).not.toHaveBeenCalled();
