@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { SessionUser } from "./auth-jwt";
+import { isPublicAuthPath } from "./public-auth-paths";
 
 type AuthContextValue = {
   user: SessionUser | null;
@@ -19,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetch("/api/auth/me")
       .then(async r => {
         if (r.ok) return r.json() as Promise<{ user: SessionUser | null }>;
-        if (typeof window !== "undefined" && !["/login", "/register"].includes(window.location.pathname)) {
+        if (typeof window !== "undefined" && !isPublicAuthPath(window.location.pathname)) {
           window.location.href = "/login";
         }
         return { user: null };
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((data: { user: SessionUser | null }) => setUser(data.user))
       .catch(() => {
         setUser(null);
-        if (typeof window !== "undefined" && !["/login", "/register"].includes(window.location.pathname)) {
+        if (typeof window !== "undefined" && !isPublicAuthPath(window.location.pathname)) {
           window.location.href = "/login";
         }
       })
