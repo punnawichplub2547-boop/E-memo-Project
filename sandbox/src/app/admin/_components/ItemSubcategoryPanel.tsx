@@ -41,6 +41,8 @@ export function ItemSubcategoryPanel() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -127,6 +129,22 @@ export function ItemSubcategoryPanel() {
     setRefreshKey(n => n + 1);
   }
 
+  async function handleDeleteSubcategory(id: number) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/item-subcategories/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
+      setConfirmDeleteId(null);
+      setEditingId(null);
+      setEditDraft(null);
+      setRefreshKey(n => n + 1);
+    } catch {
+      setError("ลบหมวดรายการย่อยไม่สำเร็จ");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
@@ -190,9 +208,26 @@ export function ItemSubcategoryPanel() {
                               <input type="checkbox" checked={editDraft.isActive} onChange={e => setEditDraft(d => d ? ({ ...d, isActive: e.target.checked }) : d)} />
                               Active
                             </label>
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                               <button className="em-btn primary" onClick={() => saveEdit(item.id)}><IconCheck size={13} /> Save</button>
-                              <button className="em-btn" onClick={() => { setEditingId(null); setEditDraft(null); }}><IconX size={13} /> Cancel</button>
+                              <button className="em-btn" onClick={() => { setEditingId(null); setEditDraft(null); setConfirmDeleteId(null); }}><IconX size={13} /> Cancel</button>
+                              {confirmDeleteId === item.id ? (
+                                <>
+                                  <span style={{ fontSize: 12, color: "#DC2626", marginRight: 6 }}>ลบถาวร? กู้คืนไม่ได้</span>
+                                  <button className="em-btn" style={{ fontSize: 12, color: "#DC2626" }}
+                                    disabled={deleting} onClick={() => handleDeleteSubcategory(item.id)}>
+                                    ยืนยันลบ
+                                  </button>
+                                  <button className="em-btn" style={{ fontSize: 12 }} onClick={() => setConfirmDeleteId(null)}>
+                                    ยกเลิก
+                                  </button>
+                                </>
+                              ) : (
+                                <button className="em-btn" style={{ fontSize: 12, color: "#DC2626" }}
+                                  onClick={() => setConfirmDeleteId(item.id)}>
+                                  ลบถาวร
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>

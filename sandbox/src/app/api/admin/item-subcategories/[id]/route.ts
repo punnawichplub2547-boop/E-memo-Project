@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
-import { setItemSubcategoryActive, updateItemSubcategory, type ItemSubcategoryInput } from "@/lib/db-item-subcategories";
+import { deleteItemSubcategory, setItemSubcategoryActive, updateItemSubcategory, type ItemSubcategoryInput } from "@/lib/db-item-subcategories";
 import { isApprovalCategory } from "@/lib/item-subcategories";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("[PUT /api/admin/item-subcategories/[id]]", error);
     return NextResponse.json({ error: "Unable to update item subcategory" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const forbidden = await requireAdmin(req);
+  if (forbidden) return forbidden;
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+  try {
+    await deleteItemSubcategory(id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[DELETE /api/admin/item-subcategories/[id]]", error);
+    return NextResponse.json({ error: "Unable to delete item subcategory" }, { status: 500 });
   }
 }
 

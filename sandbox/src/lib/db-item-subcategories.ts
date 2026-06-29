@@ -103,6 +103,11 @@ export async function setItemSubcategoryActive(id: number, isActive: boolean): P
   );
 }
 
+export async function deleteItemSubcategory(id: number): Promise<void> {
+  const pool = getDbPool();
+  await pool.execute("DELETE FROM item_subcategories WHERE id = ?", [id]);
+}
+
 function rowToItemSubcategory(row: ItemSubcategoryDbRow): AdminItemSubcategory {
   return {
     id: row.id,

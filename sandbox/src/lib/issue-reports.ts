@@ -127,3 +127,12 @@ export async function setIssueReportStatus(
   )) as [{ affectedRows: number }, unknown];
   return result.affectedRows > 0;
 }
+
+// Permanently deletes a report. Returns true only when a row was removed.
+export async function deleteIssueReport(pool: Pool, id: number): Promise<boolean> {
+  const [result] = (await pool.query(
+    "DELETE FROM issue_reports WHERE id = ?",
+    [id],
+  )) as [{ affectedRows: number }, unknown];
+  return result.affectedRows > 0;
+}

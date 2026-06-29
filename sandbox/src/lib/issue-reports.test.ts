@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "mysql2/promise";
 import {
   createIssueReport,
+  deleteIssueReport,
   listIssueReports,
   mapIssueReportRow,
   parseIssueStatusFilter,
@@ -123,5 +124,23 @@ describe("setIssueReportStatus", () => {
   it("returns false when no row changed", async () => {
     const { pool } = makeFakePool([{ affectedRows: 0 }]);
     expect(await setIssueReportStatus(pool, 7, "resolved", 99)).toBe(false);
+  });
+});
+
+describe("deleteIssueReport", () => {
+  it("deletes by id and returns true when a row changed", async () => {
+    const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const pool = { query } as never;
+    const ok = await deleteIssueReport(pool, 7);
+    expect(ok).toBe(true);
+    const [sql, params] = query.mock.calls[0];
+    expect(String(sql)).toMatch(/DELETE FROM issue_reports/i);
+    expect(params).toEqual([7]);
+  });
+
+  it("returns false when no row matched", async () => {
+    const query = vi.fn().mockResolvedValue([{ affectedRows: 0 }]);
+    const ok = await deleteIssueReport({ query } as never, 999);
+    expect(ok).toBe(false);
   });
 });
