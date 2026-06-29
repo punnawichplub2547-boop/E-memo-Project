@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { buildSoftDeleteMemoPayload, type SoftDeleteMemoBody } from "@/lib/db-memo-write";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,17 @@ type MemoIdRow = RowDataPacket & { id: number };
 // Soft-delete (void) a memo: sets memos.deleted_at and appends a "void" audit row.
 // The memo row and all its workflow_step_actions / read_actions / revisions are preserved.
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: memoNo } = await params;
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const session = await getActiveSessionUserFromToken(token);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session.roles.includes("admin")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const actorName = `${session.firstName} ${session.lastName}`.trim();
   let connection: PoolConnection | null = null;
   try {
     const body = (await request.json()) as SoftDeleteMemoBody;
@@ -33,7 +41,8 @@ export async function POST(
     }
 
     const memoDbId = rows[0].id;
-    const { memoUpdate, workflowAction } = buildSoftDeleteMemoPayload(body);
+    // Trust the session for the audit actor, never a client-supplied actorName.
+    const { memoUpdate, workflowAction } = buildSoftDeleteMemoPayload({ ...body, actorName });
 
     await connection.execute(
       "UPDATE memos SET deleted_at = ?, updated_at = ? WHERE id = ?",
