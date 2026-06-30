@@ -1,6 +1,8 @@
 # Spec — Admin: permanent-delete buttons + remove Prototype Users tab
 
-วันที่: 2026-06-29 · สถานะ: design approved · เจ้าของ: คุณพลับ · ผู้รับแผนไปทำต่อ: Codex
+วันที่: 2026-06-29 · สถานะ: ✅ **IMPLEMENTED** · เจ้าของ: คุณพลับ · Commit: `c774d76`
+
+> Implemented on branch `codex/admin-delete-prototype-cleanup` — committed and pushed to origin.
 
 ## 1. เป้าหมาย
 
@@ -17,7 +19,7 @@
 - ทุก DELETE route ผ่าน `getActiveSessionUserFromToken` + เช็ค `roles.includes("admin")` → 401/403 (เหมือน `destroy`/issues-status route)
 - การลบถาวรต้องมี **confirm step** ที่ UI (กดสองชั้น) — ไม่มี undo
 - ทำ **TDD**: route tests (mock `@/lib/auth` + `@/lib/db`) + db-helper tests (fake pool, แบบ `issue-reports.test.ts`)
-- จบงาน: `npm.cmd test` + `npm.cmd run lint` + `npm.cmd run build` เขียว แล้ว rebuild docker
+- จบงาน: `npm.cmd test` (568 passed) + `npm.cmd run lint` + `npm.cmd run build` เขียว
 
 ## 3. Referential integrity (สำคัญ — ตรวจแล้ว)
 
@@ -25,57 +27,60 @@
 - → **ลบ subcategory ถาวรปลอดภัย**: ไม่ละเมิด FK (ไม่มี) และ memo เก่ายังโชว์ `item_subcategory_label` เดิมได้ปกติ (id ที่ค้างเป็น dangling แต่ไม่ถูกใช้แสดงผล)
 - `issue_reports` ไม่มีตารางอื่นอ้างถึง → ลบถาวรปลอดภัย
 
-## 4. งานที่ต้องทำ
+## 4. งานที่ทำแล้ว
 
-### 4.1 Item Subcategory — ลบถาวร
+### 4.1 Item Subcategory — ลบถาวร ✅
 
 **Backend**
-- `src/lib/db-item-subcategories.ts`: เพิ่ม `deleteItemSubcategory(id: number): Promise<void>` → `DELETE FROM item_subcategories WHERE id = ?` (mirror `setItemSubcategoryActive`)
-- `src/app/api/admin/item-subcategories/[id]/route.ts`: เพิ่ม `export async function DELETE` ใช้ `requireAdmin` ตัวเดิม + validate id → เรียก `deleteItemSubcategory` → `{ ok: true }`
+- `src/lib/db-item-subcategories.ts`: เพิ่ม `deleteItemSubcategory(id: number): Promise<void>`
+- `src/app/api/admin/item-subcategories/[id]/route.ts`: เพิ่ม `export async function DELETE`
 
 **Frontend** — `src/app/admin/_components/ItemSubcategoryPanel.tsx`
-- ในแถว **edit** (ที่มี Save/Cancel) เพิ่มปุ่ม "ลบถาวร" (สีแดง) → กดแล้วเปลี่ยนเป็น confirm inline ("ลบถาวร? กู้คืนไม่ได้" + ยืนยัน/ยกเลิก) → `fetch(DELETE /api/admin/item-subcategories/${id})` → refresh list
-- **คงปุ่ม Deactivate (soft) ไว้เหมือนเดิม** — "ลบถาวร" เป็นทางเลือกเพิ่ม ไม่ใช่แทน
+- ในแถว edit เพิ่มปุ่ม "ลบถาวร" (สีแดง) → confirm inline → delete → refresh
 
 **Tests**
-- `db-item-subcategories` delete: db-helper test (fake pool) — ยิง SQL ถูก + param id
-- route `DELETE`: 401 ไม่มี session, 403 ไม่ใช่ admin, 400 id ไม่ถูก, 200 + เรียก `deleteItemSubcategory` เมื่อ admin
+- `db-item-subcategories.test.ts` (1 test)
+- `item-subcategories/[id]/route.test.ts` (3 tests: 403, 400, 200)
 
-### 4.2 เอา Prototype Users ออกจาก Admin (Option A)
+### 4.2 เอา Prototype Users ออกจาก Admin ✅
 
-**`src/app/admin/page.tsx`**
-- ลบ `"users"` ออกจาก type `Tab` (บรรทัด ~52)
-- ลบ entry `["users", IconUsers, "Prototype Users"]` ออกจาก tab list (บรรทัด ~358)
-- ลบ block `{tab === "users" && (...)}` ทั้งก้อน (บรรทัด ~569–668)
-- ลบ state/handlers/imports ที่ใช้เฉพาะ prototype tab จนไม่เหลือ unused (ตัวที่คาดว่าเกี่ยว: `useAdminUsers` import + `users/addUser/updateUser/deleteUser/resetToDefaults`, `showAddUser`, `newUser`, `emptyNewUser`, `NewUserState`, `saveEdit`/`cancelEdit`/`addUser`-handler ที่ผูกกับ prototype, `editingId`/`editState` เฉพาะส่วนนี้) — **Codex ต้องตรวจ references จริงก่อนลบแต่ละตัว** เพราะ `editingId` ฯลฯ อาจ shared กับแท็บอื่น (ถ้า shared ห้ามลบ)
-- ถ้า `src/lib/admin-users.tsx` ไม่ถูก import ที่อื่นเลยหลังแก้ → ลบไฟล์ + test ทิ้งได้ (ตรวจ `grep -r admin-users` ก่อน)
-- **ห้ามแตะ** `prototype-users.ts`, `prototype-user-context.tsx`, sidebar selector, และ `usePrototypeUser` ในไฟล์อื่น (นั่นคือระบบ fallback ที่ create/queue/visibility ใช้)
+**`src/app/admin/page.tsx`:**
+- ลบ `"users"` ออกจาก type `Tab`
+- ลบ tab entry + block ทั้งก้อน
+- ลบ imports ที่ไม่ใช้แล้ว (`useAdminUsers`, `IconUserPlus`, ฯลฯ)
+- **เก็บ** `admin-users.tsx` ไว้เพราะ `prototype-user-context.tsx` ยัง import ใช้
 
-**Tests**
-- ปรับ/ลบ test ที่อ้าง prototype-users admin tab (ถ้ามี) ให้ผ่าน — ต้องไม่มี test แตก
+**ไม่ได้แตะ:** `prototype-users.ts`, `prototype-user-context.tsx`, sidebar selector, `usePrototypeUser` ใน create/queue
 
-### 4.3 Issue Reports — ลบถาวร
+### 4.3 Issue Reports — ลบถาวร ✅
 
 **Backend**
-- `src/lib/issue-reports.ts`: เพิ่ม `deleteIssueReport(pool, id): Promise<boolean>` → `DELETE FROM issue_reports WHERE id = ?` (mirror `setIssueReportStatus` signature ที่รับ pool, คืน `affectedRows > 0`)
-- สร้าง `src/app/api/admin/issues/[id]/route.ts`: `export async function DELETE` — auth/admin guard (mirror `[id]/status/route.ts`), validate id → `deleteIssueReport(getDbPool(), id)` → `{ ok: true, deleted }`
+- `src/lib/issue-reports.ts`: เพิ่ม `deleteIssueReport(pool, id): Promise<boolean>`
+- สร้าง `src/app/api/admin/issues/[id]/route.ts`: `export async function DELETE`
 
-**Frontend** — `src/app/admin/page.tsx` (issues tab, ~876–973)
-- เพิ่มปุ่มลบ (ไอคอนถังขยะ สีแดง) ต่อแถว ข้างปุ่มจัดการสถานะ → confirm inline → `fetch(DELETE /api/admin/issues/${id})` → `setIssueRefresh(n=>n+1)` (โหลดใหม่)
-- เพิ่ม handler `handleDeleteIssue(id)` คล้าย `toggleIssueStatus`
+**Frontend** — `src/app/admin/page.tsx` (issues tab)
+- เพิ่มปุ่มลบ (ถังขยะ สีแดง) ต่อแถว ข้างปุ่มจัดการสถานะ → confirm inline → refresh
 
 **Tests**
-- `deleteIssueReport` db-helper test (fake pool, แบบ `issue-reports.test.ts`)
-- route `DELETE`: 401/403/400/200 + เรียก helper เมื่อ admin
+- `deleteIssueReport` tests ใน `issue-reports.test.ts` (2 tests)
+- `issues/[id]/route.test.ts` (4 tests: 401, 403, 400, 200)
 
 ## 5. Out of scope (งานแยกในอนาคต)
 
-- **รื้อระบบ prototype-user ทั้งหมด** (แทนทุก `usePrototypeUser` ด้วย real auth ใน create/queue/visibility/memo-store) — เป็น refactor ใหญ่ ต้องมี spec/plan/test ของตัวเอง เปิด ticket แยก
+- **รื้อระบบ prototype-user ทั้งหมด** (แทนทุก `usePrototypeUser` ด้วย real auth) — refactor ใหญ่
 - ไม่เพิ่ม soft-delete/undo ให้ subcategory หรือ issue (คุณพลับขอ "ถาวร")
 
-## 6. Verification
+## 6. Verification ✅
 
-- `npm.cmd test` (รวม test ใหม่ทั้งหมด) ผ่าน
-- `npm.cmd run lint` + `npm.cmd run build` เขียว (ไม่มี unused import/var หลังเอา prototype tab ออก)
-- rebuild docker local ตรวจด้วยตา: ลบ subcategory ได้, แท็บ Prototype Users หายไป, ลบ issue ได้
-- ไม่มี migration ใหม่ (ใช้ตารางเดิมทั้งหมด)
+| Check | Result |
+|---|---|
+| `npm.cmd test` | **568 passed** (46 files) |
+| `npm.cmd run lint` | Clean |
+| `npm.cmd run build` | Compiled, 26 routes |
+| Docker rebuild | Done by youพลับ |
+| working tree | Clean (เหลือ `next-env.d.ts` CRLF noise) |
+
+## 7. Changes from original design
+
+- `admin-users.tsx` **ไม่ได้ลบ** — ยังมี `prototype-user-context.tsx` import ใช้อยู่ (ตาม spec ระบุไว้ให้ตรวจ)
+- รวม commit **ครั้งเดียว** (`c774d76`) แทนที่จะแยกตาม task — เพราะคุณพลับขอ commit รวม
