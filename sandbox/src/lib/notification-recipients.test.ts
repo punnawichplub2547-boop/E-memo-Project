@@ -32,6 +32,20 @@ describe("resolveApprovalStepRecipients", () => {
   it("returns empty array when no match", async () => {
     expect(await resolveApprovalStepRecipients("MD", pool1([]))).toEqual([]);
   });
+  it("warns (so the miss is visible, not silent) when no active user has the approval level", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await resolveApprovalStepRecipients("Managing Director", pool1([]));
+    expect(warn).toHaveBeenCalled();
+    const logged = warn.mock.calls.map((c) => c.map(String).join(" ")).join(" ");
+    expect(logged).toContain("Managing Director");
+    warn.mockRestore();
+  });
+  it("does NOT warn when recipients are found", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await resolveApprovalStepRecipients("General Manager", pool1([{ id: 7 }]));
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe("resolveRequesterRecipient", () => {

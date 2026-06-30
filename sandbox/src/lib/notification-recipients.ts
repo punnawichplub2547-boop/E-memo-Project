@@ -13,6 +13,15 @@ export async function resolveApprovalStepRecipients(
     "SELECT id FROM users WHERE approval_level = ? AND status = 'active'",
     [approvalLevel],
   );
+  if (rows.length === 0) {
+    // No active user carries this exact approval_level, so the actionable approver
+    // notification (with the approve button) reaches NOBODY. Surface it instead of
+    // silently dropping — the usual cause is the step's approver (e.g. the MD) not
+    // having approval_level set to this exact label. Fix via Admin > assign role.
+    console.warn(
+      `[resolveApprovalStepRecipients] no active user has approval_level="${approvalLevel}" — approver notification not delivered for this step`,
+    );
+  }
   return rows.map(r => r.id);
 }
 
