@@ -12,7 +12,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   try {
-    const { id } = await params;
+    const userId = Number((await params).id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+    }
     const body = await req.json() as { roles?: string[]; approvalLevel?: string | null };
     const roles = Array.isArray(body.roles) && body.roles.length > 0 ? body.roles : ["requester"];
     if (roles.some(role => !ALLOWED_ROLES.has(role))) {
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (body.approvalLevel !== undefined && body.approvalLevel !== null && !ALLOWED_APPROVAL_LEVELS.has(body.approvalLevel)) {
       return NextResponse.json({ error: "Invalid approval level" }, { status: 400 });
     }
-    await approveUser(Number(id), roles, body.approvalLevel ?? null);
+    await approveUser(userId, roles, body.approvalLevel ?? null);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[POST /api/admin/users/[id]/approve]", err);

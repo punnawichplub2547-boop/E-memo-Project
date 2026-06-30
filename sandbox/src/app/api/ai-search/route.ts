@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { callGroq } from "@/lib/ai/groq";
 
 export async function POST(req: NextRequest) {
+  const session = await getActiveSessionUserFromToken(req.cookies.get(COOKIE_NAME)?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: "not_configured" });
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { callThaiLLM } from "@/lib/ai/thaillm";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -23,6 +24,9 @@ function extractJson(text: string): unknown {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getActiveSessionUserFromToken(req.cookies.get(COOKIE_NAME)?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   if (!process.env.THAILLM_API_KEY) {
     return NextResponse.json({ error: "not_configured" });
   }

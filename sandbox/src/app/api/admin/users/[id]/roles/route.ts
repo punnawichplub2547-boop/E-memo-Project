@@ -13,7 +13,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   try {
-    const { id } = await params;
+    const userId = Number((await params).id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+    }
     const body = await req.json() as {
       roles?: string[];
       approvalLevel?: string | null;
@@ -26,13 +29,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (body.approvalLevel !== undefined && body.approvalLevel !== null && !ALLOWED_APPROVAL_LEVELS.has(body.approvalLevel)) {
         return NextResponse.json({ error: "Invalid approval level" }, { status: 400 });
       }
-      await updateUserRoles(Number(id), body.roles, body.approvalLevel ?? null);
+      await updateUserRoles(userId, body.roles, body.approvalLevel ?? null);
     }
     if (body.status !== undefined) {
       if (!ALLOWED_STATUSES.has(body.status)) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
-      await updateUserStatus(Number(id), body.status);
+      await updateUserStatus(userId, body.status);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

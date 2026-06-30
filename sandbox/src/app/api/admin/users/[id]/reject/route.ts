@@ -9,8 +9,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   try {
-    const { id } = await params;
-    await rejectUser(Number(id));
+    const userId = Number((await params).id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+    }
+    await rejectUser(userId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[POST /api/admin/users/[id]/reject]", err);
