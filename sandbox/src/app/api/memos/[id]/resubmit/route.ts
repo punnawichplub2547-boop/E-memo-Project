@@ -166,7 +166,8 @@ export async function POST(
     );
 
     await connection.commit();
-    void notifyMemoEvent(memoNo, "resubmitted", session.userId).catch(() => {});
+    void notifyMemoEvent(memoNo, "resubmitted", session.userId).catch((err) =>
+      console.error("[notifyMemoEvent] resubmitted failed:", err));
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});

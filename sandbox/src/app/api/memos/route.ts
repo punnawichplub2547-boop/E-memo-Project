@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
     await connection.commit();
 
     // Fire-and-forget AFTER commit so the read_actions rows are visible to the dispatcher pool.
-    void notifyMemoEvent(memo.id, "submitted", session.userId).catch(() => {});
+    void notifyMemoEvent(memo.id, "submitted", session.userId).catch((err) =>
+      console.error("[notifyMemoEvent] submitted failed:", err));
 
     return NextResponse.json({ id: memo.id, memoDbId: memoId }, { status: 201 });
   } catch (error) {
