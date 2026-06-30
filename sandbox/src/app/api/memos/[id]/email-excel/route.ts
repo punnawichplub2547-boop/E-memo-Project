@@ -5,6 +5,7 @@ import { isMemoVisibleTo } from "@/lib/memo-visibility";
 import { memoToExcelBuffer } from "@/lib/export/memo-excel";
 import { loadMemoForExport } from "@/lib/export/load-memo-export";
 import { getEmailConfig, sendEmailMessage } from "@/lib/email/client";
+import { wrapEmailHtml, wrapEmailText } from "@/lib/email/template";
 import { parseRecipientEmails } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
@@ -50,9 +51,17 @@ export async function POST(
     const safeName = memoNo.replace(/[^A-Za-z0-9_-]/g, "_");
     const filename = `memo-${safeName}.xlsx`;
     const subject = `[E-Memo] ${memo.id} ${memo.title}`;
-    const text =
+    const senderName = `${session.firstName} ${session.lastName}`;
+    const text = wrapEmailText(
       `เอกสารเมโม ${memo.id} (${memo.title}) แนบมาในรูปแบบ Excel\n` +
-      `ส่งจากระบบ HR&GA E-Memo โดย ${session.firstName} ${session.lastName}`;
+      `ส่งจากระบบ HR&GA E-Memo โดย ${senderName}`,
+    );
+    const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = wrapEmailHtml(
+      `<p style="margin:0 0 8px;">เอกสารเมโม <b>${esc(memo.id)}</b> (${esc(memo.title)}) แนบมาในรูปแบบ Excel</p>` +
+      `<p style="margin:0;color:#6b7280;font-size:12px;">ส่งจากระบบ HR&amp;GA E-Memo โดย ${esc(senderName)}</p>`,
+      { heading: "เอกสารเมโม (Excel)" },
+    );
 
     // One message per recipient so addresses are not exposed to each other.
     const sent: string[] = [];
@@ -62,6 +71,7 @@ export async function POST(
         to,
         subject,
         text,
+        html,
         attachments: [{ filename, content: buffer }],
       });
       (result ? sent : failed).push(to);

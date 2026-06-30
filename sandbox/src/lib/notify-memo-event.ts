@@ -18,6 +18,7 @@ import {
 import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
 import { createApproveActionToken } from "./telegram/actions";
 import { getEmailConfig, sendEmailMessage } from "./email/client";
+import { wrapEmailHtml, wrapEmailText } from "./email/template";
 import type { RowDataPacket } from "mysql2";
 
 type MemoRow = RowDataPacket & {
@@ -162,7 +163,9 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
     }
     const email = emails.get(recipientUserId);
     if (email) {
-      await sendEmailAndTrack(pool, notifId, email, title, addOpenLinkText(body, queueUrl), addOpenLinkHtml(tgHtml, queueUrl));
+      await sendEmailAndTrack(pool, notifId, email, title,
+        wrapEmailText(addOpenLinkText(body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
     }
   }
   return recipientIds;
@@ -202,7 +205,9 @@ async function notifyWatchers(
     const chatId = chatIds.get(userId);
     const email = emails.get(userId);
     if (email) {
-      await sendEmailAndTrack(pool, notifId, email, title, addOpenLinkText(body, queueUrl), addOpenLinkHtml(tgHtml, queueUrl));
+      await sendEmailAndTrack(pool, notifId, email, title,
+        wrapEmailText(addOpenLinkText(body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
     }
     if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
   }

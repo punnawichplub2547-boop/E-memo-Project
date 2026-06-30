@@ -142,6 +142,7 @@ describe("sendEmailMessage", () => {
   });
 
   it("returns null instead of throwing when SMTP send fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const sendMail = vi.fn().mockRejectedValue(new Error("SMTP down"));
     await expect(sendEmailMessage(
       {
@@ -154,5 +155,17 @@ describe("sendEmailMessage", () => {
         createTransport: () => ({ sendMail }),
       },
     )).resolves.toBeNull();
+  });
+
+  it("logs the underlying error before swallowing it, so SMTP outages are visible", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sendMail = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
+    await sendEmailMessage(
+      { to: "approver@example.com", subject: "รออนุมัติ: EM-1", text: "Please review" },
+      { getConfig: () => config, createTransport: () => ({ sendMail }) },
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls.map((c) => c.map(String).join(" ")).join(" ");
+    expect(logged).toContain("ECONNREFUSED");
   });
 });

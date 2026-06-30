@@ -118,7 +118,10 @@ export async function sendEmailMessage(
         : {}),
     });
     return { messageId: result.messageId ?? "" };
-  } catch {
+  } catch (err) {
+    // Non-blocking by design (callers treat null as "not sent"), but the reason
+    // must be visible — otherwise an SMTP outage silently drops every email.
+    console.error("[sendEmailMessage] SMTP send failed:", err);
     return null;
   }
 }
