@@ -151,9 +151,12 @@ function Check-Env($key, $hint) {
     if ($inFile) { Write-Ok "$key set in .env.local" }
     else { Write-Warn2 "$key NOT in .env.local - $hint" }
 }
-Check-Env 'APP_PUBLIC_BASE_URL' 'password-reset links + email logo break without it (set https://memo.car-1996.com)'
-Check-Env 'AUTH_COOKIE_SECURE'  'should be "true" (served over HTTPS via Cloudflare Tunnel)'
+Check-Env 'APP_PUBLIC_BASE_URL' 'password-reset links break without it (set https://memo.car-1996.com)'
 Check-Env 'TELEGRAM_BOT_TOKEN'  'Telegram push disabled if unset (optional)'
+# AUTH_COOKIE_SECURE: not checked here on purpose. With NODE_ENV=production (set in
+# compose) the app defaults to a Secure cookie, so leaving it unset is correct on
+# prod. Only set AUTH_COOKIE_SECURE=false in .env.local to test over plain http.
+Write-Ok 'AUTH_COOKIE_SECURE: defaults to Secure on prod (NODE_ENV=production) - no action needed'
 
 # --- 5. Rebuild -----------------------------------------------------------
 Write-Step "docker compose up -d --build  (app rebuild; tunnel service unaffected)"

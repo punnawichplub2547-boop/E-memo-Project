@@ -18,7 +18,11 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DATABASE_URL: mysql://${MYSQL_USER:-hr_ememo}:${MYSQL_PASSWORD:-hr_ememo_dev_password}@hr-ememo-db:3306/${MYSQL_DATABASE:-hr_ememo}
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      # AUTH_COOKIE_SECURE intentionally NOT set here. A value in `environment`
+      # overrides `env_file`, so hardcoding it would mask .env.local. Left unset,
+      # the app falls back to NODE_ENV==="production" (above) => secure cookie on
+      # prod (served HTTPS via Cloudflare Tunnel). To test this image over plain
+      # http://localhost:3000, put AUTH_COOKIE_SECURE=false in .env.local.
     volumes:
       # Persist uploaded attachment binaries so they survive container rebuild/recreate.
       # Runtime cwd is /app, so the app writes to /app/storage/attachments.
