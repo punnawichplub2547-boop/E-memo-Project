@@ -1,6 +1,21 @@
 import { describe, it, expect } from "vitest";
+import ExcelJS from "exceljs";
 import { buildMemoExcelWorkbook, memoToExcelBuffer, type MemoSignature } from "./memo-excel";
 import type { MemoRecord } from "../approval";
+
+async function reasonRowHeight(description: string): Promise<number> {
+  const wb = await buildMemoExcelWorkbook(makeMemo({ description }));
+  const ws = wb.getWorksheet("Memo")!;
+  let h = 0;
+  ws.eachRow((row) => {
+    row.eachCell((cell) => {
+      if (typeof cell.value === "string" && cell.value.startsWith("เนื่องจาก/เหตุผล")) {
+        h = Number(row.height ?? 0);
+      }
+    });
+  });
+  return h;
+}
 
 function makeMemo(overrides: Partial<MemoRecord> = {}): MemoRecord {
   return {
@@ -134,5 +149,80 @@ describe("buildMemoExcelWorkbook", () => {
     // .xlsx files are zip archives - PK magic header
     expect(buffer[0]).toBe(0x50);
     expect(buffer[1]).toBe(0x4b);
+  });
+});
+
+describe("Thai layout fit", () => {
+  // Regression: ExcelJS 4.4.0 treats width exactly 9 as its internal default and drops
+  // it from the file, so columns set to 9 fall back to Excel's default and Thai text
+  // overflows. All 12 columns must keep an explicit width after a save/load round-trip.
+  it("persists all 12 column widths through a save → load round-trip", async () => {
+    const buf = await memoToExcelBuffer(makeMemo());
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.getWorksheet("Memo")!;
+    for (let c = 1; c <= 12; c++) {
+      expect(ws.getColumn(c).width ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it("grows the reason row tall enough for a long Thai description (no clipping)", async () => {
+    // ~360 Thai chars across the full-width merged cell. Thai glyphs pack fewer per
+    // column-width unit than Latin digits, so the height estimate must be generous —
+    // the old 0.8 density / 15px line gave ~75px (clips); the Thai-aware estimate ≥100px.
+    const longThai =
+      "ขออนุมัติจัดซื้อวัตถุดิบยางธรรมชาติเกรดพิเศษจำนวนมากเพื่อใช้ในการผลิตตามแผนการผลิตประจำเดือน".repeat(4);
+    expect(await reasonRowHeight(longThai)).toBeGreaterThanOrEqual(100);
+  });
+
+  it("scales the reason row height with description length", async () => {
+    const short = await reasonRowHeight("สั้น");
+    const long = await reasonRowHeight("ยาว".repeat(120));
+    expect(long).toBeGreaterThan(short);
+  });
+
+  // Regression: long Thai table headers (e.g. the price-comparison "รวมราคาขาย/บริการ
+  // ทั้งสิ้น", merged across only ~19 width units) used to render with wrapText off, so the
+  // text spilled past the cell's right border into the neighbouring "หมายเหตุ" column.
+  // gridlines are hidden, so the only visible frame is the cell border — overflowing it is
+  // exactly the "ฟอนต์เลยกรอบ" the form looked broken with.
+  function cellByValue(ws: ExcelJS.Worksheet, value: string): { cell: ExcelJS.Cell; rowHeight: number } | null {
+    let found: { cell: ExcelJS.Cell; rowHeight: number } | null = null;
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (cell.value === value) found = { cell, rowHeight: Number(row.height ?? 0) };
+      });
+    });
+    return found;
+  }
+
+  const longThaiHeaders = ["รวมราคาขาย/บริการทั้งสิ้น", "Budget ที่ใช้ไป", "Budget คงเหลือ", "Sr.General Manager"];
+
+  it.each(longThaiHeaders)("wraps the table header %s so it stays inside its border", async (header) => {
+    const wb = await buildMemoExcelWorkbook(makeMemo());
+    const ws = wb.getWorksheet("Memo")!;
+    const hit = cellByValue(ws, header);
+    expect(hit, `header "${header}" not found`).not.toBeNull();
+    expect(hit!.cell.alignment?.wrapText).toBe(true);
+  });
+
+  it("grows the price-comparison header row so the wrapped Thai header does not clip", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo());
+    const ws = wb.getWorksheet("Memo")!;
+    const hit = cellByValue(ws, "รวมราคาขาย/บริการทั้งสิ้น");
+    expect(hit).not.toBeNull();
+    // 24 Thai chars across ~19 width units wraps to 2 lines — the row must be > one line tall.
+    expect(hit!.rowHeight).toBeGreaterThan(16);
+  });
+
+  it("wraps a long subject line so it stays on the page", async () => {
+    const longSubject =
+      "ขออนุมัติจัดซื้อวัตถุดิบยางธรรมชาติเกรดพิเศษจำนวนมากเพื่อใช้ในการผลิตตามแผนการผลิตประจำเดือนกรกฎาคม";
+    const wb = await buildMemoExcelWorkbook(makeMemo({ title: longSubject }));
+    const ws = wb.getWorksheet("Memo")!;
+    const hit = cellByValue(ws, `เรื่อง: ${longSubject}`);
+    expect(hit, "subject row not found").not.toBeNull();
+    expect(hit!.cell.alignment?.wrapText).toBe(true);
+    expect(hit!.rowHeight).toBeGreaterThan(16);
   });
 });

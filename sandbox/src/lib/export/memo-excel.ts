@@ -104,6 +104,12 @@ function rangeWidth(ws: ExcelJS.Worksheet, startCol: number, endCol: number): nu
 // their cell. Estimate the wrapped line count for `text` inside the merged range and grow the
 // row so nothing clips. We under-estimate chars-per-line on purpose (taller is safe, clipped
 // is not). Never shrinks a row that another column already made taller.
+//
+// Thai (and other scripts without spaces) pack far fewer glyphs per column-width unit than
+// Latin digits — Tahoma Thai is wide and stacked vowels/tone marks add visual height — so
+// any text containing Thai uses a lower density and taller line height. fitToWidth print
+// scaling also shrinks columns at render time, which only ever needs MORE lines than the
+// natural-width estimate, so erring tall is correct.
 function fitRowHeight(
   ws: ExcelJS.Worksheet,
   row: number,
@@ -112,15 +118,28 @@ function fitRowHeight(
   endCol: number,
   opts: { lineHeight?: number; minHeight?: number; fontSize?: number } = {},
 ): void {
-  const lineHeight = opts.lineHeight ?? 15;
+  const str = String(text ?? "");
+  const hasThai = /[฀-๿]/.test(str);
+  const lineHeight = opts.lineHeight ?? (hasThai ? 16 : 15);
+  const density = hasThai ? 0.5 : 0.8;
   const fontScale = (opts.fontSize ?? 10) / 10;
-  const charsPerLine = Math.max(1, Math.floor((rangeWidth(ws, startCol, endCol) / fontScale) * 0.8));
+  const charsPerLine = Math.max(1, Math.floor((rangeWidth(ws, startCol, endCol) / fontScale) * density));
   let lines = 0;
-  for (const segment of String(text ?? "").split("\n")) {
+  for (const segment of str.split("\n")) {
     lines += Math.max(1, Math.ceil(segment.length / charsPerLine));
   }
   const needed = Math.max(lines * lineHeight, opts.minHeight ?? lineHeight);
   ws.getRow(row).height = Math.max(ws.getRow(row).height ?? 0, needed);
+}
+
+// A bordered, shaded, centered table header. Long Thai headers (e.g. "รวมราคาขาย/บริการ
+// ทั้งสิ้น") are wider than their merged column span, so without wrapText they spill past the
+// cell's right border into the neighbouring column — and with gridlines hidden, that border is
+// the only visible frame, so the overflow reads as "ฟอนต์เลยกรอบ". Wrapping keeps the text
+// inside the frame; fitRowHeight then grows the row so the extra line is not clipped.
+function headerCell(ws: ExcelJS.Worksheet, startCol: number, endCol: number, row: number, text: string): void {
+  setRange(ws, startCol, endCol, row, text, { bold: true, align: "center", wrap: true, fill: "FFF1F5F9" });
+  fitRowHeight(ws, row, text, startCol, endCol, { minHeight: 16 });
 }
 
 function findSignature(signatures: MemoSignature[], stepLabel: ApprovalLevel): MemoSignature | undefined {
@@ -141,7 +160,12 @@ export async function buildMemoExcelWorkbook(
     views: [{ showGridLines: false }],
   });
 
-  const colWidths = [6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9];
+  // NOTE: ExcelJS 4.4.0 treats a width of exactly 9 as its internal default and omits
+  // it from the saved file, so any column left at 9 silently falls back to Excel's
+  // default width and Thai text overflows. Every width here is deliberately != 9.
+  // Layout: narrow index (col 1), wider left meta / item columns (2-3), money columns
+  // on the right (9-12). Sum ~102 fits one A4 portrait page (pageSetup fitToWidth: 1).
+  const colWidths = [5, 10, 10, 8, 8, 8, 7.5, 7.5, 9.5, 9.5, 9.5, 9.5];
   colWidths.forEach((w, i) => {
     ws.getColumn(i + 1).width = w;
   });
@@ -208,18 +232,20 @@ export async function buildMemoExcelWorkbook(
   // ---- Body narrative ----
   let r = gridStartRow + Math.max(DEPT_GRID.length, metaRows.length + 1);
   setRange(ws, 1, TOTAL_COLS, r, "เรียน ผู้บังคับบัญชาตามสายงานอนุมัติ", { size: 10 }); r++;
-  setRange(ws, 1, TOTAL_COLS, r, `เรื่อง: ${memo.title}`, { bold: true, size: 10.5 }); r++;
+  const subjectText = `เรื่อง: ${memo.title}`;
+  setRange(ws, 1, TOTAL_COLS, r, subjectText, { bold: true, size: 10.5, wrap: true, valign: "top" });
+  fitRowHeight(ws, r, subjectText, 1, TOTAL_COLS, { fontSize: 10.5, minHeight: 16 }); r++;
   const reasonText = `เนื่องจาก/เหตุผล: ${memo.description ?? "-"}`;
   setRange(ws, 1, TOTAL_COLS, r, reasonText, { size: 10, wrap: true, valign: "top" });
   fitRowHeight(ws, r, reasonText, 1, TOTAL_COLS, { minHeight: 32 }); r++;
 
   // ---- Request items table ----
-  setRange(ws, 1, 1, r, "ลำดับ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 2, 6, r, "รายการ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 7, 7, r, "หน่วย", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 8, 8, r, "จำนวน", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 9, 10, r, "ราคา/หน่วย", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 11, 12, r, "รวมเป็นเงิน", { bold: true, align: "center", fill: "FFF1F5F9" });
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 6, r, "รายการ");
+  headerCell(ws, 7, 7, r, "หน่วย");
+  headerCell(ws, 8, 8, r, "จำนวน");
+  headerCell(ws, 9, 10, r, "ราคา/หน่วย");
+  headerCell(ws, 11, 12, r, "รวมเป็นเงิน");
   r++;
 
   const items = memo.requestItems ?? [];
@@ -259,12 +285,12 @@ export async function buildMemoExcelWorkbook(
 
   // ---- Budget table ----
   r++;
-  setRange(ws, 1, 1, r, "ลำดับ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 2, 4, r, "รายการ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 5, 6, r, "Budget Plan 2025", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 7, 8, r, "Budget ที่ใช้ไป", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 9, 10, r, "Budget ที่ขอใช้", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 11, 12, r, "Budget คงเหลือ", { bold: true, align: "center", fill: "FFF1F5F9" });
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 4, r, "รายการ");
+  headerCell(ws, 5, 6, r, "Budget Plan 2025");
+  headerCell(ws, 7, 8, r, "Budget ที่ใช้ไป");
+  headerCell(ws, 9, 10, r, "Budget ที่ขอใช้");
+  headerCell(ws, 11, 12, r, "Budget คงเหลือ");
   r++;
   const budgetPlan = memo.budgetPlan;
   const budgetUsed = memo.budgetUsed ?? 0;
@@ -280,12 +306,12 @@ export async function buildMemoExcelWorkbook(
 
   // ---- Price comparison table ----
   r++;
-  setRange(ws, 1, 1, r, "ลำดับ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 2, 5, r, "ผู้ให้บริการ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 6, 7, r, "ราคาเสนอ", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 8, 9, r, "ส่วนลด (ถ้ามี)", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 10, 11, r, "รวมราคาขาย/บริการทั้งสิ้น", { bold: true, align: "center", fill: "FFF1F5F9" });
-  setRange(ws, 12, 12, r, "หมายเหตุ", { bold: true, align: "center", fill: "FFF1F5F9" });
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 5, r, "ผู้ให้บริการ");
+  headerCell(ws, 6, 7, r, "ราคาเสนอ");
+  headerCell(ws, 8, 9, r, "ส่วนลด (ถ้ามี)");
+  headerCell(ws, 10, 11, r, "รวมราคาขาย/บริการทั้งสิ้น");
+  headerCell(ws, 12, 12, r, "หมายเหตุ");
   r++;
   const vendors = memo.priceComparisons ?? [];
   const vendorRowCount = Math.max(vendors.length, 3);
@@ -347,7 +373,7 @@ export async function buildMemoExcelWorkbook(
     [8, 9, "Sr.General Manager", undefined],
     [10, 12, "Managing Director", mdSig],
   ];
-  sigCols.forEach(([from, to, label]) => setRange(ws, from, to, r, label, { bold: true, align: "center", fill: "FFF1F5F9" }));
+  sigCols.forEach(([from, to, label]) => headerCell(ws, from, to, r, label));
   r++;
   sigCols.forEach(([from, to, , sig]) => setRange(ws, from, to, r, sig ? `(${sig.actorName})` : "(...ชื่อ-สกุล...)", { align: "center" }));
   r++;
