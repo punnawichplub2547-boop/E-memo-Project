@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { computeWatcherRecipients, getChatIds, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { computeReadNotifyRecipients, computeWatcherRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
 
 function chatPool(rows: unknown[]): Pool {
   return {
@@ -30,6 +30,42 @@ describe("computeWatcherRecipients", () => {
   it("drops excludeIds (approver who is also a CC is not doubled up)", () => {
     const r = computeWatcherRecipients({ requesterId: 1, ccIds: [2, 3], actorId: null, excludeActor: false, excludeIds: [3] });
     expect(r.sort()).toEqual([1, 2]);
+  });
+});
+
+describe("computeReadNotifyRecipients", () => {
+  it("dedups the resolved read-recipient ids", () => {
+    const r = computeReadNotifyRecipients({ readRecipientIds: [2, 3, 2], actorId: null });
+    expect(r.sort()).toEqual([2, 3]);
+  });
+  it("excludes the submitting actor (no 'please read' to your own memo)", () => {
+    const r = computeReadNotifyRecipients({ readRecipientIds: [5, 7], actorId: 5 });
+    expect(r).toEqual([7]);
+  });
+  it("returns empty when there are no read recipients", () => {
+    expect(computeReadNotifyRecipients({ readRecipientIds: [], actorId: 9 })).toEqual([]);
+  });
+});
+
+describe("getPendingReadLabels", () => {
+  it("queries pending read_actions for the memo + revision and returns the labels", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [[{ recipient_name: "สมชาย ขายจริง" }, { recipient_name: "qa@car-1996.com" }], undefined];
+      },
+    } as unknown as Pool;
+    const labels = await getPendingReadLabels(pool, 7, 2);
+    expect(labels).toEqual(["สมชาย ขายจริง", "qa@car-1996.com"]);
+    expect(calls[0].sql).toContain("status = 'pending'");
+    expect(calls[0].params).toEqual([7, 2]);
+  });
+  it("drops empty labels", async () => {
+    const pool = {
+      query: async () => [[{ recipient_name: "" }, { recipient_name: "ok@car-1996.com" }], undefined],
+    } as unknown as Pool;
+    expect(await getPendingReadLabels(pool, 1, 1)).toEqual(["ok@car-1996.com"]);
   });
 });
 

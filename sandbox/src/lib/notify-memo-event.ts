@@ -14,6 +14,7 @@ import {
   resolveApprovalStepRecipients,
   resolveRequesterRecipient,
   resolveMemoCcRecipients,
+  resolveReadRecipientLabels,
 } from "./notification-recipients";
 import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
 import { createApproveActionToken } from "./telegram/actions";
@@ -48,6 +49,34 @@ export function computeWatcherRecipients(input: {
   if (input.excludeActor && input.actorId != null) set.delete(input.actorId);
   for (const id of input.excludeIds ?? []) set.delete(id);
   return [...set];
+}
+
+// Pure: who to notify that they must acknowledge (Read) a memo. Dedups and drops
+// the submitting actor (no "please read" for your own memo).
+export function computeReadNotifyRecipients(input: {
+  readRecipientIds: number[];
+  actorId: number | null;
+}): number[] {
+  const set = new Set<number>();
+  for (const id of input.readRecipientIds) if (id != null) set.add(id);
+  if (input.actorId != null) set.delete(input.actorId);
+  return [...set];
+}
+
+// The still-pending Read labels for the memo's current revision (a label is an
+// email / exact name / department, resolved to users by resolveReadRecipientLabels).
+export async function getPendingReadLabels(
+  pool: Pool,
+  memoId: number,
+  revisionNo: number,
+): Promise<string[]> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT recipient_name FROM read_actions WHERE memo_id = ? AND revision_no = ? AND status = 'pending'",
+    [memoId, revisionNo],
+  );
+  return rows
+    .map((r) => String((r as { recipient_name: string }).recipient_name))
+    .filter((s) => s.length > 0);
 }
 
 async function getMemo(memoNo: string): Promise<MemoRow | null> {
@@ -213,6 +242,44 @@ async function notifyWatchers(
   }
 }
 
+// Actionable-ish: tell the memo's still-pending Read recipients they must
+// acknowledge it. Read is a blocking step (SA §6.2/6.3) — without this they'd
+// only find out by opening the queue. No approve button; Read is its own action.
+async function notifyReadRecipients(
+  memo: MemoRow,
+  queuePath: string,
+  queueUrl: string,
+  actorUserId: number | null,
+): Promise<void> {
+  const pool = getDbPool();
+  const labels = await getPendingReadLabels(pool, memo.id, memo.revision_no);
+  if (labels.length === 0) return;
+  const readerIds = await resolveReadRecipientLabels(labels, pool);
+  const recipients = computeReadNotifyRecipients({ readRecipientIds: readerIds, actorId: actorUserId });
+  if (recipients.length === 0) return;
+  const chatIds = await getChatIds(pool, recipients);
+  const emailEnabled = getEmailConfig() !== null;
+  const emails = emailEnabled ? await getUserEmails(pool, recipients) : new Map<number, string>();
+  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  const body = buildMemoNotificationText("memo_pending_read", ctx);
+  const tgHtml = buildMemoNotificationHtml("memo_pending_read", ctx);
+  const title = buildMemoNotificationTitle("memo_pending_read", memo.memo_no);
+  for (const userId of recipients) {
+    const notifId = await createNotification(pool, {
+      memoId: memo.id, recipientUserId: userId, type: "memo_pending_read",
+      title, body, actionUrl: queuePath,
+    });
+    const email = emails.get(userId);
+    if (email) {
+      await sendEmailAndTrack(pool, notifId, email, title,
+        wrapEmailText(addOpenLinkText(body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
+    }
+    const chatId = chatIds.get(userId);
+    if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+  }
+}
+
 export async function notifyMemoEvent(
   memoNo: string,
   eventType: MemoEventType,
@@ -229,11 +296,13 @@ export async function notifyMemoEvent(
 
     if (eventType === "submitted") {
       await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl);
+      await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
       return;
     }
     if (eventType === "resubmitted") {
       const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
       await notifyWatchers(memo, statusUpdate, actorUserId, true, queuePath, queueUrl, approverIds);
+      await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
       return;
     }
     if (eventType === "advanced" && memo.status === "approved") {
