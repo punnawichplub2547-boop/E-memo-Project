@@ -37,16 +37,17 @@ describe("wrapEmailHtml", () => {
     expect(out).toContain("strictly prohibited");
   });
 
-  it("renders the CAR logo image when APP_PUBLIC_BASE_URL is set", () => {
-    vi.stubEnv("APP_PUBLIC_BASE_URL", "https://memo.car-1996.com/");
+  it("embeds the CAR logo via a cid reference (not a remote URL email clients block)", () => {
     const out = wrapEmailHtml("<p>hi</p>");
-    expect(out).toContain('src="https://memo.car-1996.com/CARLOGO.png"');
+    expect(out).toContain('src="cid:carlogo"');
+    // No remote http(s) image src — those get blocked by default in most clients.
+    expect(out).not.toContain("CARLOGO.png");
+    expect(out).not.toContain("https://memo.car-1996.com/CARLOGO.png");
   });
 
-  it("falls back to a text wordmark when no base URL is configured", () => {
+  it("renders the logo regardless of APP_PUBLIC_BASE_URL (cid does not depend on it)", () => {
     vi.stubEnv("APP_PUBLIC_BASE_URL", "");
     const out = wrapEmailHtml("<p>hi</p>");
-    expect(out).not.toContain("CARLOGO.png");
-    expect(out).toContain("Complete Auto Rubber");
+    expect(out).toContain('src="cid:carlogo"');
   });
 });

@@ -43,10 +43,6 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function baseUrl(): string {
-  return (process.env.APP_PUBLIC_BASE_URL ?? "").trim().replace(/\/$/, "");
-}
-
 // Plain-text alternative: inner body, then signature + env note + disclaimer.
 export function wrapEmailText(innerText: string): string {
   return [
@@ -64,11 +60,15 @@ export function wrapEmailText(innerText: string): string {
   ].join("\n");
 }
 
+// The logo is referenced by Content-ID (cid) and embedded as an inline attachment
+// by the mail client (src/lib/email/client.ts). Remote <img src="https://..."> logos
+// are blocked by default in Outlook/Gmail; an inline cid attachment always renders.
+const LOGO_CID = "carlogo";
+
 function brandHeader(): string {
-  const base = baseUrl();
-  const logo = base
-    ? `<img src="${base}/CARLOGO.png" alt="${escapeHtml(COMPANY_NAME)}" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;" />`
-    : `<span style="font-size:16px;font-weight:700;color:#ffffff;">Complete Auto Rubber</span>`;
+  const logo =
+    `<img src="cid:${LOGO_CID}" alt="${escapeHtml(COMPANY_NAME)}" height="40" ` +
+    `style="display:block;border:0;outline:none;text-decoration:none;height:40px;" />`;
   return `<tr><td style="background:${BRAND_NAVY};padding:16px 24px;">${logo}</td></tr>`;
 }
 

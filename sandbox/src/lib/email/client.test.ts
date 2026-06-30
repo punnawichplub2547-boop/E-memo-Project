@@ -122,6 +122,56 @@ describe("sendEmailMessage", () => {
     );
   });
 
+  it("embeds the logo as an inline cid attachment when the html references cid:carlogo", async () => {
+    const sendMail = vi.fn().mockResolvedValue({ messageId: "logo-1" });
+    const logo = { filename: "CARLOGO.png", content: Buffer.from("png-bytes"), cid: "carlogo" };
+    await sendEmailMessage(
+      {
+        to: "approver@example.com",
+        subject: "รออนุมัติ: EM-1",
+        text: "Please review",
+        html: '<img src="cid:carlogo" /><p>Please review</p>',
+      },
+      { getConfig: () => config, createTransport: () => ({ sendMail }), getLogo: () => logo },
+    );
+
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ attachments: expect.arrayContaining([logo]) }),
+    );
+  });
+
+  it("does NOT attach the logo to a text-only email (no cid reference)", async () => {
+    const sendMail = vi.fn().mockResolvedValue({ messageId: "no-logo" });
+    const logo = { filename: "CARLOGO.png", content: Buffer.from("png-bytes"), cid: "carlogo" };
+    await sendEmailMessage(
+      { to: "r@example.com", subject: "s", text: "plain only" },
+      { getConfig: () => config, createTransport: () => ({ sendMail }), getLogo: () => logo },
+    );
+
+    const sent = sendMail.mock.calls[0][0];
+    expect(sent.attachments).toBeUndefined();
+  });
+
+  it("keeps caller attachments and adds the logo alongside (e.g. emailed Excel)", async () => {
+    const sendMail = vi.fn().mockResolvedValue({ messageId: "both" });
+    const logo = { filename: "CARLOGO.png", content: Buffer.from("png-bytes"), cid: "carlogo" };
+    const xlsx = { filename: "memo-EM-1.xlsx", content: Buffer.from("xlsx-bytes") };
+    await sendEmailMessage(
+      {
+        to: "r@example.com",
+        subject: "Memo EM-1",
+        text: "See attached",
+        html: '<img src="cid:carlogo" /><p>See attached</p>',
+        attachments: [xlsx],
+      },
+      { getConfig: () => config, createTransport: () => ({ sendMail }), getLogo: () => logo },
+    );
+
+    const sent = sendMail.mock.calls[0][0];
+    expect(sent.attachments).toEqual(expect.arrayContaining([xlsx, logo]));
+    expect(sent.attachments).toHaveLength(2);
+  });
+
   it("returns null when email delivery is not configured", async () => {
     const sendMail = vi.fn();
     vi.stubEnv("EMAIL_NOTIFICATIONS_ENABLED", "true");
