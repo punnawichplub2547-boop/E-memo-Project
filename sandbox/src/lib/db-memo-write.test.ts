@@ -740,10 +740,10 @@ describe("buildResubmitMemoPayload", () => {
     expect(payload.newReadActions[0].updated_at).toBe(utc);
   });
 
-  it("resets md_review_status to pending when requiresMdReview is true", () => {
+  it("resets md_review_status to null when requiresMdReview is true (re-armed by Manager's next approve, not immediately)", () => {
     const payload = buildResubmitMemoPayload({ ...baseBody, requiresMdReview: true });
 
-    expect(payload.memoUpdate.md_review_status).toBe("pending");
+    expect(payload.memoUpdate.md_review_status).toBeNull();
     expect(payload.memoUpdate.md_review_resume_step).toBeNull();
     expect(payload.memoUpdate.md_review_comment).toBeNull();
     expect(payload.memoUpdate.md_review_acted_by).toBeNull();
@@ -945,12 +945,12 @@ describe("buildSubmitRevisionPayload", () => {
     expect(payload.newReadActions[0].updated_at).toBe(expected);
   });
 
-  it("resets md_review_status from nextMemoRow.requires_md_review", () => {
+  it("resets md_review_status to null regardless of nextMemoRow.requires_md_review (re-armed by Manager's next approve, not immediately)", () => {
     const withReview = buildSubmitRevisionPayload({
       ...baseBody,
       nextMemoRow: { ...baseBody.nextMemoRow, requires_md_review: true },
     });
-    expect(withReview.memoUpdate.md_review_status).toBe("pending");
+    expect(withReview.memoUpdate.md_review_status).toBeNull();
     expect(withReview.memoUpdate.md_review_resume_step).toBeNull();
 
     const withoutReview = buildSubmitRevisionPayload({

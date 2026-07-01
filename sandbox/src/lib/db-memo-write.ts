@@ -380,7 +380,7 @@ export type ResubmitMemoPayload = {
     return_reason: null;
     reject_reason: null;
     reject_disposition: null;
-    md_review_status: "pending" | null;
+    md_review_status: null;
     md_review_resume_step: null;
     md_review_comment: null;
     md_review_acted_by: null;
@@ -426,7 +426,7 @@ export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPa
       return_reason: null,
       reject_reason: null,
       reject_disposition: null,
-      md_review_status: body.requiresMdReview ? "pending" : null,
+      md_review_status: null,
       md_review_resume_step: null,
       md_review_comment: null,
       md_review_acted_by: null,
@@ -522,7 +522,7 @@ export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevi
     memoUpdate: {
       ...body.nextMemoRow,
       revision_no: newRevisionNo,
-      md_review_status: body.nextMemoRow.requires_md_review ? "pending" : null,
+      md_review_status: null,
       md_review_resume_step: null,
       md_review_comment: null,
       md_review_acted_by: null,

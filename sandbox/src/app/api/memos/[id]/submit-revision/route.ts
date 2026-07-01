@@ -129,6 +129,7 @@ export async function POST(
          route_mode = ?,
          route_override_reason = ?,
          notify_md = ?,
+         requires_md_review = ?,
          is_price_adjustment = ?,
          follows_production_plan = ?,
          is_dead_stock = ?,
@@ -205,7 +206,7 @@ export async function POST(
   }
 }
 
-// All 41 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
+// All 42 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
 // minus the immutable identity fields: memo_no, requester_name, requester_user_id, created_at.
 // Append memoDbId last for the WHERE id = ? clause.
 function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
@@ -231,6 +232,7 @@ function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
     row.route_mode,
     row.route_override_reason,
     row.notify_md,
+    row.requires_md_review,
     row.is_price_adjustment,
     row.follows_production_plan,
     row.is_dead_stock,
