@@ -216,6 +216,35 @@ describe("sanitizeNewMemoInput", () => {
     expect(result.memo.category).toBe("general-purchase");
     expect(result.memo.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
   });
+
+  it("forces md review fields server-side, ignoring anything the client sends", () => {
+    const result = sanitizeNewMemoInput(
+      {
+        ...baseMemo,
+        requiresMdReview: true,
+        mdReviewStatus: "escalated",
+        mdReviewResumeStep: "General Manager",
+        mdReviewComment: "fake comment",
+        mdReviewActedBy: "someone else",
+        mdReviewActedAt: "01 Jan 2020 00:00",
+      },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.mdReviewStatus).toBeUndefined();
+    expect(result.memo.mdReviewResumeStep).toBeUndefined();
+    expect(result.memo.mdReviewComment).toBeUndefined();
+    expect(result.memo.mdReviewActedBy).toBeUndefined();
+    expect(result.memo.mdReviewActedAt).toBeUndefined();
+  });
+
+  it("preserves requiresMdReview as computed business content (not a workflow-state field)", () => {
+    const result = sanitizeNewMemoInput({ ...baseMemo, requiresMdReview: true }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.requiresMdReview).toBe(true);
+  });
 });
 
 describe("buildAdvanceStepPayload", () => {
