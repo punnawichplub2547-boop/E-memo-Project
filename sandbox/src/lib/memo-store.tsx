@@ -28,6 +28,14 @@ type Action =
   | { type: "MARK_READ"; id: string; recipient: string; actedAt?: string }
   | { type: "SKIP_ALL_READS"; id: string; skipReason: string; actedAt?: string }
   | { type: "RETURN_MEMO"; id: string; returnReason: string; updatedAt?: string }
+  | {
+      type: "REVIEW_MEMO";
+      id: string;
+      response: "acknowledged_no_objection" | "comment" | "request_revision" | "escalate_to_md_approval";
+      comment?: string;
+      reason?: string;
+      updatedAt?: string;
+    }
   | { type: "RESUBMIT_MEMO"; id: string; revisionNote?: string; updatedAt?: string }
   | { type: "REJECT_MEMO"; id: string; disposition: "close" | "revision-allowed"; reason: string; updatedAt?: string }
   | {
@@ -146,6 +154,23 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
         const route = m.selectedRoute;
         const idx = route ? route.indexOf(m.currentStep) : -1;
         const isLastOrMissing = !route || route.length === 0 || idx === -1 || idx === route.length - 1;
+
+        const needsReviewStash =
+          m.currentStep === "Manager / Top Section" &&
+          m.requiresMdReview === true &&
+          m.mdReviewStatus == null;
+        if (needsReviewStash) {
+          const resumeStep: ApprovalLevel = isLastOrMissing ? "Managing Director" : route![idx + 1];
+          return {
+            ...m,
+            currentStep: "Managing Director",
+            workflowState: "Checked",
+            mdReviewStatus: "pending",
+            mdReviewResumeStep: resumeStep,
+            updatedAt: action.updatedAt ?? m.updatedAt,
+          };
+        }
+
         if (isLastOrMissing) {
           return { ...m, status: "approved", workflowState: "Approved", updatedAt: action.updatedAt ?? m.updatedAt };
         }
@@ -182,6 +207,55 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
       return state.map((m) =>
         m.id === action.id ? { ...m, status: "returned", returnReason: action.returnReason, updatedAt: action.updatedAt ?? m.updatedAt } : m
       );
+    case "REVIEW_MEMO": {
+      return state.map((m) => {
+        if (m.id !== action.id || m.mdReviewStatus !== "pending") return m;
+        const updatedAt = action.updatedAt ?? m.updatedAt;
+
+        if (action.response === "request_revision") {
+          return {
+            ...m,
+            status: "returned" as const,
+            returnReason: action.reason,
+            mdReviewStatus: "completed" as const,
+            updatedAt,
+          };
+        }
+        if (action.response === "escalate_to_md_approval") {
+          return {
+            ...m,
+            status: "approved" as const,
+            workflowState: "Approved" as const,
+            currentStep: "Managing Director" as const,
+            mdReviewStatus: "escalated" as const,
+            mdReviewComment: action.comment,
+            updatedAt,
+          };
+        }
+        const resumeStep = m.mdReviewResumeStep ?? "Managing Director";
+        const comment = action.response === "comment" ? action.comment : undefined;
+        if (resumeStep === "Managing Director") {
+          return {
+            ...m,
+            status: "approved" as const,
+            workflowState: "Approved" as const,
+            currentStep: "Managing Director" as const,
+            mdReviewStatus: "completed" as const,
+            mdReviewComment: comment,
+            updatedAt,
+          };
+        }
+        return {
+          ...m,
+          status: "pending" as const,
+          workflowState: "Checked" as const,
+          currentStep: resumeStep,
+          mdReviewStatus: "completed" as const,
+          mdReviewComment: comment,
+          updatedAt,
+        };
+      });
+    }
     case "RESUBMIT_MEMO": {
       return state.map((m) => {
         if (m.id !== action.id) return m;
@@ -321,6 +395,15 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
         void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, actorName, action.updatedAt);
+      }
+    } else if (action.type === "REVIEW_MEMO") {
+      const prevState = memos;
+      const nextState = memoReducer(prevState, action);
+      reducerDispatch(action);
+      const prevMemo = prevState.find((m) => m.id === action.id);
+      const nextMemo = nextState.find((m) => m.id === action.id);
+      if (prevMemo && nextMemo && prevMemo !== nextMemo) {
+        void persistReviewMemo(action.id, action.response, action.comment, action.reason);
       }
     } else if (action.type === "REJECT_MEMO") {
       const prevState = memos;
@@ -486,6 +569,26 @@ async function persistReturnMemo(
     }
   } catch (error) {
     console.error("[MemoProvider] RETURN_MEMO persist failed", error);
+  }
+}
+
+async function persistReviewMemo(
+  memoId: string,
+  response: "acknowledged_no_objection" | "comment" | "request_revision" | "escalate_to_md_approval",
+  comment: string | undefined,
+  reason: string | undefined,
+) {
+  try {
+    const response_ = await fetch(`/api/memos/${encodeURIComponent(memoId)}/md-review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response, comment, reason }),
+    });
+    if (!response_.ok) {
+      console.error("[MemoProvider] REVIEW_MEMO persist failed", response_.status, await response_.text());
+    }
+  } catch (error) {
+    console.error("[MemoProvider] REVIEW_MEMO persist failed", error);
   }
 }
 

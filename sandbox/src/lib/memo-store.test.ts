@@ -210,6 +210,92 @@ describe("memoReducer — ADVANCE_STEP", () => {
     const next = memoReducer([mgr2gm, other], { type: "ADVANCE_STEP", id: mgr2gm.id });
     expect(next.find((m) => m.id === other.id)).toEqual(other);
   });
+
+  it("parks current_step at Managing Director with mdReviewStatus pending when requires_md_review and not yet reviewed", () => {
+    const memo: MemoRecord = { ...mgr2gm, requiresMdReview: true };
+    const next = memoReducer([memo], { type: "ADVANCE_STEP", id: memo.id });
+    expect(next[0].currentStep).toBe("Managing Director");
+    expect(next[0].mdReviewStatus).toBe("pending");
+    expect(next[0].mdReviewResumeStep).toBe("General Manager");
+  });
+
+  it("stashes mdReviewResumeStep as Managing Director when the route ends at Manager (merge case)", () => {
+    const memo: MemoRecord = {
+      ...seedMemos[0],
+      status: "pending",
+      selectedRoute: ["Manager / Top Section"],
+      currentStep: "Manager / Top Section",
+      requiresMdReview: true,
+    };
+    const next = memoReducer([memo], { type: "ADVANCE_STEP", id: memo.id });
+    expect(next[0].currentStep).toBe("Managing Director");
+    expect(next[0].mdReviewStatus).toBe("pending");
+    expect(next[0].mdReviewResumeStep).toBe("Managing Director");
+    expect(next[0].status).toBe("pending");
+  });
+});
+
+describe("memoReducer — REVIEW_MEMO", () => {
+  const reviewBaseMemo: MemoRecord = {
+    ...seedMemos[0],
+    status: "pending",
+    currentStep: "Managing Director",
+    requiresMdReview: true,
+    mdReviewStatus: "pending",
+    mdReviewResumeStep: "General Manager",
+    selectedRoute: ["Manager / Top Section", "General Manager", "Managing Director"],
+  };
+
+  it("acknowledged_no_objection resumes at the stashed step", () => {
+    const next = memoReducer([reviewBaseMemo], {
+      type: "REVIEW_MEMO",
+      id: reviewBaseMemo.id,
+      response: "acknowledged_no_objection",
+    });
+    expect(next[0].currentStep).toBe("General Manager");
+    expect(next[0].status).toBe("pending");
+    expect(next[0].mdReviewStatus).toBe("completed");
+  });
+
+  it("acknowledged_no_objection auto-finalizes when resume step is Managing Director", () => {
+    const next = memoReducer(
+      [{ ...reviewBaseMemo, mdReviewResumeStep: "Managing Director" }],
+      { type: "REVIEW_MEMO", id: reviewBaseMemo.id, response: "acknowledged_no_objection" },
+    );
+    expect(next[0].status).toBe("approved");
+    expect(next[0].workflowState).toBe("Approved");
+  });
+
+  it("escalate_to_md_approval finalizes immediately", () => {
+    const next = memoReducer([reviewBaseMemo], {
+      type: "REVIEW_MEMO",
+      id: reviewBaseMemo.id,
+      response: "escalate_to_md_approval",
+    });
+    expect(next[0].status).toBe("approved");
+    expect(next[0].mdReviewStatus).toBe("escalated");
+  });
+
+  it("request_revision returns the memo with the given reason", () => {
+    const next = memoReducer([reviewBaseMemo], {
+      type: "REVIEW_MEMO",
+      id: reviewBaseMemo.id,
+      response: "request_revision",
+      reason: "กรุณาแนบใบเสนอราคาเพิ่มเติม",
+    });
+    expect(next[0].status).toBe("returned");
+    expect(next[0].returnReason).toBe("กรุณาแนบใบเสนอราคาเพิ่มเติม");
+  });
+
+  it("ignores the action when no review is pending", () => {
+    const notPending = { ...reviewBaseMemo, mdReviewStatus: "completed" as const };
+    const next = memoReducer([notPending], {
+      type: "REVIEW_MEMO",
+      id: reviewBaseMemo.id,
+      response: "acknowledged_no_objection",
+    });
+    expect(next[0]).toBe(notPending);
+  });
 });
 
 describe("memoReducer — MARK_READ", () => {
