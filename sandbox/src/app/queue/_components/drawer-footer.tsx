@@ -8,6 +8,7 @@ import {
   canApproveMemo,
   canResubmitMemo,
   canReturnOrRejectMemo,
+  canReviewMdMemo,
   type PrototypeUser,
 } from "@/lib/prototype-users";
 
@@ -19,6 +20,7 @@ export function DrawerFooter({
   onReturn,
   onResubmit,
   onSkipAllReads,
+  onReview,
 }: {
   memo: MemoRecord;
   currentUser: PrototypeUser;
@@ -27,6 +29,12 @@ export function DrawerFooter({
   onReturn: (id: string, reason: string) => void;
   onResubmit: (id: string, revisionNote?: string) => void;
   onSkipAllReads: (id: string, reason: string) => void;
+  onReview: (
+    id: string,
+    response: "acknowledged_no_objection" | "comment" | "request_revision" | "escalate_to_md_approval",
+    comment?: string,
+    reason?: string,
+  ) => void;
 }) {
   const router = useRouter();
 
@@ -41,6 +49,11 @@ export function DrawerFooter({
   const [revisionNote, setRevisionNote] = useState("");
   const [skipReadsMode, setSkipReadsMode] = useState(false);
   const [skipReason, setSkipReason] = useState("");
+  const [reviewCommentMode, setReviewCommentMode] = useState(false);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewRevisionMode, setReviewRevisionMode] = useState(false);
+  const [reviewRevisionReason, setReviewRevisionReason] = useState("");
+  const canReview = canReviewMdMemo(currentUser, memo);
 
   const hasPendingReads = memo.readActions?.some(ra => ra.status === "pending") ?? false;
   const canApprove = canApproveMemo(currentUser, memo);
@@ -119,7 +132,119 @@ export function DrawerFooter({
 
   return (
     <div className="em-drawer-foot">
-      {memo.status === "pending" ? (
+      {memo.mdReviewStatus === "pending" ? (
+        reviewCommentMode ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 12.5, color: "var(--ink-2)", fontWeight: 700 }}>ความเห็นของ MD</div>
+            <textarea
+              className="em-textarea"
+              style={{ minHeight: 64 }}
+              placeholder="ระบุความเห็นประกอบ (ไม่บังคับ)"
+              value={reviewComment}
+              onChange={e => setReviewComment(e.target.value)}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="em-btn sm ghost" style={{ flex: 1 }} onClick={() => setReviewCommentMode(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="em-btn sm primary"
+                style={{ flex: 2 }}
+                disabled={!canReview}
+                onClick={() => {
+                  onReview(memo.id, "comment", reviewComment.trim() || undefined);
+                  setReviewCommentMode(false);
+                }}
+              >
+                ยืนยันความเห็น
+              </button>
+            </div>
+          </div>
+        ) : reviewRevisionMode ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 12.5, color: "var(--amber)", fontWeight: 700 }}>
+              ระบุสิ่งที่ต้องการให้แก้ไข <span style={{ color: "var(--rose)" }}>*</span>
+            </div>
+            <textarea
+              className="em-textarea"
+              style={{ minHeight: 72 }}
+              placeholder="เช่น ราคาสูงกว่าตลาด, ขอใบเสนอราคาเพิ่มเติม"
+              value={reviewRevisionReason}
+              onChange={e => setReviewRevisionReason(e.target.value)}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="em-btn sm ghost" style={{ flex: 1 }} onClick={() => setReviewRevisionMode(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="em-btn sm"
+                style={{ flex: 2, background: "var(--amber-soft)", color: "var(--amber)", border: "1px solid rgba(180,83,9,0.30)" }}
+                disabled={!reviewRevisionReason.trim() || !canReview}
+                onClick={() => onReview(memo.id, "request_revision", undefined, reviewRevisionReason.trim())}
+              >
+                ยืนยันขอแก้ไข
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{
+              padding: "8px 10px", borderRadius: 6, background: "var(--gold-soft)",
+              border: "1px solid rgba(201,168,76,0.40)", fontSize: 12, color: "#7C5E0F", fontWeight: 700,
+            }}>
+              ต้องผ่านการพิจารณาของ MD ก่อนที่ workflow จะดำเนินต่อ
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="em-btn"
+                style={{ flex: 1 }}
+                disabled={!canReview}
+                title={canReview ? "No objection" : noWorkflowPermissionText}
+                onClick={() => onReview(memo.id, "acknowledged_no_objection")}
+              >
+                ไม่มีข้อโต้แย้ง
+              </button>
+              <button
+                type="button"
+                className="em-btn"
+                style={{ flex: 1 }}
+                disabled={!canReview}
+                title={canReview ? "Add a comment" : noWorkflowPermissionText}
+                onClick={() => { setReviewCommentMode(true); setReviewComment(""); }}
+              >
+                แสดงความเห็น
+              </button>
+              <button
+                type="button"
+                className="em-btn"
+                style={{ flex: 1, borderColor: "rgba(180,83,9,0.35)", color: "var(--amber)" }}
+                disabled={!canReview}
+                title={canReview ? "Request revision" : noWorkflowPermissionText}
+                onClick={() => { setReviewRevisionMode(true); setReviewRevisionReason(""); }}
+              >
+                ขอแก้ไข
+              </button>
+              {memo.mdReviewResumeStep !== "Managing Director" && (
+                <button
+                  type="button"
+                  className="em-btn primary"
+                  style={{ flex: 1 }}
+                  disabled={!canReview}
+                  title={canReview ? "Escalate — decide now" : noWorkflowPermissionText}
+                  onClick={() => onReview(memo.id, "escalate_to_md_approval")}
+                >
+                  ยกระดับเป็นผู้อนุมัติ
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      ) : memo.status === "pending" ? (
         rejectMode ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 12.5, color: "var(--rose)", fontWeight: 700 }}>

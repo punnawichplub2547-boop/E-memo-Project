@@ -25,6 +25,7 @@ export function DrawerPanel({
   onResubmit,
   onMarkRead,
   onSkipAllReads,
+  onReview,
   inline = false,
 }: {
   memo: MemoRecord;
@@ -36,6 +37,12 @@ export function DrawerPanel({
   onResubmit: (id: string, revisionNote?: string) => void;
   onMarkRead: (id: string, recipient: string) => void;
   onSkipAllReads: (id: string, reason: string) => void;
+  onReview: (
+    id: string,
+    response: "acknowledged_no_objection" | "comment" | "request_revision" | "escalate_to_md_approval",
+    comment?: string,
+    reason?: string,
+  ) => void;
   inline?: boolean;
 }) {
   const isMd = memo.currentStep === "Managing Director";
@@ -641,6 +648,7 @@ export function DrawerPanel({
         onReturn={onReturn}
         onResubmit={onResubmit}
         onSkipAllReads={onSkipAllReads}
+        onReview={onReview}
       />
     </div>
   );

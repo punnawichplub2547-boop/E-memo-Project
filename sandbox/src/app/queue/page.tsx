@@ -19,6 +19,7 @@ import {
   canMarkReadRecipient,
   canResubmitMemo,
   canReturnOrRejectMemo,
+  canReviewMdMemo,
 } from "@/lib/prototype-users";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
@@ -159,6 +160,18 @@ function QueuePageContent() {
     const memo = memos.find((m) => m.id === id);
     if (!memo || !canReturnOrRejectMemo(user, memo)) return;
     dispatch({ type: "SKIP_ALL_READS", id, skipReason: reason, actedAt: stampNow() });
+  };
+
+  const handleReview = (
+    id: string,
+    response: "acknowledged_no_objection" | "comment" | "request_revision" | "escalate_to_md_approval",
+    comment?: string,
+    reason?: string,
+  ) => {
+    const memo = memos.find((m) => m.id === id);
+    if (!memo || !canReviewMdMemo(user, memo)) return;
+    dispatch({ type: "REVIEW_MEMO", id, response, comment, reason, updatedAt: stampNow() });
+    setSelected(null);
   };
 
   return (
@@ -533,6 +546,7 @@ function QueuePageContent() {
                     onResubmit={handleResubmit}
                     onMarkRead={handleMarkRead}
                     onSkipAllReads={handleSkipAllReads}
+                    onReview={handleReview}
                     inline
                   />
                 )}
@@ -553,6 +567,7 @@ function QueuePageContent() {
             onResubmit={handleResubmit}
             onMarkRead={handleMarkRead}
             onSkipAllReads={handleSkipAllReads}
+            onReview={handleReview}
           />
         )}
       </div>
