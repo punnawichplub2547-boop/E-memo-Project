@@ -51,6 +51,12 @@ export type MemoDbRow = {
   route_mode: string | null;
   route_override_reason: string | null;
   notify_md: DbBoolean;
+  requires_md_review: DbBoolean;
+  md_review_status: string | null;
+  md_review_resume_step: string | null;
+  md_review_comment: string | null;
+  md_review_acted_by: string | null;
+  md_review_acted_at: DbDate | null;
   is_price_adjustment: DbBoolean;
   follows_production_plan: DbBoolean;
   is_dead_stock: DbBoolean;
@@ -122,6 +128,12 @@ export function serializeMemoRecord(
     routeMode: optional(row.route_mode) as ApprovalRouteMode | undefined,
     routeOverrideReason: optional(row.route_override_reason),
     notifyMD: toBoolean(row.notify_md),
+    requiresMdReview: toBoolean(row.requires_md_review),
+    mdReviewStatus: optional(row.md_review_status) as MemoRecord["mdReviewStatus"],
+    mdReviewResumeStep: optional(row.md_review_resume_step) as ApprovalLevel | undefined,
+    mdReviewComment: optional(row.md_review_comment),
+    mdReviewActedBy: optional(row.md_review_acted_by),
+    mdReviewActedAt: row.md_review_acted_at ? toBangkokDisplayTimestamp(row.md_review_acted_at) : undefined,
     isPriceAdjustment: toBoolean(row.is_price_adjustment),
     followsProductionPlan: toBoolean(row.follows_production_plan),
     isDeadStockOrSlowMovement: toBoolean(row.is_dead_stock),

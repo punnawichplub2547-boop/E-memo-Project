@@ -98,6 +98,24 @@ describe("approval rules from HR&GA workbook (Book1.xlsx)", () => {
     expect(gp.notifyMD).toBe(false);
   });
 
+
+  it("marks requiresMdReview true whenever notifyMD is true (same trigger)", () => {
+    const raw = getApprovalRecommendation({
+      category: "raw-material",
+      amount: 9000,
+      budgetStatus: "in-budget",
+      isPriceAdjustment: true
+    });
+    expect(raw.requiresMdReview).toBe(true);
+
+    const gp = getApprovalRecommendation({
+      category: "general-purchase",
+      amount: 5000,
+      budgetStatus: "in-budget",
+      isPriceAdjustment: true
+    });
+    expect(gp.requiresMdReview).toBe(false);
+  });
   it("escalates over-budget 1-10k to MD when department monthly quota would be exceeded", () => {
     const rec = getApprovalRecommendation({
       category: "general-purchase",

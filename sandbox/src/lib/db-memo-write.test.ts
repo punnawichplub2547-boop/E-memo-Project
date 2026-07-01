@@ -86,6 +86,37 @@ describe("DB memo write helpers", () => {
   it("does not build read action rows when no readActions exist", () => {
     expect(buildNewMemoReadActionRows({ ...memo, readActions: undefined })).toEqual([]);
   });
+
+  it("round-trips md review fields through memoToDbSeedRow", () => {
+    const reviewMemo: MemoRecord = {
+      ...memo,
+      requiresMdReview: true,
+      mdReviewStatus: "pending",
+      mdReviewResumeStep: "General Manager",
+      mdReviewComment: "โปรดตรวจสอบราคาเพิ่มเติม",
+      mdReviewActedBy: "วิชาญ ประสิทธิ์ชัย",
+      mdReviewActedAt: "01 Jun 2026 15:00",
+    };
+    const row = memoToDbSeedRow(reviewMemo);
+
+    expect(row.requires_md_review).toBe(true);
+    expect(row.md_review_status).toBe("pending");
+    expect(row.md_review_resume_step).toBe("General Manager");
+    expect(row.md_review_comment).toBe("โปรดตรวจสอบราคาเพิ่มเติม");
+    expect(row.md_review_acted_by).toBe("วิชาญ ประสิทธิ์ชัย");
+    expect(row.md_review_acted_at).toBe("2026-06-01 08:00:00");
+  });
+
+  it("defaults md review fields to falsy/null when absent", () => {
+    const row = memoToDbSeedRow(memo);
+
+    expect(row.requires_md_review).toBe(false);
+    expect(row.md_review_status).toBeNull();
+    expect(row.md_review_resume_step).toBeNull();
+    expect(row.md_review_comment).toBeNull();
+    expect(row.md_review_acted_by).toBeNull();
+    expect(row.md_review_acted_at).toBeNull();
+  });
 });
 
 // Regression coverage for a real vulnerability: POST /api/memos previously wrote

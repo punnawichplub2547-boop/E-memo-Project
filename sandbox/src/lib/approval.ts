@@ -48,6 +48,7 @@ export type ApprovalRecommendation = {
   reason: string;
   notifyMD: boolean;
   notifyMDReason?: string;
+  requiresMdReview: boolean;
 };
 
 export type MemoStatus = "draft" | "pending" | "approved" | "rejected" | "returned";
@@ -130,6 +131,12 @@ export type MemoSnapshot = {
   routeMode?: ApprovalRouteMode;
   routeOverrideReason?: string;
   notifyMD?: boolean;
+  requiresMdReview?: boolean;
+  mdReviewStatus?: "pending" | "completed" | "escalated";
+  mdReviewResumeStep?: ApprovalLevel;
+  mdReviewComment?: string;
+  mdReviewActedBy?: string;
+  mdReviewActedAt?: string;
 };
 
 export type MemoRevision = {
@@ -179,6 +186,12 @@ export type MemoRecord = {
   budgetPlan?: number;
   budgetUsed?: number;
   notifyMD?: boolean;
+  requiresMdReview?: boolean;
+  mdReviewStatus?: "pending" | "completed" | "escalated";
+  mdReviewResumeStep?: ApprovalLevel;
+  mdReviewComment?: string;
+  mdReviewActedBy?: string;
+  mdReviewActedAt?: string;
   priceComparisons?: PriceComparison[];
   selectedVendorId?: string;
   selectedVendorReason?: string;
@@ -226,14 +239,15 @@ export function getApprovalRecommendation(
 
   const notifyMDFields: Pick<
     ApprovalRecommendation,
-    "notifyMD" | "notifyMDReason"
+    "notifyMD" | "notifyMDReason" | "requiresMdReview"
   > = priceAdjustmentActive
     ? {
         notifyMD: true,
         notifyMDReason:
-          "Supplier ปรับราคา ต้องแจ้ง MD เพื่อรับทราบ (Book1 หมวด 1/2)"
+          "Supplier ปรับราคา ต้องแจ้ง MD เพื่อรับทราบ (Book1 หมวด 1/2)",
+        requiresMdReview: true
       }
-    : { notifyMD: false };
+    : { notifyMD: false, requiresMdReview: false }
 
   if (input.category === "mold") {
     return {

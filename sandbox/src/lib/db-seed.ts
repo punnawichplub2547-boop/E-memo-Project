@@ -28,6 +28,12 @@ export type MemoSeedRow = {
   route_mode: Nullable<string>;
   route_override_reason: Nullable<string>;
   notify_md: boolean;
+  requires_md_review: boolean;
+  md_review_status: Nullable<string>;
+  md_review_resume_step: Nullable<string>;
+  md_review_comment: Nullable<string>;
+  md_review_acted_by: Nullable<string>;
+  md_review_acted_at: Nullable<string>;
   is_price_adjustment: boolean;
   follows_production_plan: boolean;
   is_dead_stock: boolean;
@@ -142,6 +148,12 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     route_mode: memo.routeMode ?? null,
     route_override_reason: memo.routeOverrideReason ?? null,
     notify_md: memo.notifyMD ?? false,
+    requires_md_review: memo.requiresMdReview ?? false,
+    md_review_status: memo.mdReviewStatus ?? null,
+    md_review_resume_step: memo.mdReviewResumeStep ?? null,
+    md_review_comment: memo.mdReviewComment ?? null,
+    md_review_acted_by: memo.mdReviewActedBy ?? null,
+    md_review_acted_at: memo.mdReviewActedAt ? toMysqlUtcDateTime(memo.mdReviewActedAt) : null,
     is_price_adjustment: memo.isPriceAdjustment ?? false,
     follows_production_plan: memo.followsProductionPlan ?? false,
     is_dead_stock: memo.isDeadStockOrSlowMovement ?? false,
