@@ -402,6 +402,9 @@ export function evaluateReviewAction(input: {
   if (input.actor.status !== "active") {
     return { ok: false, status: 403, message: "User account is not active" };
   }
+  if (input.memo.deleted_at !== null) {
+    return { ok: false, status: 409, message: "Memo has been voided" };
+  }
   if (input.memo.md_review_status !== "pending") {
     return { ok: false, status: 409, message: "No MD review is pending on this memo" };
   }

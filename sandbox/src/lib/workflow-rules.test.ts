@@ -685,6 +685,17 @@ describe("evaluateReviewAction", () => {
       ...overrides,
     });
 
+  it("rejects a voided memo even when md_review_status is pending and actor is MD", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ deleted_at: "2026-06-15 10:00:00" }),
+      actor: mdActor(),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+  });
+
   it("rejects when md_review_status is not pending", () => {
     const result = evaluateReviewAction({
       memo: reviewMemo({ md_review_status: "completed" }),
