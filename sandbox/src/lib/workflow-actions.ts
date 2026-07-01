@@ -9,6 +9,8 @@ import {
   evaluateApproveAction,
   evaluateRejectAction,
   evaluateReturnAction,
+  evaluateReviewAction,
+  type ReviewResponse,
   type WorkflowActionRow,
   type WorkflowActionSource,
   type WorkflowActorRow,
@@ -55,7 +57,8 @@ async function loadMemoForUpdate(
 ): Promise<WorkflowMemoRow> {
   const [rows] = await connection.execute<MemoRowResult[]>(
     `SELECT id, memo_no, status, current_step, revision_no,
-        selected_route_json, deleted_at, department_name
+        selected_route_json, deleted_at, department_name,
+        requires_md_review, md_review_status, md_review_resume_step
    FROM memos WHERE memo_no = ? FOR UPDATE`,
     [memoNo],
   );
@@ -164,12 +167,16 @@ export async function approveMemoAction(input: {
          current_step = ?,
          workflow_state = ?,
          status = ?,
+         md_review_status = ?,
+         md_review_resume_step = ?,
          updated_at = ?
        WHERE id = ?`,
       [
         memoUpdate.current_step,
         memoUpdate.workflow_state,
         memoUpdate.status,
+        memoUpdate.md_review_status,
+        memoUpdate.md_review_resume_step,
         memoUpdate.updated_at,
         memo.id,
       ],
@@ -258,4 +265,75 @@ export async function rejectMemoAction(input: {
     await insertWorkflowAction(connection, memo.id, workflowAction);
     return { ok: true as const };
   });
+}
+
+export async function reviewMemoAction(input: {
+  memoNo: string;
+  actorUserId: number;
+  response: ReviewResponse;
+  comment?: string;
+  reason?: string;
+  source: WorkflowActionSource;
+  metadata?: Record<string, unknown>;
+}): Promise<{ ok: true }> {
+  // Capture once before the transaction so acted_at and updated_at are identical.
+  const now = new Date();
+  return withWorkflowTransaction(async (connection) => {
+    const memo = await loadMemoForUpdate(connection, input.memoNo);
+    const actor = await loadActor(connection, input.actorUserId);
+    const { memoUpdate, workflowAction } = unwrap(
+      evaluateReviewAction({
+        memo,
+        actor,
+        response: input.response,
+        comment: input.comment,
+        reason: input.reason,
+        source: input.source,
+        metadata: input.metadata,
+        now,
+      }),
+    );
+
+    if (memoUpdate.status === "returned") {
+      await connection.execute(
+        `UPDATE memos SET
+           status = ?,
+           return_reason = ?,
+           md_review_status = ?,
+           updated_at = ?
+         WHERE id = ?`,
+        [memoUpdate.status, memoUpdate.return_reason, memoUpdate.md_review_status, memoUpdate.updated_at, memo.id],
+      );
+    } else {
+      await connection.execute(
+        `UPDATE memos SET
+           status = ?,
+           workflow_state = ?,
+           current_step = ?,
+           md_review_status = ?,
+           md_review_comment = ?,
+           md_review_acted_by = ?,
+           md_review_acted_at = ?,
+           updated_at = ?
+         WHERE id = ?`,
+        [
+          memoUpdate.status,
+          memoUpdate.workflow_state,
+          memoUpdate.current_step,
+          memoUpdate.md_review_status,
+          memoUpdate.md_review_comment,
+          actorDisplayNameOf(actor),
+          memoUpdate.updated_at,
+          memoUpdate.updated_at,
+          memo.id,
+        ],
+      );
+    }
+    await insertWorkflowAction(connection, memo.id, workflowAction);
+    return { ok: true as const };
+  });
+}
+
+function actorDisplayNameOf(actor: WorkflowActorRow): string {
+  return `${actor.first_name} ${actor.last_name}`.trim();
 }
