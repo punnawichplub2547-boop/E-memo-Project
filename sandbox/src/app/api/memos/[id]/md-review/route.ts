@@ -18,25 +18,27 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
-  const session = await getActiveSessionUserFromToken(sessionToken);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id: memoNo } = await params;
-  const body = (await request.json().catch(() => null)) as
-    | { response?: string; comment?: string; reason?: string }
-    | null;
-  if (!body || !VALID_RESPONSES.includes(body.response as ReviewResponse)) {
-    return NextResponse.json({ error: "Invalid response" }, { status: 400 });
-  }
-
   try {
+    const sessionToken = request.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(sessionToken);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = (await request.json().catch(() => null)) as
+      | { response?: unknown; comment?: unknown; reason?: unknown }
+      | null;
+    if (!body || !VALID_RESPONSES.includes(body.response as ReviewResponse)) {
+      return NextResponse.json({ error: "Invalid response" }, { status: 400 });
+    }
+    const comment = typeof body.comment === "string" ? body.comment : undefined;
+    const reason = typeof body.reason === "string" ? body.reason : undefined;
+
     await reviewMemoAction({
       memoNo,
       actorUserId: session.userId,
       response: body.response as ReviewResponse,
-      comment: body.comment,
-      reason: body.reason,
+      comment,
+      reason,
       source: "web",
     });
     const eventType = body.response === "request_revision" ? "returned" : "advanced";
