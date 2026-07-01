@@ -77,7 +77,7 @@ export function RoutingCard({
           <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--gold-soft)", border: "1px solid rgba(201,168,76,0.40)", display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ width: 22, height: 22, borderRadius: 6, background: "rgba(201,168,76,0.25)", color: "#7C5E0F", display: "grid", placeItems: "center", flexShrink: 0 }}><IconBell size={12} /></div>
             <div style={{ flex: 1 }}>
-              <div className="em-eyebrow" style={{ marginBottom: 3, color: "#7C5E0F" }}>แจ้ง MD เพื่อทราบ</div>
+              <div className="em-eyebrow" style={{ marginBottom: 3, color: "#7C5E0F" }}>ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ</div>
               <div style={{ fontSize: 12.5, color: "#5C4708", lineHeight: 1.5 }}>{recommendation.notifyMDReason}</div>
             </div>
           </div>

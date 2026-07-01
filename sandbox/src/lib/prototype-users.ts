@@ -162,3 +162,9 @@ export function canMarkReadRecipient(user: PrototypeUser, recipient: string): bo
   const labels = new Set([user.name, user.department, ...(user.readRecipientLabels ?? [])]);
   return labels.has(recipient);
 }
+
+export function canReviewMdMemo(user: PrototypeUser, memo: MemoRecord): boolean {
+  if (memo.mdReviewStatus !== "pending") return false;
+  if (isPrototypeAdmin(user)) return true;
+  return user.approvalLevel === "Managing Director";
+}

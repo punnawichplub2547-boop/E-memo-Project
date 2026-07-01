@@ -5,6 +5,7 @@ import {
   canMarkReadRecipient,
   canResubmitMemo,
   canReturnOrRejectMemo,
+  canReviewMdMemo,
   PROTOTYPE_USERS,
 } from "./prototype-users";
 
@@ -53,6 +54,24 @@ describe("prototype user permissions", () => {
 
     expect(canApproveMemo(user("admin"), mdMemo)).toBe(true);
     expect(canReturnOrRejectMemo(user("admin"), mdMemo)).toBe(true);
+  });
+
+  it("allows only Managing Director (or admin) to act on a pending MD review, and only while it's pending", () => {
+    const memoUnderReview: MemoRecord = {
+      ...baseMemo,
+      currentStep: "Managing Director",
+      requiresMdReview: true,
+      mdReviewStatus: "pending",
+    };
+    const memoNormalMdStep: MemoRecord = {
+      ...baseMemo,
+      currentStep: "Managing Director",
+    };
+
+    expect(canReviewMdMemo(user("md"), memoUnderReview)).toBe(true);
+    expect(canReviewMdMemo(user("admin"), memoUnderReview)).toBe(true);
+    expect(canReviewMdMemo(user("gm"), memoUnderReview)).toBe(false);
+    expect(canReviewMdMemo(user("md"), memoNormalMdStep)).toBe(false);
   });
 
   it("allows requester or admin to resubmit returned or revision-allowed rejected memos", () => {
