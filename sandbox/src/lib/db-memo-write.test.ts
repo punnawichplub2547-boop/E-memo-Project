@@ -611,6 +611,7 @@ describe("buildResubmitMemoPayload", () => {
     readRecipients: ["ACC/FIN", "HR&GA"],
     updatedAt: "02 Jun 2026 09:00",
     actorName: ACTOR,
+    requiresMdReview: false,
   };
 
   it("memoRevision.revision_no is old; memoUpdate, workflowAction, and newReadActions use new (old + 1)", () => {
@@ -737,6 +738,22 @@ describe("buildResubmitMemoPayload", () => {
     expect(payload.workflowAction.acted_at).toBe(utc);
     expect(payload.newReadActions[0].created_at).toBe(utc);
     expect(payload.newReadActions[0].updated_at).toBe(utc);
+  });
+
+  it("resets md_review_status to pending when requiresMdReview is true", () => {
+    const payload = buildResubmitMemoPayload({ ...baseBody, requiresMdReview: true });
+
+    expect(payload.memoUpdate.md_review_status).toBe("pending");
+    expect(payload.memoUpdate.md_review_resume_step).toBeNull();
+    expect(payload.memoUpdate.md_review_comment).toBeNull();
+    expect(payload.memoUpdate.md_review_acted_by).toBeNull();
+    expect(payload.memoUpdate.md_review_acted_at).toBeNull();
+  });
+
+  it("resets md_review_status to null when requiresMdReview is false", () => {
+    const payload = buildResubmitMemoPayload({ ...baseBody, requiresMdReview: false });
+
+    expect(payload.memoUpdate.md_review_status).toBeNull();
   });
 });
 
@@ -926,5 +943,20 @@ describe("buildSubmitRevisionPayload", () => {
     expect(payload.workflowAction.acted_at).toBe(expected);
     expect(payload.newReadActions[0].created_at).toBe(expected);
     expect(payload.newReadActions[0].updated_at).toBe(expected);
+  });
+
+  it("resets md_review_status from nextMemoRow.requires_md_review", () => {
+    const withReview = buildSubmitRevisionPayload({
+      ...baseBody,
+      nextMemoRow: { ...baseBody.nextMemoRow, requires_md_review: true },
+    });
+    expect(withReview.memoUpdate.md_review_status).toBe("pending");
+    expect(withReview.memoUpdate.md_review_resume_step).toBeNull();
+
+    const withoutReview = buildSubmitRevisionPayload({
+      ...baseBody,
+      nextMemoRow: { ...baseBody.nextMemoRow, requires_md_review: false },
+    });
+    expect(withoutReview.memoUpdate.md_review_status).toBeNull();
   });
 });

@@ -145,6 +145,11 @@ export async function POST(
          price_adjustment_reason = ?,
          request_items_json = ?,
          read_recipients_json = ?,
+         md_review_status = ?,
+         md_review_resume_step = ?,
+         md_review_comment = ?,
+         md_review_acted_by = ?,
+         md_review_acted_at = ?,
          updated_at = ?
        WHERE id = ?`,
       memoUpdateParams(memoUpdate, memoDbId)
@@ -200,7 +205,7 @@ export async function POST(
   }
 }
 
-// All 36 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
+// All 41 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
 // minus the immutable identity fields: memo_no, requester_name, requester_user_id, created_at.
 // Append memoDbId last for the WHERE id = ? clause.
 function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
@@ -242,6 +247,11 @@ function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
     row.price_adjustment_reason,
     row.request_items_json,
     row.read_recipients_json,
+    row.md_review_status,
+    row.md_review_resume_step,
+    row.md_review_comment,
+    row.md_review_acted_by,
+    row.md_review_acted_at,
     row.updated_at,
     memoDbId,
   ];

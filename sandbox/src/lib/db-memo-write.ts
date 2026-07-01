@@ -344,6 +344,7 @@ export type ResubmitMemoBody = {
   readRecipients: string[];
   updatedAt: string;
   actorName: string | null;
+  requiresMdReview: boolean;
 };
 
 export type ResubmitMemoReadActionRow = {
@@ -379,6 +380,11 @@ export type ResubmitMemoPayload = {
     return_reason: null;
     reject_reason: null;
     reject_disposition: null;
+    md_review_status: "pending" | null;
+    md_review_resume_step: null;
+    md_review_comment: null;
+    md_review_acted_by: null;
+    md_review_acted_at: null;
   };
   newReadActions: ResubmitMemoReadActionRow[];
   workflowAction: {
@@ -420,6 +426,11 @@ export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPa
       return_reason: null,
       reject_reason: null,
       reject_disposition: null,
+      md_review_status: body.requiresMdReview ? "pending" : null,
+      md_review_resume_step: null,
+      md_review_comment: null,
+      md_review_acted_by: null,
+      md_review_acted_at: null,
     },
     newReadActions: body.readRecipients.map((recipient) => ({
       revision_no: newRevisionNo,
@@ -508,7 +519,15 @@ export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevi
       revision_impact: null,
       created_at: updatedAtUtc,
     },
-    memoUpdate: { ...body.nextMemoRow, revision_no: newRevisionNo },
+    memoUpdate: {
+      ...body.nextMemoRow,
+      revision_no: newRevisionNo,
+      md_review_status: body.nextMemoRow.requires_md_review ? "pending" : null,
+      md_review_resume_step: null,
+      md_review_comment: null,
+      md_review_acted_by: null,
+      md_review_acted_at: null,
+    },
     newReadActions: body.readRecipients.map((recipient) => ({
       revision_no: newRevisionNo,
       recipient_name: recipient,

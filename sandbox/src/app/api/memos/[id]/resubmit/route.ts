@@ -18,6 +18,7 @@ type MemoIdRow = RowDataPacket & {
   reject_disposition: string | null;
   revision_no: number;
   selected_route_json: string;
+  requires_md_review: number | boolean;
 };
 
 export async function POST(
@@ -38,7 +39,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      `SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, selected_route_json
+      `SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, selected_route_json, requires_md_review
        FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE`,
       [memoNo]
     );
@@ -77,6 +78,7 @@ export async function POST(
     const selectedRoute = JSON.parse(memo.selected_route_json || "[]") as string[];
     body.nextCurrentStep = selectedRoute[0] ?? "Manager / Top Section";
     body.oldRevisionNo = memo.revision_no;
+    body.requiresMdReview = Boolean(memo.requires_md_review);
 
     const memoDbId = memo.id;
     const { memoRevision, memoUpdate, newReadActions, workflowAction } = buildResubmitMemoPayload(body);
@@ -111,7 +113,12 @@ export async function POST(
          updated_at = ?,
          return_reason = ?,
          reject_reason = ?,
-         reject_disposition = ?
+         reject_disposition = ?,
+         md_review_status = ?,
+         md_review_resume_step = ?,
+         md_review_comment = ?,
+         md_review_acted_by = ?,
+         md_review_acted_at = ?
        WHERE id = ?`,
       [
         memoUpdate.status,
@@ -124,6 +131,11 @@ export async function POST(
         memoUpdate.return_reason,
         memoUpdate.reject_reason,
         memoUpdate.reject_disposition,
+        memoUpdate.md_review_status,
+        memoUpdate.md_review_resume_step,
+        memoUpdate.md_review_comment,
+        memoUpdate.md_review_acted_by,
+        memoUpdate.md_review_acted_at,
         memoDbId,
       ]
     );

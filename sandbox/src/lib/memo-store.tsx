@@ -509,6 +509,9 @@ async function persistResubmitMemo(
     readRecipients: prev.readActions?.map((ra) => ra.recipient) ?? [],
     updatedAt: updatedAt ?? next.updatedAt,
     actorName,
+    // Server overrides this from the DB row (trust boundary) — sent here only to
+    // satisfy the request body shape.
+    requiresMdReview: next.requiresMdReview ?? false,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/resubmit`, {
