@@ -14,6 +14,8 @@ export type WorkflowMemoRow = {
   selected_route_json: unknown;
   deleted_at: string | Date | null;
   department_name: string;
+  requires_md_review: boolean;
+  md_review_status: "pending" | "completed" | "escalated" | null;
 };
 
 // Actor shape after roles_json has been parsed (see workflow-actions.ts loadActor).
@@ -137,6 +139,9 @@ function guardActorAndMemo(
   if (memo.status !== "pending") {
     return { ok: false, status: 409, message: "Memo is not pending" };
   }
+  if (memo.md_review_status === "pending") {
+    return { ok: false, status: 409, message: "Awaiting MD review" };
+  }
   if (!canActOnStep(actor, memo)) {
     return { ok: false, status: 403, message: "You do not have permission for this step" };
   }
@@ -160,6 +165,8 @@ export type ApproveActionPayload = {
     workflow_state: "Checked" | "Approved";
     current_step: string;
     updated_at: string;
+    md_review_status: "pending" | null;
+    md_review_resume_step: string | null;
   };
   workflowAction: WorkflowActionRow;
 };
@@ -181,6 +188,45 @@ export function evaluateApproveAction(input: {
   if (!next.ok) return { ok: false, status: 422, message: next.message };
 
   const actedAt = nowMysqlUtcDateTime(input.now);
+
+  // MD Review gate: right after the Manager/Top Section check completes, if the
+  // memo requires MD review and hasn't been reviewed yet, park current_step at
+  // "Managing Director" and stash the real next step instead of advancing there
+  // directly. If the route would already have ended at Manager (no-op case),
+  // stash "Managing Director" itself so the review resolution auto-finalizes
+  // (merge MD_REVIEW+APPROVE per spec §6.5).
+  const needsReviewStash =
+    input.memo.current_step === "Manager / Top Section" &&
+    input.memo.requires_md_review &&
+    input.memo.md_review_status === null;
+
+  if (needsReviewStash) {
+    const resumeStep = next.isFinal ? "Managing Director" : next.nextCurrentStep;
+    return {
+      ok: true,
+      payload: {
+        memoUpdate: {
+          status: "pending",
+          workflow_state: "Checked",
+          current_step: "Managing Director",
+          updated_at: actedAt,
+          md_review_status: "pending",
+          md_review_resume_step: resumeStep,
+        },
+        workflowAction: {
+          revision_no: input.memo.revision_no,
+          action_type: "check",
+          step_label: input.memo.current_step,
+          actor_name: actorDisplayName(input.actor),
+          result: "intermediate",
+          reason: null,
+          acted_at: actedAt,
+          metadata_json: buildActionMetadata(input.source, input.metadata),
+        },
+      },
+    };
+  }
+
   return {
     ok: true,
     payload: {
@@ -189,6 +235,8 @@ export function evaluateApproveAction(input: {
         workflow_state: next.nextWorkflowState,
         current_step: next.nextCurrentStep,
         updated_at: actedAt,
+        md_review_status: null,
+        md_review_resume_step: null,
       },
       workflowAction: {
         revision_no: input.memo.revision_no,

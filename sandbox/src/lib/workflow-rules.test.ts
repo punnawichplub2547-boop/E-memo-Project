@@ -203,6 +203,8 @@ function makeMemo(overrides: Partial<WorkflowMemoRow> = {}): WorkflowMemoRow {
     selected_route_json: JSON.stringify(FULL_ROUTE),
     deleted_at: null,
     department_name: "IT",
+    requires_md_review: false,
+    md_review_status: null,
     ...overrides,
   };
 }
@@ -236,6 +238,8 @@ describe("evaluateApproveAction", () => {
       workflow_state: "Checked",
       current_step: "General Manager",
       updated_at: NOW_SQL,
+      md_review_status: null,
+      md_review_resume_step: null,
     });
     expect(result.payload.workflowAction).toEqual({
       revision_no: 0,
@@ -276,6 +280,97 @@ describe("evaluateApproveAction", () => {
       ok: false,
       status: 403,
       message: "You do not have permission for this step",
+    });
+  });
+
+  it("Manager check on a requires_md_review memo parks current_step at MD for review instead of advancing normally", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ requires_md_review: true, md_review_status: null }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toEqual({
+      status: "pending",
+      workflow_state: "Checked",
+      current_step: "Managing Director",
+      updated_at: NOW_SQL,
+      md_review_status: "pending",
+      md_review_resume_step: "General Manager",
+    });
+  });
+
+  it("Manager check on a requires_md_review memo whose route ends at Manager stashes resume step as Managing Director (merge case)", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({
+        selected_route_json: JSON.stringify(["Manager / Top Section"]),
+        requires_md_review: true,
+        md_review_status: null,
+      }),
+      actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.current_step).toBe("Managing Director");
+    expect(result.payload.memoUpdate.status).toBe("pending");
+    expect(result.payload.memoUpdate.md_review_status).toBe("pending");
+    expect(result.payload.memoUpdate.md_review_resume_step).toBe("Managing Director");
+  });
+
+  it("does not re-stash once review is already completed (GM's own approve after review clears proceeds normally)", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({
+        current_step: "General Manager",
+        requires_md_review: true,
+        md_review_status: "completed",
+      }),
+      actor: makeActor({
+        id: 8,
+        first_name: "ประเสริฐ",
+        last_name: "สุขสวัสดิ์",
+        roles: ["general-manager"],
+        approval_level: "General Manager",
+        department: "IT",
+      }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.current_step).toBe("Managing Director");
+    expect(result.payload.memoUpdate.md_review_status).toBeNull();
+  });
+
+  it("blocks approve when md_review_status is pending, even for the Managing Director actor", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({
+        current_step: "Managing Director",
+        requires_md_review: true,
+        md_review_status: "pending",
+      }),
+      actor: makeActor({
+        id: 9,
+        first_name: "วิชาญ",
+        last_name: "ประสิทธิ์ชัย",
+        roles: ["managing-director"],
+        approval_level: "Managing Director",
+        department: "IT",
+      }),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      message: "Awaiting MD review",
     });
   });
 
@@ -320,6 +415,8 @@ describe("evaluateApproveAction", () => {
       workflow_state: "Approved",
       current_step: "Managing Director",
       updated_at: NOW_SQL,
+      md_review_status: null,
+      md_review_resume_step: null,
     });
     expect(result.payload.workflowAction.action_type).toBe("approve");
     expect(result.payload.workflowAction.result).toBe("final");
