@@ -28,7 +28,7 @@ export class WorkflowActionError extends Error {
 
 type MemoRowResult = RowDataPacket & WorkflowMemoRow;
 type ActorRowResult = RowDataPacket &
-  Pick<UserRow, "id" | "first_name" | "last_name" | "roles_json" | "approval_level" | "status">;
+  Pick<UserRow, "id" | "first_name" | "last_name" | "roles_json" | "approval_level" | "department" | "status">;
 type PendingCountRow = RowDataPacket & { pending_count: number };
 
 async function withWorkflowTransaction<T>(
@@ -55,7 +55,7 @@ async function loadMemoForUpdate(
 ): Promise<WorkflowMemoRow> {
   const [rows] = await connection.execute<MemoRowResult[]>(
     `SELECT id, memo_no, status, current_step, revision_no,
-        selected_route_json, deleted_at
+        selected_route_json, deleted_at, department_name
    FROM memos WHERE memo_no = ? FOR UPDATE`,
     [memoNo],
   );
@@ -70,7 +70,7 @@ async function loadActor(
   actorUserId: number,
 ): Promise<WorkflowActorRow> {
   const [rows] = await connection.execute<ActorRowResult[]>(
-    `SELECT id, first_name, last_name, roles_json, approval_level, status
+    `SELECT id, first_name, last_name, roles_json, approval_level, department, status
    FROM users WHERE id = ? LIMIT 1`,
     [actorUserId],
   );
@@ -87,6 +87,7 @@ async function loadActor(
     last_name: user.last_name,
     roles: parseRoles(user.roles_json),
     approval_level: user.approval_level,
+    department: user.department,
     status: user.status,
   };
 }

@@ -13,6 +13,7 @@ export type WorkflowMemoRow = {
   revision_no: number;
   selected_route_json: unknown;
   deleted_at: string | Date | null;
+  department_name: string;
 };
 
 // Actor shape after roles_json has been parsed (see workflow-actions.ts loadActor).
@@ -22,15 +23,24 @@ export type WorkflowActorRow = {
   last_name: string;
   roles: string[];
   approval_level: string | null;
+  department: string;
   status: "pending" | "active" | "suspended";
 };
 
+// Manager / Top Section is department-scoped — memo-visibility.ts already limits
+// what a Manager can SEE to their own department. Action permission must match,
+// or a Manager could approve/return/reject a memo from a department they can't
+// even see in their queue. GM and MD stay global (no department restriction).
 export function canActOnStep(
-  actor: Pick<WorkflowActorRow, "roles" | "approval_level">,
-  currentStep: string,
+  actor: Pick<WorkflowActorRow, "roles" | "approval_level" | "department">,
+  memo: Pick<WorkflowMemoRow, "current_step" | "department_name">,
 ): boolean {
   if (actor.roles.includes("admin")) return true;
-  return actor.approval_level !== null && actor.approval_level === currentStep;
+  if (actor.approval_level === null || actor.approval_level !== memo.current_step) return false;
+  if (actor.approval_level === "Manager / Top Section") {
+    return actor.department === memo.department_name;
+  }
+  return true;
 }
 
 export function actorDisplayName(
@@ -127,7 +137,7 @@ function guardActorAndMemo(
   if (memo.status !== "pending") {
     return { ok: false, status: 409, message: "Memo is not pending" };
   }
-  if (!canActOnStep(actor, memo.current_step)) {
+  if (!canActOnStep(actor, memo)) {
     return { ok: false, status: 403, message: "You do not have permission for this step" };
   }
   return null;

@@ -7,6 +7,7 @@ import {
   buildMemoWritePayload,
   buildNewMemoReadActionRows,
   buildNewMemoWorkflowAction,
+  sanitizeNewMemoInput,
 } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
 import { serializeMemoRecord, type MemoDbRow, type MemoRevisionDbRow, type ReadActionDbRow } from "@/lib/db-memos";
@@ -91,10 +92,20 @@ export async function POST(request: NextRequest) {
 
   let connection: PoolConnection | null = null;
   try {
-    const memo = await request.json() as MemoRecord;
+    const clientMemo = await request.json() as MemoRecord;
     // Never trust the client for identity — the creator is the session user.
-    memo.requester = `${session.firstName} ${session.lastName}`;
-    memo.requesterUserId = session.userId;
+    clientMemo.requester = `${session.firstName} ${session.lastName}`;
+    clientMemo.requesterUserId = session.userId;
+
+    // Never trust the client for workflow/lifecycle state either — sanitizeNewMemoInput
+    // is the trust boundary that forces status/current_step/workflow_state/revision_no/
+    // timestamps server-side so a memo cannot be created already "approved".
+    const sanitized = sanitizeNewMemoInput(clientMemo);
+    if (!sanitized.ok) {
+      return NextResponse.json({ error: sanitized.message }, { status: 400 });
+    }
+    const memo = sanitized.memo;
+
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();

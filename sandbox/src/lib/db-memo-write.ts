@@ -1,5 +1,45 @@
 import type { MemoRecord, ReadActionStatus } from "./approval";
 import { memoToDbSeedRow, toMysqlUtcDateTime, type MemoSeedRow } from "./db-seed";
+import { formatTimestamp } from "./format-timestamp";
+
+export type NewMemoValidationResult =
+  | { ok: true; memo: MemoRecord }
+  | { ok: false; message: string };
+
+// Trust boundary for memo CREATION. POST /api/memos must run every client-supplied
+// MemoRecord through this before it reaches memoToDbSeedRow — otherwise a client can
+// hand-craft a "record" that is already approved/rejected/mid-workflow and skip the
+// entire approval chain. Only server-computed identity (requester, requesterUserId,
+// handled by the caller) and this function's forced fields are trusted; everything
+// else (department, amount, category, selectedRoute, price comparisons, etc.) is
+// legitimate business content the client is expected to author.
+export function sanitizeNewMemoInput(
+  memo: MemoRecord,
+  now: Date = new Date(),
+): NewMemoValidationResult {
+  if (memo.status !== "draft" && memo.status !== "pending") {
+    return { ok: false, message: "status must be draft or pending" };
+  }
+  const stamp = formatTimestamp(now);
+  return {
+    ok: true,
+    memo: {
+      ...memo,
+      status: memo.status,
+      currentStep: memo.selectedRoute?.[0] ?? "Manager / Top Section",
+      workflowState: "Issued",
+      revisionNo: 0,
+      revisionNote: undefined,
+      revisionSubmittedAt: undefined,
+      revisions: undefined,
+      returnReason: undefined,
+      rejectReason: undefined,
+      rejectDisposition: undefined,
+      createdAt: stamp,
+      updatedAt: stamp,
+    },
+  };
+}
 
 export type MemoWritePayload = {
   row: MemoSeedRow;

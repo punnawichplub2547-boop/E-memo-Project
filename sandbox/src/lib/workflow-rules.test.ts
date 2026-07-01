@@ -16,11 +16,11 @@ import {
 const FULL_ROUTE = ["Manager / Top Section", "General Manager", "Managing Director"];
 
 describe("canActOnStep", () => {
-  it("manager can act at Manager / Top Section step", () => {
+  it("manager can act at Manager / Top Section step for their own department's memo", () => {
     expect(
       canActOnStep(
-        { roles: ["manager"], approval_level: "Manager / Top Section" },
-        "Manager / Top Section",
+        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT" },
       ),
     ).toBe(true);
   });
@@ -28,38 +28,69 @@ describe("canActOnStep", () => {
   it("manager cannot act at General Manager step", () => {
     expect(
       canActOnStep(
-        { roles: ["manager"], approval_level: "Manager / Top Section" },
-        "General Manager",
+        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "General Manager", department_name: "IT" },
       ),
     ).toBe(false);
   });
 
-  it("GM can act at General Manager step", () => {
+  it("manager CANNOT act on another department's memo at Manager / Top Section step", () => {
+    // Visibility already scopes Manager/Top Section to their own department
+    // (memo-visibility.ts); action permission must match, or a Manager could
+    // approve/return/reject a memo they can't even see in their queue.
     expect(
       canActOnStep(
-        { roles: ["general-manager"], approval_level: "General Manager" },
-        "General Manager",
+        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "QA" },
+      ),
+    ).toBe(false);
+  });
+
+  it("GM can act at General Manager step regardless of department", () => {
+    expect(
+      canActOnStep(
+        { roles: ["general-manager"], approval_level: "General Manager", department: "IT" },
+        { current_step: "General Manager", department_name: "QA" },
       ),
     ).toBe(true);
   });
 
-  it("admin can act at any step", () => {
+  it("MD can act at Managing Director step regardless of department", () => {
     expect(
-      canActOnStep({ roles: ["admin", "requester"], approval_level: null }, "Managing Director"),
+      canActOnStep(
+        { roles: ["managing-director"], approval_level: "Managing Director", department: "IT" },
+        { current_step: "Managing Director", department_name: "QA" },
+      ),
+    ).toBe(true);
+  });
+
+  it("admin can act at any step regardless of department", () => {
+    expect(
+      canActOnStep(
+        { roles: ["admin", "requester"], approval_level: null, department: "IT" },
+        { current_step: "Managing Director", department_name: "QA" },
+      ),
     ).toBe(true);
   });
 
   it("null approval_level without admin role grants nothing", () => {
     expect(
-      canActOnStep({ roles: ["requester"], approval_level: null }, "Manager / Top Section"),
+      canActOnStep(
+        { roles: ["requester"], approval_level: null, department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT" },
+      ),
     ).toBe(false);
   });
 
   it("HR&GA-style user with no admin role and no approval_level cannot act (department is never checked)", () => {
-    // canActOnStep deliberately has no department parameter — department name
+    // canActOnStep deliberately has no department-based grant path — department name
     // alone must never grant workflow power (CLAUDE.md role/visibility decision).
+    // Department is only ever used to RESTRICT the Manager tier, never to grant.
     expect(
-      canActOnStep({ roles: ["requester", "read-recipient"], approval_level: null }, "General Manager"),
+      canActOnStep(
+        { roles: ["requester", "read-recipient"], approval_level: null, department: "HR&GA" },
+        { current_step: "General Manager", department_name: "HR&GA" },
+      ),
     ).toBe(false);
   });
 });
@@ -171,6 +202,7 @@ function makeMemo(overrides: Partial<WorkflowMemoRow> = {}): WorkflowMemoRow {
     revision_no: 0,
     selected_route_json: JSON.stringify(FULL_ROUTE),
     deleted_at: null,
+    department_name: "IT",
     ...overrides,
   };
 }
@@ -182,6 +214,7 @@ function makeActor(overrides: Partial<WorkflowActorRow> = {}): WorkflowActorRow 
     last_name: "รักษ์ดี",
     roles: ["manager"],
     approval_level: "Manager / Top Section",
+    department: "IT",
     status: "active",
     ...overrides,
   };
@@ -220,6 +253,21 @@ describe("evaluateApproveAction", () => {
     const result = evaluateApproveAction({
       memo: makeMemo({ current_step: "General Manager" }),
       actor: makeActor(),
+      pendingReadCount: 0,
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      message: "You do not have permission for this step",
+    });
+  });
+
+  it("manager from a different department cannot approve → 403 (matches visibility scoping)", () => {
+    const result = evaluateApproveAction({
+      memo: makeMemo({ department_name: "QA" }),
+      actor: makeActor({ department: "IT" }),
       pendingReadCount: 0,
       source: "web",
       now: NOW,

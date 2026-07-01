@@ -11,6 +11,7 @@ import {
   buildReturnMemoPayload,
   buildSkipAllReadsPayload,
   buildSubmitRevisionPayload,
+  sanitizeNewMemoInput,
   type ResubmitMemoBody,
   type SubmitRevisionBody,
 } from "./db-memo-write";
@@ -84,6 +85,105 @@ describe("DB memo write helpers", () => {
 
   it("does not build read action rows when no readActions exist", () => {
     expect(buildNewMemoReadActionRows({ ...memo, readActions: undefined })).toEqual([]);
+  });
+});
+
+// Regression coverage for a real vulnerability: POST /api/memos previously wrote
+// almost the entire client-supplied MemoRecord straight to the DB (only
+// requester/requesterUserId were server-set). Any logged-in user could POST a
+// memo with status "approved" and skip the whole approval chain. This function
+// is the trust boundary — every workflow/lifecycle field on a *new* memo must
+// come from the server, never the client.
+describe("sanitizeNewMemoInput", () => {
+  const NOW = new Date(Date.UTC(2026, 5, 11, 2, 0, 0)); // 09:00 Bangkok
+  const baseMemo: MemoRecord = {
+    id: "EM-20260611-090000-ABC",
+    title: "New memo",
+    requester: "สมชาย รักษ์ดี",
+    department: "IT",
+    category: "general-purchase",
+    amount: 5000,
+    status: "pending",
+    currentStep: "Manager / Top Section",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    createdAt: "01 Jan 2020 00:00",
+    updatedAt: "01 Jan 2020 00:00",
+  };
+
+  it("rejects a status the client should never set on creation", () => {
+    const result = sanitizeNewMemoInput({ ...baseMemo, status: "approved" }, NOW);
+    expect(result).toEqual({ ok: false, message: "status must be draft or pending" });
+  });
+
+  it("forces currentStep to the first step of selectedRoute even if the client lies", () => {
+    const result = sanitizeNewMemoInput(
+      { ...baseMemo, currentStep: "Managing Director" },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.currentStep).toBe("Manager / Top Section");
+  });
+
+  it("forces workflowState to Issued regardless of client input", () => {
+    const result = sanitizeNewMemoInput(
+      { ...baseMemo, workflowState: "Approved" },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.workflowState).toBe("Issued");
+  });
+
+  it("forces revisionNo to 0 and clears revision/return/reject fields the client should not set on creation", () => {
+    const result = sanitizeNewMemoInput(
+      {
+        ...baseMemo,
+        revisionNo: 5,
+        revisionNote: "fake note",
+        revisionSubmittedAt: "01 Jan 2020 00:00",
+        returnReason: "fake return",
+        rejectReason: "fake reject",
+        rejectDisposition: "close",
+      },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.revisionNo).toBe(0);
+    expect(result.memo.revisionNote).toBeUndefined();
+    expect(result.memo.revisionSubmittedAt).toBeUndefined();
+    expect(result.memo.returnReason).toBeUndefined();
+    expect(result.memo.rejectReason).toBeUndefined();
+    expect(result.memo.rejectDisposition).toBeUndefined();
+  });
+
+  it("forces createdAt/updatedAt to the server clock, ignoring client-supplied timestamps", () => {
+    const result = sanitizeNewMemoInput(baseMemo, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.createdAt).toBe("11 Jun 2026 09:00");
+    expect(result.memo.updatedAt).toBe("11 Jun 2026 09:00");
+  });
+
+  it("defaults currentStep to Manager / Top Section when selectedRoute is missing", () => {
+    const result = sanitizeNewMemoInput(
+      { ...baseMemo, selectedRoute: undefined },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.currentStep).toBe("Manager / Top Section");
+  });
+
+  it("preserves legitimate business content untouched (department, amount, category, route)", () => {
+    const result = sanitizeNewMemoInput(baseMemo, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.department).toBe("IT");
+    expect(result.memo.amount).toBe(5000);
+    expect(result.memo.category).toBe("general-purchase");
+    expect(result.memo.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
   });
 });
 
