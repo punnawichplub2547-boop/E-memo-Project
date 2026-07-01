@@ -16,6 +16,7 @@ export type WorkflowMemoRow = {
   department_name: string;
   requires_md_review: boolean;
   md_review_status: "pending" | "completed" | "escalated" | null;
+  md_review_resume_step: string | null;
 };
 
 // Actor shape after roles_json has been parsed (see workflow-actions.ts loadActor).
@@ -344,6 +345,168 @@ export function evaluateRejectAction(input: {
         reason,
         acted_at: actedAt,
         metadata_json: buildActionMetadata(input.source, input.metadata),
+      },
+    },
+  };
+}
+
+export type ReviewResponse =
+  | "acknowledged_no_objection"
+  | "comment"
+  | "request_revision"
+  | "escalate_to_md_approval";
+
+export type ReviewActionPayload =
+  | {
+      memoUpdate: {
+        status: "pending";
+        workflow_state: "Checked";
+        current_step: string;
+        md_review_status: "completed";
+        md_review_comment: string | null;
+        updated_at: string;
+      };
+      workflowAction: WorkflowActionRow;
+    }
+  | {
+      memoUpdate: {
+        status: "approved";
+        workflow_state: "Approved";
+        current_step: "Managing Director";
+        md_review_status: "completed" | "escalated";
+        md_review_comment: string | null;
+        updated_at: string;
+      };
+      workflowAction: WorkflowActionRow;
+    }
+  | {
+      memoUpdate: {
+        status: "returned";
+        return_reason: string;
+        md_review_status: "completed";
+        updated_at: string;
+      };
+      workflowAction: WorkflowActionRow;
+    };
+
+export function evaluateReviewAction(input: {
+  memo: WorkflowMemoRow;
+  actor: WorkflowActorRow;
+  response: ReviewResponse;
+  comment?: string;
+  reason?: string;
+  source: WorkflowActionSource;
+  metadata?: Record<string, unknown>;
+  now?: Date;
+}): WorkflowEvaluation<ReviewActionPayload> {
+  if (input.actor.status !== "active") {
+    return { ok: false, status: 403, message: "User account is not active" };
+  }
+  if (input.memo.md_review_status !== "pending") {
+    return { ok: false, status: 409, message: "No MD review is pending on this memo" };
+  }
+  const isMdOrAdmin =
+    input.actor.roles.includes("admin") || input.actor.approval_level === "Managing Director";
+  if (!isMdOrAdmin) {
+    return { ok: false, status: 403, message: "Only the Managing Director can act on this review" };
+  }
+
+  const actedAt = nowMysqlUtcDateTime(input.now);
+  const baseWorkflowAction = {
+    revision_no: input.memo.revision_no,
+    action_type: "review" as const,
+    step_label: input.memo.current_step,
+    actor_name: actorDisplayName(input.actor),
+    acted_at: actedAt,
+    metadata_json: buildActionMetadata(input.source, input.metadata),
+  };
+
+  if (input.response === "request_revision") {
+    const reason = input.reason?.trim();
+    if (!reason) {
+      return { ok: false, status: 400, message: "reason is required for request_revision" };
+    }
+    return {
+      ok: true,
+      payload: {
+        memoUpdate: {
+          status: "returned",
+          return_reason: reason,
+          md_review_status: "completed",
+          updated_at: actedAt,
+        },
+        workflowAction: {
+          ...baseWorkflowAction,
+          result: "request_revision",
+          reason,
+        },
+      },
+    };
+  }
+
+  if (input.response === "escalate_to_md_approval") {
+    return {
+      ok: true,
+      payload: {
+        memoUpdate: {
+          status: "approved",
+          workflow_state: "Approved",
+          current_step: "Managing Director",
+          md_review_status: "escalated",
+          md_review_comment: input.comment?.trim() || null,
+          updated_at: actedAt,
+        },
+        workflowAction: {
+          ...baseWorkflowAction,
+          result: "escalate_to_md_approval",
+          reason: input.comment?.trim() || null,
+        },
+      },
+    };
+  }
+
+  // acknowledged_no_objection or comment: resume at the stashed step. If the
+  // stashed step is Managing Director itself, this response also finalizes
+  // the memo — the spec's "merge MD_REVIEW+APPROVE into one action" rule.
+  const resumeStep = input.memo.md_review_resume_step ?? "Managing Director";
+  const comment = input.response === "comment" ? input.comment?.trim() || null : null;
+
+  if (resumeStep === "Managing Director") {
+    return {
+      ok: true,
+      payload: {
+        memoUpdate: {
+          status: "approved",
+          workflow_state: "Approved",
+          current_step: "Managing Director",
+          md_review_status: "completed",
+          md_review_comment: comment,
+          updated_at: actedAt,
+        },
+        workflowAction: {
+          ...baseWorkflowAction,
+          result: input.response,
+          reason: comment,
+        },
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      memoUpdate: {
+        status: "pending",
+        workflow_state: "Checked",
+        current_step: resumeStep,
+        md_review_status: "completed",
+        md_review_comment: comment,
+        updated_at: actedAt,
+      },
+      workflowAction: {
+        ...baseWorkflowAction,
+        result: input.response,
+        reason: comment,
       },
     },
   };

@@ -7,6 +7,7 @@ import {
   evaluateApproveAction,
   evaluateRejectAction,
   evaluateReturnAction,
+  evaluateReviewAction,
   nowMysqlUtcDateTime,
   parseRouteJson,
   type WorkflowActorRow,
@@ -205,6 +206,7 @@ function makeMemo(overrides: Partial<WorkflowMemoRow> = {}): WorkflowMemoRow {
     department_name: "IT",
     requires_md_review: false,
     md_review_status: null,
+    md_review_resume_step: null,
     ...overrides,
   };
 }
@@ -660,5 +662,177 @@ describe("evaluateRejectAction", () => {
       now: NOW,
     });
     expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+  });
+});
+
+describe("evaluateReviewAction", () => {
+  const reviewMemo = (overrides: Partial<WorkflowMemoRow> = {}) =>
+    makeMemo({
+      current_step: "Managing Director",
+      requires_md_review: true,
+      md_review_status: "pending",
+      md_review_resume_step: "General Manager",
+      ...overrides,
+    });
+
+  const mdActor = (overrides: Partial<WorkflowActorRow> = {}) =>
+    makeActor({
+      id: 9,
+      first_name: "วิชาญ",
+      last_name: "ประสิทธิ์ชัย",
+      roles: ["managing-director"],
+      approval_level: "Managing Director",
+      ...overrides,
+    });
+
+  it("rejects when md_review_status is not pending", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ md_review_status: "completed" }),
+      actor: mdActor(),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      message: "No MD review is pending on this memo",
+    });
+  });
+
+  it("rejects an actor who is not Managing Director tier (and not admin)", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: makeActor({ roles: ["general-manager"], approval_level: "General Manager" }),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      message: "Only the Managing Director can act on this review",
+    });
+  });
+
+  it("acknowledged_no_objection resumes at the stashed step and clears the review gate", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: mdActor(),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toMatchObject({
+      status: "pending",
+      current_step: "General Manager",
+      md_review_status: "completed",
+    });
+    expect(result.payload.workflowAction.action_type).toBe("review");
+    expect(result.payload.workflowAction.result).toBe("acknowledged_no_objection");
+  });
+
+  it("comment resumes at the stashed step, stores the comment, and clears the review gate", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: mdActor(),
+      response: "comment",
+      comment: "ราคาสมเหตุสมผลแล้ว",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toMatchObject({
+      status: "pending",
+      current_step: "General Manager",
+      md_review_status: "completed",
+      md_review_comment: "ราคาสมเหตุสมผลแล้ว",
+    });
+  });
+
+  it("acknowledged_no_objection auto-finalizes when the resume step is Managing Director itself (merge rule)", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ md_review_resume_step: "Managing Director" }),
+      actor: mdActor(),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toMatchObject({
+      status: "approved",
+      workflow_state: "Approved",
+      current_step: "Managing Director",
+      md_review_status: "completed",
+    });
+    expect(result.payload.workflowAction.action_type).toBe("review");
+    expect(result.payload.workflowAction.result).toBe("acknowledged_no_objection");
+  });
+
+  it("request_revision requires a reason and returns the memo like a normal Return", () => {
+    const missingReason = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: mdActor(),
+      response: "request_revision",
+      source: "web",
+      now: NOW,
+    });
+    expect(missingReason).toEqual({
+      ok: false,
+      status: 400,
+      message: "reason is required for request_revision",
+    });
+
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: mdActor(),
+      response: "request_revision",
+      reason: "กรุณาแนบใบเสนอราคาผู้ขายรายใหม่",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toMatchObject({
+      status: "returned",
+      return_reason: "กรุณาแนบใบเสนอราคาผู้ขายรายใหม่",
+      md_review_status: "completed",
+    });
+    expect(result.payload.workflowAction.result).toBe("request_revision");
+  });
+
+  it("escalate_to_md_approval finalizes immediately, skipping the remaining route", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: mdActor(),
+      response: "escalate_to_md_approval",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate).toMatchObject({
+      status: "approved",
+      workflow_state: "Approved",
+      current_step: "Managing Director",
+      md_review_status: "escalated",
+    });
+    expect(result.payload.workflowAction.action_type).toBe("review");
+    expect(result.payload.workflowAction.result).toBe("escalate_to_md_approval");
+  });
+
+  it("admin can act on the review like the Managing Director", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo(),
+      actor: makeActor({ roles: ["admin"], approval_level: null }),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
   });
 });
