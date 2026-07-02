@@ -63,9 +63,14 @@ migration ใหม่ (schema เดิมรองรับได้ครบ:
 
 `แสดงความเห็น` / `ขอแก้ไข`:
 
-1. กดปุ่ม (`callback_data`: `review_comment_start:<memoId>`, `review_revision_start:<memoId>`)
-   → เขียนแถวใหม่ใน `telegram_conversation_states` (`action_type` = `review_comment` หรือ
-   `review_revision`, `state` = `"awaiting_text"`, `expires_at` = +30 นาที เหมือน token อื่น)
+1. กดปุ่ม — ใช้ `telegram_action_tokens` เดียวกับข้อ 3 (ไม่ใช่ raw `<memoId>` ใน
+   `callback_data` ตรงๆ — แก้จากดราฟต์แรกของสเปกนี้ เพราะ raw memoId ไม่มีการเช็ค
+   ownership/tamper เลย ต่างจาก token ที่ผ่าน atomic consume แบบเดียวกับปุ่มอื่นทุกปุ่ม
+   จุดนี้ตัดสินใจระหว่างเขียนแผน implementation ไม่ใช่ตอน brainstorm):
+   `callback_data`: `review_comment_start:<tokenDbId>`, `review_revision_start:<tokenDbId>`
+   → consume token (ได้ `memoNo`/`userId`/`memoId`) → เขียนแถวใหม่ใน
+   `telegram_conversation_states` (`action_type` = `review_comment` หรือ `review_revision`,
+   `state` = `"awaiting_text"`, `expires_at` = +30 นาที เหมือน token อื่น)
    → บอทตอบ "กรุณาพิมพ์..." พร้อม inline keyboard ปุ่มเดียว "ยกเลิก"
    (`callback_data`: `review_cancel:<conversationStateId>`)
 2. Webhook ต้องรองรับ **ข้อความอิสระ** เป็นครั้งแรก (ปัจจุบันรับแค่ `/start <token>` กับ
