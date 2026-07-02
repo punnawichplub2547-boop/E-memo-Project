@@ -63,7 +63,7 @@ async function loadMemoForUpdate(
     [memoNo],
   );
   if (rows.length === 0) {
-    throw new WorkflowActionError(404, "Memo not found");
+    throw new WorkflowActionError(404, "ไม่พบเมโมนี้");
   }
   return rows[0];
 }
@@ -82,7 +82,7 @@ async function loadActor(
   // a future Telegram webhook), where existence must not be revealed.
   const user = rows[0];
   if (!user) {
-    throw new WorkflowActionError(403, "Forbidden");
+    throw new WorkflowActionError(403, "ไม่มีสิทธิ์เข้าถึง");
   }
   return {
     id: user.id,

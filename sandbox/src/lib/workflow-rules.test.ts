@@ -266,7 +266,7 @@ describe("evaluateApproveAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 403,
-      message: "You do not have permission for this step",
+      message: "คุณไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้",
     });
   });
 
@@ -281,7 +281,7 @@ describe("evaluateApproveAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 403,
-      message: "You do not have permission for this step",
+      message: "คุณไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้",
     });
   });
 
@@ -372,7 +372,7 @@ describe("evaluateApproveAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 409,
-      message: "Awaiting MD review",
+      message: "รอการพิจารณาของ MD ก่อน",
     });
   });
 
@@ -435,7 +435,7 @@ describe("evaluateApproveAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 409,
-      message: "Pending read acknowledgements remain",
+      message: "ยังมีผู้รับทราบที่ยังไม่ได้กดรับทราบ",
     });
   });
 
@@ -447,7 +447,7 @@ describe("evaluateApproveAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 403, message: "User account is not active" });
+    expect(result).toEqual({ ok: false, status: 403, message: "บัญชีผู้ใช้ไม่ได้ใช้งานอยู่" });
   });
 
   it("rejects non-pending memo", () => {
@@ -458,7 +458,7 @@ describe("evaluateApproveAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" });
   });
 
   it("rejects voided memo", () => {
@@ -469,7 +469,7 @@ describe("evaluateApproveAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" });
   });
 
   it("errors with 422 when route is missing", () => {
@@ -565,7 +565,7 @@ describe("evaluateReturnAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 400, message: "returnReason is required" });
+    expect(result).toEqual({ ok: false, status: 400, message: "ต้องระบุเหตุผลในการส่งคืน" });
   });
 
   it("rejects voided memo", () => {
@@ -576,7 +576,7 @@ describe("evaluateReturnAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" });
   });
 
   it("rejects non-pending memo", () => {
@@ -587,7 +587,7 @@ describe("evaluateReturnAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" });
   });
 });
 
@@ -637,7 +637,7 @@ describe("evaluateRejectAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 400, message: "rejectReason is required" });
+    expect(result).toEqual({ ok: false, status: 400, message: "ต้องระบุเหตุผลในการปฏิเสธ" });
   });
 
   it("rejects voided memo", () => {
@@ -649,7 +649,7 @@ describe("evaluateRejectAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" });
   });
 
   it("rejects non-pending memo", () => {
@@ -661,7 +661,7 @@ describe("evaluateRejectAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo is not pending" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" });
   });
 });
 
@@ -693,7 +693,7 @@ describe("evaluateReviewAction", () => {
       source: "web",
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, status: 409, message: "Memo has been voided" });
+    expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" });
   });
 
   it("rejects when md_review_status is not pending", () => {
@@ -707,7 +707,7 @@ describe("evaluateReviewAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 409,
-      message: "No MD review is pending on this memo",
+      message: "เมโมนี้ไม่มีการรอพิจารณาจาก MD อยู่",
     });
   });
 
@@ -722,7 +722,7 @@ describe("evaluateReviewAction", () => {
     expect(result).toEqual({
       ok: false,
       status: 403,
-      message: "Only the Managing Director can act on this review",
+      message: "มีเฉพาะ Managing Director เท่านั้นที่ดำเนินการกับการพิจารณานี้ได้",
     });
   });
 
@@ -795,7 +795,7 @@ describe("evaluateReviewAction", () => {
     expect(missingReason).toEqual({
       ok: false,
       status: 400,
-      message: "reason is required for request_revision",
+      message: "ต้องระบุเหตุผลเมื่อขอแก้ไข",
     });
 
     const result = evaluateReviewAction({

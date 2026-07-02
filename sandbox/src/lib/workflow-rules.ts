@@ -88,10 +88,10 @@ export function calculateNextStep(
   currentStep: string,
 ): NextStepResult {
   const route = parseRouteJson(selectedRouteJson);
-  if (!route) return { ok: false, message: "Memo has no valid approval route" };
+  if (!route) return { ok: false, message: "เมโมนี้ไม่มีเส้นทางอนุมัติที่ถูกต้อง" };
   const index = route.indexOf(currentStep);
   if (index === -1) {
-    return { ok: false, message: "Current step is not in the approval route" };
+    return { ok: false, message: "ขั้นตอนปัจจุบันไม่อยู่ในเส้นทางอนุมัติ" };
   }
   if (index === route.length - 1) {
     return {
@@ -132,19 +132,19 @@ function guardActorAndMemo(
   actor: WorkflowActorRow,
 ): { ok: false; status: number; message: string } | null {
   if (actor.status !== "active") {
-    return { ok: false, status: 403, message: "User account is not active" };
+    return { ok: false, status: 403, message: "บัญชีผู้ใช้ไม่ได้ใช้งานอยู่" };
   }
   if (memo.deleted_at !== null) {
-    return { ok: false, status: 409, message: "Memo has been voided" };
+    return { ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" };
   }
   if (memo.status !== "pending") {
-    return { ok: false, status: 409, message: "Memo is not pending" };
+    return { ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" };
   }
   if (memo.md_review_status === "pending") {
-    return { ok: false, status: 409, message: "Awaiting MD review" };
+    return { ok: false, status: 409, message: "รอการพิจารณาของ MD ก่อน" };
   }
   if (!canActOnStep(actor, memo)) {
-    return { ok: false, status: 403, message: "You do not have permission for this step" };
+    return { ok: false, status: 403, message: "คุณไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้" };
   }
   return null;
 }
@@ -183,7 +183,7 @@ export function evaluateApproveAction(input: {
   const guard = guardActorAndMemo(input.memo, input.actor);
   if (guard) return guard;
   if (input.pendingReadCount > 0) {
-    return { ok: false, status: 409, message: "Pending read acknowledgements remain" };
+    return { ok: false, status: 409, message: "ยังมีผู้รับทราบที่ยังไม่ได้กดรับทราบ" };
   }
   const next = calculateNextStep(input.memo.selected_route_json, input.memo.current_step);
   if (!next.ok) return { ok: false, status: 422, message: next.message };
@@ -274,7 +274,7 @@ export function evaluateReturnAction(input: {
   if (guard) return guard;
   const reason = input.reason.trim();
   if (!reason) {
-    return { ok: false, status: 400, message: "returnReason is required" };
+    return { ok: false, status: 400, message: "ต้องระบุเหตุผลในการส่งคืน" };
   }
 
   const actedAt = nowMysqlUtcDateTime(input.now);
@@ -323,7 +323,7 @@ export function evaluateRejectAction(input: {
   if (guard) return guard;
   const reason = input.reason.trim();
   if (!reason) {
-    return { ok: false, status: 400, message: "rejectReason is required" };
+    return { ok: false, status: 400, message: "ต้องระบุเหตุผลในการปฏิเสธ" };
   }
 
   const actedAt = nowMysqlUtcDateTime(input.now);
@@ -400,18 +400,18 @@ export function evaluateReviewAction(input: {
   now?: Date;
 }): WorkflowEvaluation<ReviewActionPayload> {
   if (input.actor.status !== "active") {
-    return { ok: false, status: 403, message: "User account is not active" };
+    return { ok: false, status: 403, message: "บัญชีผู้ใช้ไม่ได้ใช้งานอยู่" };
   }
   if (input.memo.deleted_at !== null) {
-    return { ok: false, status: 409, message: "Memo has been voided" };
+    return { ok: false, status: 409, message: "เมโมนี้ถูกยกเลิกแล้ว" };
   }
   if (input.memo.md_review_status !== "pending") {
-    return { ok: false, status: 409, message: "No MD review is pending on this memo" };
+    return { ok: false, status: 409, message: "เมโมนี้ไม่มีการรอพิจารณาจาก MD อยู่" };
   }
   const isMdOrAdmin =
     input.actor.roles.includes("admin") || input.actor.approval_level === "Managing Director";
   if (!isMdOrAdmin) {
-    return { ok: false, status: 403, message: "Only the Managing Director can act on this review" };
+    return { ok: false, status: 403, message: "มีเฉพาะ Managing Director เท่านั้นที่ดำเนินการกับการพิจารณานี้ได้" };
   }
 
   const actedAt = nowMysqlUtcDateTime(input.now);
@@ -427,7 +427,7 @@ export function evaluateReviewAction(input: {
   if (input.response === "request_revision") {
     const reason = input.reason?.trim();
     if (!reason) {
-      return { ok: false, status: 400, message: "reason is required for request_revision" };
+      return { ok: false, status: 400, message: "ต้องระบุเหตุผลเมื่อขอแก้ไข" };
     }
     return {
       ok: true,
