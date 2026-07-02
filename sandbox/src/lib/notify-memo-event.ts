@@ -17,7 +17,7 @@ import {
   resolveReadRecipientLabels,
 } from "./notification-recipients";
 import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
-import { createApproveActionToken } from "./telegram/actions";
+import { createApproveActionToken, createReviewActionToken, type ReviewTokenActionType } from "./telegram/actions";
 import { getEmailConfig, sendEmailMessage } from "./email/client";
 import { wrapEmailHtml, wrapEmailText } from "./email/template";
 import type { RowDataPacket } from "mysql2";
@@ -26,6 +26,8 @@ type MemoRow = RowDataPacket & {
   id: number; memo_no: string; title: string; requester_name: string;
   requester_user_id: number | null;
   current_step: string; status: string; revision_no: number;
+  md_review_status: "pending" | "completed" | "escalated" | null;
+  md_review_resume_step: string | null;
 };
 type ChatRow = RowDataPacket & { user_id: number; telegram_chat_id: string };
 type EmailRow = RowDataPacket & { id: number; email: string };
@@ -49,6 +51,16 @@ export function computeWatcherRecipients(input: {
   if (input.excludeActor && input.actorId != null) set.delete(input.actorId);
   for (const id of input.excludeIds ?? []) set.delete(id);
   return [...set];
+}
+
+// Pure: which MD-review buttons to show, in display order. Escalate is
+// omitted when the resume step is already Managing Director (per the web
+// drawer-footer's identical rule — acknowledging vs escalating would be the
+// same outcome in that case, so escalate is redundant).
+export function buildMdReviewButtonPlan(mdReviewResumeStep: string | null): ReviewTokenActionType[] {
+  const base: ReviewTokenActionType[] = ["review_no_objection", "review_comment_start", "review_revision_start"];
+  if (mdReviewResumeStep === "Managing Director") return base;
+  return [...base, "review_escalate"];
 }
 
 // Pure: who to notify that they must acknowledge (Read) a memo. Dedups and drops
@@ -82,7 +94,9 @@ export async function getPendingReadLabels(
 async function getMemo(memoNo: string): Promise<MemoRow | null> {
   const pool = getDbPool();
   const [rows] = await pool.query<MemoRow[]>(
-    "SELECT id, memo_no, title, requester_name, requester_user_id, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1",
+    `SELECT id, memo_no, title, requester_name, requester_user_id, current_step, status, revision_no,
+            md_review_status, md_review_resume_step
+     FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1`,
     [memoNo],
   );
   return rows[0] ?? null;
@@ -164,6 +178,13 @@ function addOpenLinkHtml(body: string, queueUrl: string): string {
   return `${body.replace(/\n/g, "<br>")}<br><br><a href="${escapedUrl}">เปิดใน E-Memo</a>`;
 }
 
+const BUTTON_LABELS: Record<ReviewTokenActionType, string> = {
+  review_no_objection: "✅ ไม่มีข้อโต้แย้ง",
+  review_comment_start: "💬 แสดงความเห็น",
+  review_revision_start: "✏️ ขอแก้ไข",
+  review_escalate: "⤴️ ยกระดับเป็นผู้อนุมัติ",
+};
+
 // Actionable: notify the approvers at the memo's current step, with an approve button.
 // Returns the approver user ids so the caller can exclude them from the watcher fan-out.
 async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string): Promise<number[]> {
@@ -173,22 +194,36 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
   const chatIds = await getChatIds(pool, recipientIds);
   const emailEnabled = getEmailConfig() !== null;
   const emails = emailEnabled ? await getUserEmails(pool, recipientIds) : new Map<number, string>();
+  const isMdReviewPending = memo.md_review_status === "pending";
+  const notifType = isMdReviewPending ? "memo_md_review_pending" : "memo_pending_approval";
   const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
-  const body = buildMemoNotificationText("memo_pending_approval", ctx);
-  const tgHtml = buildMemoNotificationHtml("memo_pending_approval", ctx);
-  const title = buildMemoNotificationTitle("memo_pending_approval", memo.memo_no);
+  const body = buildMemoNotificationText(notifType, ctx);
+  const tgHtml = buildMemoNotificationHtml(notifType, ctx);
+  const title = buildMemoNotificationTitle(notifType, memo.memo_no);
   for (const recipientUserId of recipientIds) {
     const notifId = await createNotification(pool, {
-      memoId: memo.id, recipientUserId, type: "memo_pending_approval",
+      memoId: memo.id, recipientUserId, type: notifType,
       title, body, actionUrl: queuePath,
     });
     const chatId = chatIds.get(recipientUserId);
     if (chatId) {
-      const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
-      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[
-        { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
-        { text: "เปิดใน E-Memo", url: queueUrl },
-      ]]));
+      if (isMdReviewPending) {
+        const actions = buildMdReviewButtonPlan(memo.md_review_resume_step);
+        const buttons: { text: string; callback_data: string }[] = [];
+        for (const actionType of actions) {
+          const { tokenDbId } = await createReviewActionToken(memo.id, recipientUserId, chatId, actionType, pool);
+          buttons.push({ text: BUTTON_LABELS[actionType], callback_data: `${actionType}:${tokenDbId}` });
+        }
+        const rows = [buttons.slice(0, 2), buttons.slice(2), [{ text: "เปิดใน E-Memo", url: queueUrl }]]
+          .filter((row) => row.length > 0);
+        await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard(rows));
+      } else {
+        const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
+        await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[
+          { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
+          { text: "เปิดใน E-Memo", url: queueUrl },
+        ]]));
+      }
     }
     const email = emails.get(recipientUserId);
     if (email) {

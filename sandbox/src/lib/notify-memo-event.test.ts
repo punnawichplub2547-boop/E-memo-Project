@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { computeReadNotifyRecipients, computeWatcherRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { buildMdReviewButtonPlan, computeReadNotifyRecipients, computeWatcherRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
 
 function chatPool(rows: unknown[]): Pool {
   return {
@@ -163,5 +163,23 @@ describe("sendEmailAndTrack", () => {
     expect(calls[1].params[0]).toBe("failed");
     expect(calls[1].params[1]).toBeNull();
     expect(calls[1].params[6]).toBe("email");
+  });
+});
+
+describe("buildMdReviewButtonPlan", () => {
+  it("includes all 4 actions when the resume step is not Managing Director", () => {
+    expect(buildMdReviewButtonPlan("General Manager")).toEqual([
+      "review_no_objection", "review_comment_start", "review_revision_start", "review_escalate",
+    ]);
+  });
+  it("omits escalate when the resume step is already Managing Director", () => {
+    expect(buildMdReviewButtonPlan("Managing Director")).toEqual([
+      "review_no_objection", "review_comment_start", "review_revision_start",
+    ]);
+  });
+  it("omits escalate when the resume step is null", () => {
+    expect(buildMdReviewButtonPlan(null)).toEqual([
+      "review_no_objection", "review_comment_start", "review_revision_start", "review_escalate",
+    ]);
   });
 });
