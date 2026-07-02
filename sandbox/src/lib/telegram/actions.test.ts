@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { consumeApproveActionToken, consumeReviewActionToken } from "./actions";
+import {
+  consumeApproveActionToken,
+  consumeReviewActionToken,
+  createReviewConversationState,
+  findActiveReviewConversationState,
+  deleteReviewConversationState,
+} from "./actions";
 import type { Pool } from "mysql2/promise";
 
 function makePoolSuccess(memoNo: string, userId: number): Pool {
@@ -48,5 +54,50 @@ describe("consumeReviewActionToken", () => {
   });
   it("returns null when token is not found, used, expired, or wrong telegram_user_id", async () => {
     expect(await consumeReviewActionToken(99, 1n, "review_escalate", makeReviewPoolFailed())).toBeNull();
+  });
+});
+
+describe("createReviewConversationState", () => {
+  it("inserts a row and returns its id", async () => {
+    const pool = {
+      query: vi.fn().mockResolvedValueOnce([{ insertId: 55 }, undefined]),
+    } as unknown as Pool;
+    const result = await createReviewConversationState({
+      telegramUserId: 123456n, userId: 7, memoId: 42, actionType: "review_comment", pool,
+    });
+    expect(result).toEqual({ id: 55 });
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO telegram_conversation_states"),
+      expect.arrayContaining([123456n.toString(), 7, 42, "review_comment", "awaiting_text"]),
+    );
+  });
+});
+
+describe("findActiveReviewConversationState", () => {
+  it("returns the state when an active row exists", async () => {
+    const pool = {
+      query: vi.fn().mockResolvedValueOnce([
+        [{ id: 55, user_id: 7, memo_id: 42, memo_no: "EM-2026-001", action_type: "review_comment" }],
+        undefined,
+      ]),
+    } as unknown as Pool;
+    expect(await findActiveReviewConversationState(123456n, pool)).toEqual({
+      id: 55, userId: 7, memoId: 42, memoNo: "EM-2026-001", actionType: "review_comment",
+    });
+  });
+  it("returns null when no active row exists", async () => {
+    const pool = { query: vi.fn().mockResolvedValueOnce([[], undefined]) } as unknown as Pool;
+    expect(await findActiveReviewConversationState(999n, pool)).toBeNull();
+  });
+});
+
+describe("deleteReviewConversationState", () => {
+  it("deletes scoped to id and telegram_user_id", async () => {
+    const pool = { query: vi.fn().mockResolvedValueOnce([{ affectedRows: 1 }, undefined]) } as unknown as Pool;
+    await deleteReviewConversationState(55, 123456n, pool);
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM telegram_conversation_states"),
+      [55, "123456"],
+    );
   });
 });
