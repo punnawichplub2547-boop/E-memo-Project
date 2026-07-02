@@ -2,11 +2,18 @@ import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { findUserById } from "@/lib/db-users";
-import { sendTelegramMessage, answerCallbackQuery, escHtml } from "@/lib/telegram/client";
+import { sendTelegramMessage, answerCallbackQuery, escHtml, buildInlineKeyboard } from "@/lib/telegram/client";
 import { consumeLinkToken, upsertTelegramAccount } from "@/lib/telegram/linking";
-import { consumeApproveActionToken } from "@/lib/telegram/actions";
+import {
+  consumeApproveActionToken,
+  consumeReviewActionToken,
+  createReviewConversationState,
+  deleteReviewConversationState,
+  type ReviewConversationActionType,
+} from "@/lib/telegram/actions";
 import { isFromTelegramIp } from "@/lib/telegram/ip-allowlist";
-import { approveMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
+import { approveMemoAction, reviewMemoAction, WorkflowActionError } from "@/lib/workflow-actions";
+import type { ReviewResponse } from "@/lib/workflow-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +89,67 @@ async function handleApproveCallback(cqId: string, tokenDbId: number, telegramUs
   }
 }
 
+async function handleReviewActionCallback(
+  cqId: string,
+  actionType: "review_no_objection" | "review_escalate",
+  tokenDbId: number,
+  telegramUserId: bigint,
+  chatId: bigint,
+): Promise<void> {
+  const pool = getDbPool();
+  const result = await consumeReviewActionToken(tokenDbId, telegramUserId, actionType, pool);
+  if (!result) {
+    await answerCallbackQuery(cqId, "การดำเนินการหมดอายุหรือถูกใช้แล้ว", true);
+    return;
+  }
+  const response: ReviewResponse =
+    actionType === "review_no_objection" ? "acknowledged_no_objection" : "escalate_to_md_approval";
+  try {
+    await reviewMemoAction({
+      memoNo: result.memoNo,
+      actorUserId: result.userId,
+      response,
+      source: "telegram",
+      metadata: { telegram_user_id: telegramUserId.toString(), telegram_chat_id: chatId.toString() },
+    });
+    await answerCallbackQuery(cqId, "บันทึกผลการพิจารณาสำเร็จ ✅");
+    const successText = response === "acknowledged_no_objection"
+      ? `✅ บันทึกว่าไม่มีข้อโต้แย้งสำหรับ ${escHtml(result.memoNo)} แล้ว`
+      : `✅ ยกระดับเป็นผู้อนุมัติสำหรับ ${escHtml(result.memoNo)} แล้ว`;
+    await sendTelegramMessage(chatId, successText);
+  } catch (err) {
+    const msg = err instanceof WorkflowActionError ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+    await answerCallbackQuery(cqId, msg, true);
+  }
+}
+
+async function handleReviewStartCallback(
+  cqId: string,
+  actionType: "review_comment_start" | "review_revision_start",
+  tokenDbId: number,
+  telegramUserId: bigint,
+  chatId: bigint,
+): Promise<void> {
+  const pool = getDbPool();
+  const result = await consumeReviewActionToken(tokenDbId, telegramUserId, actionType, pool);
+  if (!result) {
+    await answerCallbackQuery(cqId, "การดำเนินการหมดอายุหรือถูกใช้แล้ว", true);
+    return;
+  }
+  const conversationActionType: ReviewConversationActionType =
+    actionType === "review_comment_start" ? "review_comment" : "review_revision";
+  const { id: stateId } = await createReviewConversationState({
+    telegramUserId, userId: result.userId, memoId: result.memoId, actionType: conversationActionType, pool,
+  });
+  await answerCallbackQuery(cqId);
+  const prompt = conversationActionType === "review_comment"
+    ? `กรุณาพิมพ์ความเห็นของคุณสำหรับ ${escHtml(result.memoNo)}`
+    : `กรุณาพิมพ์เหตุผลที่ต้องการให้แก้ไขสำหรับ ${escHtml(result.memoNo)}`;
+  await sendTelegramMessage(chatId, prompt, {
+    replyMarkup: buildInlineKeyboard([[{ text: "ยกเลิก", callback_data: `review_cancel:${stateId}` }]]),
+  });
+}
+
 export async function POST(request: NextRequest) {
   const cfIp = request.headers.get("cf-connecting-ip");
   if (cfIp && !isFromTelegramIp(cfIp)) {
@@ -108,6 +176,28 @@ export async function POST(request: NextRequest) {
       if (data.startsWith("approve:")) {
         const tokenDbId = parseInt(data.slice(8), 10);
         if (!isNaN(tokenDbId)) await handleApproveCallback(cq.id, tokenDbId, telegramUserId, chatId);
+      } else if (data.startsWith("review_no_objection:") || data.startsWith("review_escalate:")) {
+        const [prefix, idStr] = data.split(":");
+        const tokenDbId = parseInt(idStr, 10);
+        if (!isNaN(tokenDbId)) {
+          await handleReviewActionCallback(
+            cq.id, prefix as "review_no_objection" | "review_escalate", tokenDbId, telegramUserId, chatId,
+          );
+        }
+      } else if (data.startsWith("review_comment_start:") || data.startsWith("review_revision_start:")) {
+        const [prefix, idStr] = data.split(":");
+        const tokenDbId = parseInt(idStr, 10);
+        if (!isNaN(tokenDbId)) {
+          await handleReviewStartCallback(
+            cq.id, prefix as "review_comment_start" | "review_revision_start", tokenDbId, telegramUserId, chatId,
+          );
+        }
+      } else if (data.startsWith("review_cancel:")) {
+        const stateId = parseInt(data.slice("review_cancel:".length), 10);
+        if (!isNaN(stateId)) {
+          await deleteReviewConversationState(stateId, telegramUserId, getDbPool());
+          await answerCallbackQuery(cq.id, "ยกเลิกแล้ว");
+        }
       } else {
         await answerCallbackQuery(cq.id, "ไม่รู้จักคำสั่งนี้");
       }

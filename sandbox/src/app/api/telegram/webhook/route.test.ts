@@ -7,6 +7,7 @@ vi.mock("@/lib/telegram/client", () => ({
   sendTelegramMessage: vi.fn().mockResolvedValue(null),
   answerCallbackQuery: vi.fn().mockResolvedValue(undefined),
   escHtml: (s: string) => s,
+  buildInlineKeyboard: (rows: unknown) => ({ inline_keyboard: rows }),
 }));
 vi.mock("@/lib/telegram/linking", () => ({
   consumeLinkToken: vi.fn().mockResolvedValue(null),
@@ -14,9 +15,13 @@ vi.mock("@/lib/telegram/linking", () => ({
 }));
 vi.mock("@/lib/telegram/actions", () => ({
   consumeApproveActionToken: vi.fn().mockResolvedValue(null),
+  consumeReviewActionToken: vi.fn(),
+  createReviewConversationState: vi.fn(),
+  deleteReviewConversationState: vi.fn(),
 }));
 vi.mock("@/lib/workflow-actions", () => ({
   approveMemoAction: vi.fn().mockResolvedValue({ ok: true }),
+  reviewMemoAction: vi.fn(),
   WorkflowActionError: class WorkflowActionError extends Error {
     status: number;
     constructor(status: number, message: string) { super(message); this.status = status; }
@@ -25,8 +30,9 @@ vi.mock("@/lib/workflow-actions", () => ({
 
 import { POST } from "./route";
 import { consumeLinkToken } from "@/lib/telegram/linking";
-import { consumeApproveActionToken } from "@/lib/telegram/actions";
+import { consumeApproveActionToken, consumeReviewActionToken, createReviewConversationState, deleteReviewConversationState } from "@/lib/telegram/actions";
 import { answerCallbackQuery } from "@/lib/telegram/client";
+import { reviewMemoAction } from "@/lib/workflow-actions";
 
 const SECRET = "test-webhook-secret-32-chars-xxxx";
 
@@ -140,5 +146,73 @@ describe("approve callback", () => {
     const res = await POST(makeReq(body, SECRET));
     expect(res.status).toBe(200);
     expect(vi.mocked(answerCallbackQuery)).toHaveBeenCalledWith("cq3", "ไม่รู้จักคำสั่งนี้");
+  });
+});
+
+describe("POST /api/telegram/webhook — MD review callbacks", () => {
+  it("calls reviewMemoAction with acknowledged_no_objection for review_no_objection callback", async () => {
+    vi.mocked(consumeReviewActionToken).mockResolvedValueOnce({ memoNo: "EM-2026-001", userId: 3, memoId: 42 });
+    vi.mocked(reviewMemoAction).mockResolvedValueOnce({ ok: true });
+    const body = {
+      callback_query: { id: "cq1", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_no_objection:10" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).toHaveBeenCalledWith(expect.objectContaining({
+      memoNo: "EM-2026-001", actorUserId: 3, response: "acknowledged_no_objection", source: "telegram",
+    }));
+  });
+
+  it("calls reviewMemoAction with escalate_to_md_approval for review_escalate callback", async () => {
+    vi.mocked(consumeReviewActionToken).mockResolvedValueOnce({ memoNo: "EM-2026-002", userId: 3, memoId: 43 });
+    vi.mocked(reviewMemoAction).mockResolvedValueOnce({ ok: true });
+    const body = {
+      callback_query: { id: "cq2", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_escalate:11" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).toHaveBeenCalledWith(expect.objectContaining({
+      memoNo: "EM-2026-002", actorUserId: 3, response: "escalate_to_md_approval", source: "telegram",
+    }));
+  });
+
+  it("creates a conversation state for review_comment_start callback without calling reviewMemoAction", async () => {
+    vi.mocked(consumeReviewActionToken).mockResolvedValueOnce({ memoNo: "EM-2026-003", userId: 3, memoId: 44 });
+    vi.mocked(createReviewConversationState).mockResolvedValueOnce({ id: 77 });
+    const body = {
+      callback_query: { id: "cq3", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_comment_start:12" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(createReviewConversationState).toHaveBeenCalledWith(expect.objectContaining({
+      telegramUserId: 999n, userId: 3, memoId: 44, actionType: "review_comment",
+    }));
+    expect(reviewMemoAction).not.toHaveBeenCalled();
+  });
+
+  it("creates a conversation state for review_revision_start callback", async () => {
+    vi.mocked(consumeReviewActionToken).mockResolvedValueOnce({ memoNo: "EM-2026-004", userId: 3, memoId: 45 });
+    vi.mocked(createReviewConversationState).mockResolvedValueOnce({ id: 78 });
+    const body = {
+      callback_query: { id: "cq4", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_revision_start:13" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(createReviewConversationState).toHaveBeenCalledWith(expect.objectContaining({
+      actionType: "review_revision",
+    }));
+  });
+
+  it("deletes the conversation state for review_cancel callback", async () => {
+    const body = {
+      callback_query: { id: "cq5", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_cancel:77" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(deleteReviewConversationState).toHaveBeenCalledWith(77, 999n, expect.anything());
+  });
+
+  it("shows the token-expired message when consumeReviewActionToken returns null", async () => {
+    vi.mocked(consumeReviewActionToken).mockResolvedValueOnce(null);
+    const body = {
+      callback_query: { id: "cq6", from: { id: 999 }, message: { chat: { id: 555 } }, data: "review_no_objection:99" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).not.toHaveBeenCalled();
   });
 });
