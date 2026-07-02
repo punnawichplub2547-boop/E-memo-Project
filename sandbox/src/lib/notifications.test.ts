@@ -188,6 +188,18 @@ describe("buildMemoNotificationTitle", () => {
   });
 });
 
+describe("memo_md_review_pending notification copy", () => {
+  const ctx = { memoNo: "EM-2026-001", title: "ทดสอบ", requesterName: "สมชาย", currentStep: "Managing Director" };
+
+  it("produces a Thai title distinct from memo_pending_approval", () => {
+    expect(buildMemoNotificationTitle("memo_md_review_pending", "EM-2026-001")).toBe("รอ MD พิจารณา: EM-2026-001");
+  });
+
+  it("produces body text using the MD-review label", () => {
+    expect(buildMemoNotificationText("memo_md_review_pending", ctx)).toContain("รอ MD พิจารณา");
+  });
+});
+
 describe("parseNotificationLimit", () => {
   it("returns the value for a valid positive number", () => {
     expect(parseNotificationLimit("30")).toBe(30);

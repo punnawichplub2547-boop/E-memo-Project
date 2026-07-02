@@ -11,6 +11,7 @@ export type MemoNotificationContext = {
 
 const TYPE_LABELS: Record<string, string> = {
   memo_pending_approval: "รออนุมัติ",
+  memo_md_review_pending: "รอ MD พิจารณา",
   memo_pending_read:     "รอรับทราบ",
   memo_cc:               "แจ้งเพื่อทราบ",
   memo_returned:         "ส่งคืนแก้ไข",
