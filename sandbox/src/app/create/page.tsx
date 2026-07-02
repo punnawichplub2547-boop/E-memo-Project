@@ -550,6 +550,7 @@ function CreatePageContent() {
         routeMode: routeReview.mode,
         routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
         notifyMD: recommendation.notifyMD,
+        requiresMdReview: recommendation.requiresMdReview,
         updatedAt: stamp,
       });
       router.push("/queue");
@@ -591,6 +592,7 @@ function CreatePageContent() {
         budgetPlan,
         budgetUsed,
         notifyMD: recommendation.notifyMD,
+        requiresMdReview: recommendation.requiresMdReview,
         priceComparisons,
         selectedVendorId: selectedVendor?.id,
         selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,

@@ -125,6 +125,23 @@ describe("memoReducer — RESUBMIT_MEMO", () => {
       { recipient: "IT", status: "pending" },
     ]);
   });
+
+  it("clears stale MD review fields on resubmit so the gate can re-arm", () => {
+    const withMdReview: MemoRecord = {
+      ...returnedBase,
+      mdReviewStatus: "completed",
+      mdReviewResumeStep: "General Manager",
+      mdReviewComment: "รับทราบ ไม่มีข้อขัดข้อง",
+      mdReviewActedBy: "MD คนเดิม",
+      mdReviewActedAt: "27 May 2026 10:00",
+    };
+    const next = memoReducer([withMdReview], { type: "RESUBMIT_MEMO", id: withMdReview.id });
+    expect(next[0].mdReviewStatus).toBeFalsy();
+    expect(next[0].mdReviewResumeStep).toBeUndefined();
+    expect(next[0].mdReviewComment).toBeUndefined();
+    expect(next[0].mdReviewActedBy).toBeUndefined();
+    expect(next[0].mdReviewActedAt).toBeUndefined();
+  });
 });
 
 describe("memoReducer — ADVANCE_STEP", () => {
@@ -709,6 +726,38 @@ describe("memoReducer — SUBMIT_REVISION", () => {
     const other: MemoRecord = { ...seedMemos[1] };
     const result = memoReducer([revBase, other], basePayload);
     expect(result.find((m) => m.id === other.id)).toEqual(other);
+  });
+
+  it("sets requiresMdReview true on the memo when the action carries requiresMdReview: true", () => {
+    const result = memoReducer([revBase], { ...basePayload, requiresMdReview: true });
+    expect(result[0].requiresMdReview).toBe(true);
+  });
+
+  it("leaves requiresMdReview falsy when the action omits requiresMdReview", () => {
+    const result = memoReducer([revBase], basePayload);
+    expect(result[0].requiresMdReview).toBeFalsy();
+  });
+
+  it("leaves requiresMdReview falsy when the action carries requiresMdReview: false", () => {
+    const result = memoReducer([revBase], { ...basePayload, requiresMdReview: false });
+    expect(result[0].requiresMdReview).toBeFalsy();
+  });
+
+  it("clears stale MD review fields on submit-revision so the gate can re-arm", () => {
+    const withMdReview: MemoRecord = {
+      ...revBase,
+      mdReviewStatus: "completed",
+      mdReviewResumeStep: "General Manager",
+      mdReviewComment: "รับทราบ ไม่มีข้อขัดข้อง",
+      mdReviewActedBy: "MD คนเดิม",
+      mdReviewActedAt: "27 May 2026 10:00",
+    };
+    const result = memoReducer([withMdReview], basePayload);
+    expect(result[0].mdReviewStatus).toBeFalsy();
+    expect(result[0].mdReviewResumeStep).toBeUndefined();
+    expect(result[0].mdReviewComment).toBeUndefined();
+    expect(result[0].mdReviewActedBy).toBeUndefined();
+    expect(result[0].mdReviewActedAt).toBeUndefined();
   });
 });
 

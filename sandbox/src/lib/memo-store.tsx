@@ -70,6 +70,7 @@ type Action =
       routeMode?: ApprovalRouteMode;
       routeOverrideReason?: string;
       notifyMD?: boolean;
+      requiresMdReview?: boolean;
       revisionNote?: string;
       updatedAt?: string;
     }
@@ -278,6 +279,11 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           returnReason: undefined,
           rejectReason: undefined,
           rejectDisposition: undefined,
+          mdReviewStatus: undefined,
+          mdReviewResumeStep: undefined,
+          mdReviewComment: undefined,
+          mdReviewActedBy: undefined,
+          mdReviewActedAt: undefined,
           revisionSubmittedAt: action.updatedAt ?? m.updatedAt,
         };
       });
@@ -323,6 +329,7 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           routeMode: action.routeMode,
           routeOverrideReason: action.routeOverrideReason,
           notifyMD: action.notifyMD,
+          requiresMdReview: action.requiresMdReview,
           // Workflow reset (same as RESUBMIT_MEMO):
           status: "pending" as const,
           currentStep: action.selectedRoute?.[0] ?? "Manager / Top Section",
@@ -334,6 +341,11 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           returnReason: undefined,
           rejectReason: undefined,
           rejectDisposition: undefined,
+          mdReviewStatus: undefined,
+          mdReviewResumeStep: undefined,
+          mdReviewComment: undefined,
+          mdReviewActedBy: undefined,
+          mdReviewActedAt: undefined,
           revisionSubmittedAt: action.updatedAt ?? m.updatedAt,
         };
       });
