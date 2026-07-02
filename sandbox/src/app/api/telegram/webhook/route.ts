@@ -9,6 +9,7 @@ import {
   consumeReviewActionToken,
   createReviewConversationState,
   deleteReviewConversationState,
+  findActiveReviewConversationState,
   type ReviewConversationActionType,
 } from "@/lib/telegram/actions";
 import { isFromTelegramIp } from "@/lib/telegram/ip-allowlist";
@@ -150,6 +151,31 @@ async function handleReviewStartCallback(
   });
 }
 
+async function handleReviewTextReply(text: string, telegramUserId: bigint, chatId: bigint): Promise<void> {
+  const pool = getDbPool();
+  const state = await findActiveReviewConversationState(telegramUserId, pool);
+  if (!state) return; // no pending conversation — stay silent, same as any other unrecognized update
+  await deleteReviewConversationState(state.id, telegramUserId, pool);
+  const response: ReviewResponse = state.actionType === "review_comment" ? "comment" : "request_revision";
+  try {
+    await reviewMemoAction({
+      memoNo: state.memoNo,
+      actorUserId: state.userId,
+      response,
+      ...(response === "comment" ? { comment: text } : { reason: text }),
+      source: "telegram",
+      metadata: { telegram_user_id: telegramUserId.toString(), telegram_chat_id: chatId.toString() },
+    });
+    const successText = response === "comment"
+      ? `✅ บันทึกความเห็นสำหรับ ${escHtml(state.memoNo)} แล้ว`
+      : `✅ ส่งคำขอแก้ไขสำหรับ ${escHtml(state.memoNo)} กลับไปยังผู้ร้องขอแล้ว`;
+    await sendTelegramMessage(chatId, successText);
+  } catch (err) {
+    const msg = err instanceof WorkflowActionError ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+    await sendTelegramMessage(chatId, msg);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const cfIp = request.headers.get("cf-connecting-ip");
   if (cfIp && !isFromTelegramIp(cfIp)) {
@@ -165,6 +191,14 @@ export async function POST(request: NextRequest) {
     if (update.message?.text?.startsWith("/start ")) {
       const rawToken = update.message.text.slice(7).trim();
       if (rawToken) await handleStart(update, rawToken);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (update.message?.text && !update.message.text.startsWith("/start")) {
+      const from = update.message.from;
+      if (from) {
+        await handleReviewTextReply(update.message.text, BigInt(from.id), BigInt(update.message.chat.id));
+      }
       return NextResponse.json({ ok: true });
     }
 

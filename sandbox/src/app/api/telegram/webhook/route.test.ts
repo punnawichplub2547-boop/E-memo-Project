@@ -18,6 +18,7 @@ vi.mock("@/lib/telegram/actions", () => ({
   consumeReviewActionToken: vi.fn(),
   createReviewConversationState: vi.fn(),
   deleteReviewConversationState: vi.fn(),
+  findActiveReviewConversationState: vi.fn(),
 }));
 vi.mock("@/lib/workflow-actions", () => ({
   approveMemoAction: vi.fn().mockResolvedValue({ ok: true }),
@@ -30,7 +31,13 @@ vi.mock("@/lib/workflow-actions", () => ({
 
 import { POST } from "./route";
 import { consumeLinkToken } from "@/lib/telegram/linking";
-import { consumeApproveActionToken, consumeReviewActionToken, createReviewConversationState, deleteReviewConversationState } from "@/lib/telegram/actions";
+import {
+  consumeApproveActionToken,
+  consumeReviewActionToken,
+  createReviewConversationState,
+  deleteReviewConversationState,
+  findActiveReviewConversationState,
+} from "@/lib/telegram/actions";
 import { answerCallbackQuery } from "@/lib/telegram/client";
 import { reviewMemoAction } from "@/lib/workflow-actions";
 
@@ -214,5 +221,60 @@ describe("POST /api/telegram/webhook — MD review callbacks", () => {
     };
     await POST(makeReq(body, SECRET));
     expect(reviewMemoAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/telegram/webhook — free-text MD review replies", () => {
+  it("calls reviewMemoAction with response=comment when an active review_comment state exists", async () => {
+    vi.mocked(findActiveReviewConversationState).mockResolvedValueOnce({
+      id: 77, userId: 3, memoId: 42, memoNo: "EM-2026-001", actionType: "review_comment",
+    });
+    vi.mocked(reviewMemoAction).mockResolvedValueOnce({ ok: true });
+    const body = {
+      message: { from: { id: 999 }, chat: { id: 555 }, text: "เห็นด้วยกับการปรับราคานี้" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).toHaveBeenCalledWith(expect.objectContaining({
+      memoNo: "EM-2026-001", actorUserId: 3, response: "comment", comment: "เห็นด้วยกับการปรับราคานี้", source: "telegram",
+    }));
+    expect(deleteReviewConversationState).toHaveBeenCalledWith(77, 999n, expect.anything());
+  });
+
+  it("calls reviewMemoAction with response=request_revision when an active review_revision state exists", async () => {
+    vi.mocked(findActiveReviewConversationState).mockResolvedValueOnce({
+      id: 78, userId: 3, memoId: 43, memoNo: "EM-2026-002", actionType: "review_revision",
+    });
+    vi.mocked(reviewMemoAction).mockResolvedValueOnce({ ok: true });
+    const body = {
+      message: { from: { id: 999 }, chat: { id: 555 }, text: "ขอใบเสนอราคาเพิ่ม" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).toHaveBeenCalledWith(expect.objectContaining({
+      memoNo: "EM-2026-002", actorUserId: 3, response: "request_revision", reason: "ขอใบเสนอราคาเพิ่ม", source: "telegram",
+    }));
+  });
+
+  it("does nothing and does not call reviewMemoAction when no active conversation state exists", async () => {
+    vi.mocked(findActiveReviewConversationState).mockResolvedValueOnce(null);
+    const body = {
+      message: { from: { id: 999 }, chat: { id: 555 }, text: "สวัสดีครับ" },
+    };
+    await POST(makeReq(body, SECRET));
+    expect(reviewMemoAction).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the translated WorkflowActionError message when reviewMemoAction rejects", async () => {
+    vi.mocked(findActiveReviewConversationState).mockResolvedValueOnce({
+      id: 79, userId: 3, memoId: 44, memoNo: "EM-2026-003", actionType: "review_comment",
+    });
+    const { WorkflowActionError: MockError } = await import("@/lib/workflow-actions");
+    vi.mocked(reviewMemoAction).mockRejectedValueOnce(new MockError(409, "เมโมนี้ไม่มีการรอพิจารณาจาก MD อยู่"));
+    const body = {
+      message: { from: { id: 999 }, chat: { id: 555 }, text: "สาย เกินไปแล้ว" },
+    };
+    await POST(makeReq(body, SECRET));
+    // deleteReviewConversationState still called before the action attempt, per the
+    // "delete first" rule that prevents double-submit even when the action fails.
+    expect(deleteReviewConversationState).toHaveBeenCalledWith(79, 999n, expect.anything());
   });
 });
