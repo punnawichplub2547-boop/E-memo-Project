@@ -232,7 +232,7 @@ export function MemoDetailsCard({
               )}
               {supportsPriceAdjustment && (
                 <FlagCheckbox checked={isPriceAdjustment} onChange={onIsPriceAdjustmentChange}
-                  title="Supplier ปรับราคา (Book1 หมวด 1/2)" sub="ระบบจะแจ้ง MD ให้รับทราบ - flow อนุมัติยังตามวงเงิน" />
+                  title="Supplier ปรับราคา (Book1 หมวด 1/2)" sub="ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ - flow จะหยุดรอจนกว่า MD จะตอบกลับ" />
               )}
               {effectiveIsPriceAdjustment && (
                 <div className="em-field" style={{ gap: 4, paddingLeft: 8 }}>

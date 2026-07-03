@@ -244,7 +244,7 @@ export function getApprovalRecommendation(
     ? {
         notifyMD: true,
         notifyMDReason:
-          "Supplier ปรับราคา ต้องแจ้ง MD เพื่อรับทราบ (Book1 หมวด 1/2)",
+          "Supplier ปรับราคา ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ (Book1 หมวด 1/2)",
         requiresMdReview: true
       }
     : { notifyMD: false, requiresMdReview: false }
