@@ -12,8 +12,9 @@
          service is OUTSIDE compose, so the tunnel stays up - brief app downtime only)
       5. Wait for the app to answer on http://localhost:3000/login
 
-    Safe to re-run: migrations are skipped when their table already exists, and all
-    migration files use CREATE TABLE IF NOT EXISTS.
+    Safe to re-run: table migrations are skipped when their table already exists
+    (CREATE TABLE IF NOT EXISTS), and column migrations (ALTER TABLE ADD COLUMN,
+    not itself idempotent) are skipped when their column already exists.
 
 .PARAMETER DryRun
     Show what would happen (pull / migrations / rebuild) without changing anything.
@@ -42,11 +43,18 @@ $DbUser       = 'hr_ememo'
 $AppUrl       = 'http://localhost:3000/login'
 
 # Ordered map: table marker -> migration file. A migration runs ONLY if its table
-# is absent. Add future migrations here (keep chronological order).
+# is absent. Add future CREATE TABLE migrations here (keep chronological order).
 $Migrations = [ordered]@{
     'issue_reports'         = '2026-06-24-issue-reports-table.sql'
     'item_subcategories'    = '2026-06-25-item-subcategories.sql'
     'password_reset_tokens' = '2026-06-29-password-reset-tokens.sql'
+}
+
+# Ordered map: "table.column" marker -> migration file. For ALTER TABLE ADD COLUMN
+# migrations, which aren't self-idempotent (re-running errors on duplicate column).
+# A migration runs ONLY if its column is absent. Add future ALTER migrations here.
+$ColumnMigrations = [ordered]@{
+    'memos.requires_md_review' = '2026-07-01-add-md-review-columns.sql'
 }
 
 # --- Helpers --------------------------------------------------------------
@@ -61,6 +69,14 @@ function Test-ContainerRunning($name) {
 
 function Test-TableExists($pw, $table) {
     $q = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DbName' AND table_name='$table';"
+    $out = docker exec -e "MYSQL_PWD=$pw" $DbContainer mysql -N -B "-u$DbUser" $DbName -e $q 2>$null
+    if (-not $out) { return $false }
+    $val = ("$out" -split "\r?\n" | Where-Object { $_ -ne '' } | Select-Object -Last 1)
+    return (($val).Trim() -eq '1')
+}
+
+function Test-ColumnExists($pw, $table, $column) {
+    $q = "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DbName' AND table_name='$table' AND column_name='$column';"
     $out = docker exec -e "MYSQL_PWD=$pw" $DbContainer mysql -N -B "-u$DbUser" $DbName -e $q 2>$null
     if (-not $out) { return $false }
     $val = ("$out" -split "\r?\n" | Where-Object { $_ -ne '' } | Select-Object -Last 1)
@@ -138,6 +154,34 @@ foreach ($table in $Migrations.Keys) {
     cmd /c $inner
     if ($LASTEXITCODE -ne 0) { throw "Migration $file failed (exit $LASTEXITCODE)." }
     if (-not (Test-TableExists $pw $table)) { throw "Migration $file ran but table '$table' still missing." }
+    Write-Ok "applied $file"
+}
+
+Write-Step "Column migrations (run only if column missing)"
+foreach ($marker in $ColumnMigrations.Keys) {
+    $file = $ColumnMigrations[$marker]
+    $full = Join-Path (Join-Path $RepoRoot 'db\migrations') $file
+    if (-not (Test-Path $full)) { Write-Warn2 "missing file $file - skipped"; continue }
+
+    $table, $column = $marker -split '\.', 2
+    $exists = $false
+    if ($pw) { $exists = Test-ColumnExists $pw $table $column }
+
+    if ($exists) {
+        Write-Ok "$marker already present - skip $file"
+        continue
+    }
+
+    if ($DryRun) {
+        Write-Warn2 "DryRun: would apply $file (column '$marker' absent)"
+        continue
+    }
+
+    Write-Host "    applying $file ..." -ForegroundColor White
+    $inner = "docker exec -e MYSQL_PWD=$pw -i $DbContainer mysql --default-character-set=utf8mb4 -u$DbUser $DbName < `"$full`""
+    cmd /c $inner
+    if ($LASTEXITCODE -ne 0) { throw "Migration $file failed (exit $LASTEXITCODE)." }
+    if (-not (Test-ColumnExists $pw $table $column)) { throw "Migration $file ran but column '$marker' still missing." }
     Write-Ok "applied $file"
 }
 
