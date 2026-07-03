@@ -5,12 +5,12 @@
  */
 import {
   LoginShot,
-  DashboardShot,
   CreateDetailsShot,
   CreateMdReviewDemoGif,
-  RoutingShot,
-  QueueShot,
-  HistoryShot,
+  RoutingOverrideDemoGif,
+  QueueBrowseDemoGif,
+  HistoryFilterDemoGif,
+  NotificationBellDemoGif,
   ProfileShot,
 } from "./manual-mockups";
 
@@ -44,8 +44,6 @@ export function ManualSections() {
         <h2>หน้า Dashboard</h2>
         <p className="man-section-desc">หน้าแรกที่คุณจะเห็นทันทีหลังเข้าสู่ระบบ สรุปให้เห็นภาพรวมว่ามีงานอะไรรอคุณอยู่บ้าง และผลงานอนุมัติที่ผ่านมาเป็นอย่างไร</p>
         <div className="man-rule" />
-
-        <DashboardShot />
 
         <ul className="man-plain" style={{ marginTop: 20 }}>
           <li><b>การ์ดสีเข้มด้านบน</b> — ทักทายคุณตามช่วงเวลาจริง พร้อมบอกจำนวนเอกสารที่กำลังรอให้คุณอนุมัติ กดปุ่ม &ldquo;Review Queue&rdquo; เพื่อไปดูรายการได้ทันที</li>
@@ -86,7 +84,7 @@ export function ManualSections() {
         <h3 className="man-step-title" id="sec-routing"><span className="man-step-badge">2</span> เส้นทางอนุมัติ (Approver Routing)</h3>
         <p>ทันทีที่คุณกรอกหมวดรายการและจำนวนเงินครบ แผงด้านขวาของฟอร์มจะคำนวณและแนะนำผู้อนุมัติที่เหมาะสมให้โดยอัตโนมัติ ตามกฎของ Book1 หากจำเป็นคุณสามารถเลือกผู้อนุมัติเองแทนคำแนะนำได้ แต่ระบบจะขอให้ระบุเหตุผลไว้ด้วย เพื่อให้ตรวจสอบย้อนหลังได้ในภายหลัง</p>
 
-        <RoutingShot />
+        <RoutingOverrideDemoGif />
 
         <ul className="man-plain" style={{ marginTop: 18 }}>
           <li><b>TIER badge</b> — บอกระดับผู้อนุมัติสุดท้ายที่ระบบแนะนำ (Manager / GM / MD)</li>
@@ -106,7 +104,7 @@ export function ManualSections() {
         <p className="man-section-desc">หน้านี้รวมสถานะเอกสารทั้งหมดที่เกี่ยวข้องกับคุณไว้ในที่เดียว ทั้งเมโมที่คุณส่งเอง และเมโมที่รอให้คุณอนุมัติ (ถ้าคุณมีสิทธิ์นั้น)</p>
         <div className="man-rule" />
 
-        <QueueShot />
+        <QueueBrowseDemoGif />
 
         <ul className="man-plain" style={{ marginTop: 18 }}>
           <li><b>แท็บสถานะ</b> ด้านบน — All / Pending / Approved / Rejected / Returned / Draft คลิกเพื่อกรองดูเฉพาะสถานะที่ต้องการได้ทันที</li>
@@ -147,7 +145,7 @@ export function ManualSections() {
         <p className="man-section-desc">หน้านี้รวบรวมสถิติของทุกเมโมที่ผ่านมือคุณ พร้อมไทม์ไลน์การอนุมัติแบบละเอียด เหมาะสำหรับตรวจสอบย้อนหลังหรือทำรายงานเสนอผู้บริหาร</p>
         <div className="man-rule" />
 
-        <HistoryShot />
+        <HistoryFilterDemoGif />
 
         <ul className="man-plain" style={{ marginTop: 18 }}>
           <li><b>การ์ดตัวเลข 5 ช่อง</b> — จำนวนที่ดำเนินการทั้งหมด, อัตราอนุมัติ, อัตราปฏิเสธ, เวลาเฉลี่ยต่อฉบับ และจำนวนที่ผ่านระดับ MD</li>
@@ -163,7 +161,9 @@ export function ManualSections() {
         <p className="man-section-desc">ระบบแจ้งเตือนคุณผ่านสองช่องทางพร้อมกัน เพื่อให้มั่นใจว่าจะไม่พลาดเอกสารที่ต้องดำเนินการ</p>
         <div className="man-rule" />
 
-        <ul className="man-plain">
+        <NotificationBellDemoGif />
+
+        <ul className="man-plain" style={{ marginTop: 18 }}>
           <li><b>กระดิ่งแจ้งเตือนในระบบ</b> (มุมขวาบนทุกหน้า) — จะมีจุดสีแดงขึ้นเมื่อมีแจ้งเตือนใหม่ คลิกเพื่อดูรายการ แล้วคลิกอีกครั้งที่รายการนั้นเพื่อไปยังเมโมที่เกี่ยวข้องได้โดยตรง หรือกดปุ่ม &ldquo;อ่านทั้งหมด&rdquo; เพื่อล้างสถานะในคลิกเดียว</li>
           <li><b>Telegram</b> — ช่องทางเสริมที่ส่งแจ้งเตือนแบบ push ทันทีที่มีเอกสารรอคุณอนุมัติ พร้อมปุ่มกดอนุมัติ ตีกลับ หรือปฏิเสธได้เลยจากในแชท ไม่ต้องเปิดเว็บก็จัดการได้</li>
         </ul>

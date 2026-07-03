@@ -21,25 +21,80 @@ function Shot({ url, caption, children }: { url: string; caption: string; childr
   );
 }
 
-// A real screen recording (not a CSS mockup) — served from /public, so no
+// Real screen recordings (not CSS mockups) — served from /public, so no
 // self-contained/base64 constraint here unlike the standalone Artifact draft.
-export function CreateMdReviewDemoGif() {
+function DemoGif({ url, filename, alt, caption }: { url: string; filename: string; alt: string; caption: string }) {
   return (
     <>
       <figure className="man-shot">
         <div className="man-shot-chrome">
           <i /><i /><i />
-          <span>memo.car-1996.com/create</span>
+          <span>{url}</span>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element -- animated GIF; next/image re-encodes and drops animation */}
         <img
-          src="/manual/create-memo-md-review-demo.gif"
-          alt="วิดีโอสาธิตการกรอกแบบฟอร์มสร้างเมโม เลือกหมวดวัตถุดิบแล้วติ๊ก Supplier ปรับราคา จนแผง MD Review ปรากฏขึ้น"
+          src={`/manual/${filename}`}
+          alt={alt}
           style={{ display: "block", width: "100%", height: "auto" }}
         />
       </figure>
-      <p className="man-figcaption">วิดีโอสาธิตจริง — กรอกเรื่อง เลือกหมวด &ldquo;วัตถุดิบ&rdquo; แล้วติ๊ก &ldquo;Supplier ปรับราคา&rdquo; จนระบบขึ้นเงื่อนไข MD Review ให้เห็นแบบเรียลไทม์</p>
+      <p className="man-figcaption">{caption}</p>
     </>
+  );
+}
+
+export function CreateMdReviewDemoGif() {
+  return (
+    <DemoGif
+      url="memo.car-1996.com/create"
+      filename="create-memo-md-review-demo.gif"
+      alt="วิดีโอสาธิตการกรอกแบบฟอร์มสร้างเมโม เลือกหมวดวัตถุดิบแล้วติ๊ก Supplier ปรับราคา จนแผง MD Review ปรากฏขึ้น"
+      caption="วิดีโอสาธิตจริง — กรอกเรื่อง เลือกหมวด &ldquo;วัตถุดิบ&rdquo; แล้วติ๊ก &ldquo;Supplier ปรับราคา&rdquo; จนระบบขึ้นเงื่อนไข MD Review ให้เห็นแบบเรียลไทม์"
+    />
+  );
+}
+
+export function RoutingOverrideDemoGif() {
+  return (
+    <DemoGif
+      url="memo.car-1996.com/create"
+      filename="routing-override-demo.gif"
+      alt="วิดีโอสาธิตการ override ผู้อนุมัติสุดท้ายจาก General Manager เป็น Managing Director และ ROUTE STATUS เปลี่ยนเป็น exception"
+      caption="วิดีโอสาธิตจริง — กรอกจำนวนเงินแล้วเลือกผู้อนุมัติเองแทนคำแนะนำ ระบบขึ้น ROUTE STATUS เป็น &ldquo;escalated&rdquo; ทันที"
+    />
+  );
+}
+
+export function QueueBrowseDemoGif() {
+  return (
+    <DemoGif
+      url="memo.car-1996.com/queue"
+      filename="approval-queue-browse-demo.gif"
+      alt="วิดีโอสาธิตการกรองแท็บสถานะและเปิด drawer รายละเอียดเมโมในหน้า Approval Queue"
+      caption="วิดีโอสาธิตจริง — กรองแท็บ &ldquo;Approved&rdquo; แล้วคลิกแถวเพื่อเปิด drawer ดูรายละเอียดและไทม์ไลน์การอนุมัติ"
+    />
+  );
+}
+
+export function HistoryFilterDemoGif() {
+  return (
+    <DemoGif
+      url="memo.car-1996.com/history"
+      filename="history-filter-demo.gif"
+      alt="วิดีโอสาธิตการกรองแท็บ Approved ในหน้าประวัติเอกสารและการ์ด KPI ที่ไฮไลต์ตาม"
+      caption="วิดีโอสาธิตจริง — คลิกแท็บกรอง &ldquo;Approved&rdquo; การ์ด KPI ที่เกี่ยวข้องจะไฮไลต์ตามให้เห็นทันที"
+    />
+  );
+}
+
+export function NotificationBellDemoGif() {
+  return (
+    <DemoGif
+      url="memo.car-1996.com/"
+      filename="notification-bell-demo.gif"
+      alt="วิดีโอสาธิตการคลิกกระดิ่งแจ้งเตือนที่มุมขวาบน แสดงรายการแจ้งเตือน"
+      caption="วิดีโอสาธิตจริง — คลิกกระดิ่งแจ้งเตือนมุมขวาบน เพื่อดูรายการล่าสุด"
+    />
   );
 }
 
@@ -65,46 +120,6 @@ export function LoginShot() {
           <div className="man-field-lbl">Password</div>
           <div className="man-field">••••••••</div>
           <div style={{ background: "var(--primary-grad)", color: "#fff", textAlign: "center", borderRadius: 7, padding: 8, fontSize: 10.5, fontWeight: 700, marginTop: 6 }}>เข้าสู่ระบบ</div>
-        </div>
-      </div>
-    </Shot>
-  );
-}
-
-export function DashboardShot() {
-  return (
-    <Shot url="memo.car-1996.com/" caption="ภาพประกอบจำลองหน้า Dashboard">
-      <div className="man-app-frame">
-        <div className="man-app-side">
-          <div className="man-app-brand"><em>EM</em><div><b>E-Memo</b><small>HR&amp;GA</small></div></div>
-          <div className="man-app-nav">
-            <div className="on">Dashboard</div>
-            <div>Create Memo</div>
-            <div>Approval Queue</div>
-            <div>AI Search</div>
-            <div>History</div>
-          </div>
-        </div>
-        <div className="man-app-main">
-          <div className="man-app-topbar">
-            <div><div className="man-crumb">Complete Auto Rubber / HR&amp;GA / Dashboard</div><h4>Approval Center Overview</h4></div>
-            <span className="man-pill blue">+ New Memo</span>
-          </div>
-          <div className="man-hero-card">
-            <div className="date">FRIDAY, 3 JULY 2026</div>
-            <h5>สวัสดีตอนเช้า, ปุณณวิช ภูประเสริฐ</h5>
-            <p>มีเอกสาร 0 ฉบับ รอการอนุมัติ &nbsp;·&nbsp; <span style={{ textDecoration: "underline" }}>Review Queue</span></p>
-          </div>
-          <div className="man-kpi-row">
-            <div className="man-kpi"><div className="lbl">TOTAL MEMO</div><div className="val">3</div></div>
-            <div className="man-kpi"><div className="lbl">PENDING</div><div className="val">0</div></div>
-            <div className="man-kpi"><div className="lbl">APPROVED</div><div className="val">3</div></div>
-            <div className="man-kpi"><div className="lbl">AVG. CYCLE</div><div className="val">12h</div></div>
-          </div>
-          <div className="man-card" style={{ marginTop: 2 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Recent Activity</div>
-            <div className="man-timeline-item"><div className="man-tl-dot">✓</div><div style={{ fontSize: 9.5 }}>Managing Director อนุมัติ EM-2026-002 · การว่าจ้าง/สัญญา</div></div>
-          </div>
         </div>
       </div>
     </Shot>
@@ -146,81 +161,6 @@ export function CreateDetailsShot() {
             <div className="man-field-lbl">สถานะงบประมาณ *</div>
             <div className="man-field filled">● ในงบ &nbsp;&nbsp;○ เกินงบ &nbsp;&nbsp;○ ไม่มีงบ</div>
           </div>
-        </div>
-      </div>
-    </Shot>
-  );
-}
-
-export function RoutingShot() {
-  return (
-    <Shot url="Approver Routing panel" caption="ภาพประกอบจำลองแผง Approver Routing">
-      <div style={{ padding: "16px 18px" }}>
-        <div className="man-mrow" style={{ alignItems: "center" }}>
-          <span className="man-pill ghost">TIER · GM</span>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700, margin: "4px 0 8px" }}>General Manager</div>
-        <div className="man-card" style={{ background: "var(--emerald-soft)", borderColor: "rgba(4,120,87,0.22)" }}>
-          <span style={{ fontSize: 9.5, color: "var(--emerald)" }}>✓ ซื้อทั่วไป ภายใน Budget &lt;= 10,000 บาท → GM (Book1 ข้อ 1.2 — หมวดนี้ไม่ให้ Manager อนุมัติ)</span>
-        </div>
-        <div className="man-field-lbl" style={{ marginTop: 8 }}>เลือกผู้อนุมัติสุดท้าย (override ได้)</div>
-        <div className="man-field filled">General Manager (แนะนำ)</div>
-        <div className="man-mrow" style={{ alignItems: "center", marginTop: 6 }}>
-          <span style={{ fontSize: 9.5, color: "var(--muted-2)" }}>ROUTE STATUS</span>
-          <span className="man-pill good">recommended</span>
-        </div>
-        <div style={{ fontSize: 9.5, color: "var(--slate)", margin: "6px 0 10px" }}>ใช้เส้นทางแนะนำของ Book1 (stair route)</div>
-        <div className="man-card"><span style={{ fontSize: 10 }}>Manager / Top Section <b style={{ color: "var(--gold)" }}>MANDATORY</b></span></div>
-        <div className="man-card" style={{ background: "var(--primary-grad-soft)", borderColor: "var(--ice-200)" }}><span style={{ fontSize: 10 }}>→ General Manager <i style={{ color: "var(--primary)", fontStyle: "normal" }}>ผู้อนุมัติสุดท้ายที่เลือก</i></span></div>
-      </div>
-    </Shot>
-  );
-}
-
-export function QueueShot() {
-  return (
-    <Shot url="memo.car-1996.com/queue" caption="ภาพประกอบจำลองหน้า Approval Queue">
-      <div style={{ padding: "16px 18px" }}>
-        <div className="man-mrow" style={{ justifyContent: "space-between" }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Approval Queue</div>
-        </div>
-        <div className="man-mrow">
-          <span className="man-pill blue">All 3</span>
-          <span className="man-pill ghost">Pending 0</span>
-          <span className="man-pill ghost">Approved 3</span>
-          <span className="man-pill ghost">Rejected 0</span>
-          <span className="man-pill ghost">Returned 0</span>
-          <span className="man-pill ghost">Draft 0</span>
-        </div>
-        <table className="man-mini">
-          <tbody>
-            <tr><th>Memo ID</th><th>เรื่อง</th><th>จำนวนเงิน</th><th>ระดับผู้อนุมัติ</th><th>สถานะ</th></tr>
-            <tr><td className="man-num">EM-2026-014</td><td>จัดซื้อสินทรัพย์ถาวร</td><td className="man-num">฿70,000</td><td>General Manager</td><td><span className="man-pill good">Approved</span></td></tr>
-            <tr><td className="man-num">EM-2026-002</td><td>ซ่อมบำรุงระบบไฟฟ้า</td><td className="man-num">฿45,000</td><td>Managing Director</td><td><span className="man-pill good">Approved</span></td></tr>
-            <tr><td className="man-num">EM-2026-005</td><td>ต่ออายุซอฟต์แวร์</td><td className="man-num">฿76,000</td><td>Managing Director</td><td><span className="man-pill good">Approved</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </Shot>
-  );
-}
-
-export function HistoryShot() {
-  return (
-    <Shot url="memo.car-1996.com/history" caption="ภาพประกอบจำลองหน้า History">
-      <div style={{ padding: "16px 18px" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Memo History &amp; Audit</div>
-        <div className="man-kpi-row" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-          <div className="man-kpi"><div className="lbl">TOTAL</div><div className="val">3</div></div>
-          <div className="man-kpi"><div className="lbl">APPROVAL RATE</div><div className="val">100%</div></div>
-          <div className="man-kpi"><div className="lbl">REJECTED</div><div className="val">0</div></div>
-          <div className="man-kpi"><div className="lbl">AVG. CYCLE</div><div className="val">12h</div></div>
-          <div className="man-kpi"><div className="lbl">MD-TIER</div><div className="val">2</div></div>
-        </div>
-        <div className="man-card">
-          <div style={{ fontSize: 9, color: "var(--muted-2)", marginBottom: 6 }}>15 Jun 2026</div>
-          <div className="man-timeline-item"><div className="man-tl-dot">✓</div><div style={{ fontSize: 9.5 }}>EM-2026-014 · General Manager อนุมัติ ฿70,000 <span className="man-pill ghost" style={{ marginLeft: 4 }}>GM</span></div></div>
-          <div className="man-timeline-item"><div className="man-tl-dot">✓</div><div style={{ fontSize: 9.5 }}>EM-2026-002 · Managing Director อนุมัติ ฿45,000 <span className="man-pill gold" style={{ marginLeft: 4 }}>MD</span></div></div>
         </div>
       </div>
     </Shot>
