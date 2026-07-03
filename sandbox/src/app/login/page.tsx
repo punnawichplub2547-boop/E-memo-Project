@@ -666,6 +666,23 @@ export default function LoginPage() {
               </Link>
             </div>
 
+            {/* First-time help — public manual, no login required */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #EEF2F9", textAlign: "center" }}>
+              <Link
+                href="/manual"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  fontSize: 13, color: "#475569", textDecoration: "none", fontWeight: 600,
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 2.6c-1.1-.7-2.6-1-4.2-1-.5 0-.9.4-.9.9v8.7c0 .5.4.9.9.9 1.6 0 3.1.3 4.2 1 1.1-.7 2.6-1 4.2-1 .5 0 .9-.4.9-.9V2.5c0-.5-.4-.9-.9-.9-1.6 0-3.1.3-4.2 1Z" stroke="#2563EB" strokeWidth="1.2" strokeLinejoin="round" />
+                  <path d="M8 2.6v9.9" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+                ใช้งานครั้งแรก? ดูคู่มือการใช้งานระบบ
+              </Link>
+            </div>
+
             </div>{/* /em-login-card */}
 
             {/* Footer */}

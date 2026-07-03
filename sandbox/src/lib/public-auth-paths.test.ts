@@ -9,6 +9,10 @@ describe("isPublicAuthPath", () => {
     expect(isPublicAuthPath("/reset-password")).toBe(true);
   });
 
+  it("treats the public manual page as public (reachable pre-login)", () => {
+    expect(isPublicAuthPath("/manual")).toBe(true);
+  });
+
   it("treats protected app pages as non-public", () => {
     expect(isPublicAuthPath("/")).toBe(false);
     expect(isPublicAuthPath("/queue")).toBe(false);
