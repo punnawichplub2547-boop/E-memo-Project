@@ -239,8 +239,48 @@ describe("sanitizeNewMemoInput", () => {
     expect(result.memo.mdReviewActedAt).toBeUndefined();
   });
 
-  it("preserves requiresMdReview as computed business content (not a workflow-state field)", () => {
+  // requiresMdReview gates the MD-review blocking step (raw-material / fixed-asset
+  // price adjustments, Book1). The client computes it for its own UI, but the server
+  // must recompute it from the memo's business fields — otherwise a crafted request
+  // could set requiresMdReview:false on a qualifying memo and skip the gate, or set
+  // requiresMdReview:true on a non-qualifying memo and falsely trigger it.
+  it("forces requiresMdReview back to true when the memo qualifies but the client sends false (bypass attempt)", () => {
+    const result = sanitizeNewMemoInput(
+      {
+        ...baseMemo,
+        category: "raw-material",
+        isPriceAdjustment: true,
+        requiresMdReview: false,
+      },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.requiresMdReview).toBe(true);
+  });
+
+  it("forces requiresMdReview back to false when the memo does not qualify but the client sends true (false-positive)", () => {
     const result = sanitizeNewMemoInput({ ...baseMemo, requiresMdReview: true }, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.requiresMdReview).toBe(false);
+  });
+
+  it("does not gate a raw-material memo that is not a price adjustment even if the client sends true", () => {
+    const result = sanitizeNewMemoInput(
+      { ...baseMemo, category: "raw-material", isPriceAdjustment: false, requiresMdReview: true },
+      NOW,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.memo.requiresMdReview).toBe(false);
+  });
+
+  it("gates a fixed-asset price adjustment regardless of the client's requiresMdReview value", () => {
+    const result = sanitizeNewMemoInput(
+      { ...baseMemo, category: "fixed-asset", isPriceAdjustment: true, requiresMdReview: false },
+      NOW,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.memo.requiresMdReview).toBe(true);
@@ -958,5 +998,35 @@ describe("buildSubmitRevisionPayload", () => {
       nextMemoRow: { ...baseBody.nextMemoRow, requires_md_review: false },
     });
     expect(withoutReview.memoUpdate.md_review_status).toBeNull();
+  });
+
+  // Edit-and-resubmit can change category/isPriceAdjustment, so the MD-review gate
+  // flag must be recomputed server-side — the client's requires_md_review is ignored.
+  it("recomputes requires_md_review to true when the revised memo qualifies, even if the client sends false", () => {
+    const payload = buildSubmitRevisionPayload({
+      ...baseBody,
+      nextMemoRow: {
+        ...baseBody.nextMemoRow,
+        category: "raw-material",
+        is_price_adjustment: true,
+        requires_md_review: false,
+      },
+    });
+
+    expect(payload.memoUpdate.requires_md_review).toBe(true);
+  });
+
+  it("recomputes requires_md_review to false when the revised memo does not qualify, even if the client sends true", () => {
+    const payload = buildSubmitRevisionPayload({
+      ...baseBody,
+      nextMemoRow: {
+        ...baseBody.nextMemoRow,
+        category: "general-purchase",
+        is_price_adjustment: false,
+        requires_md_review: true,
+      },
+    });
+
+    expect(payload.memoUpdate.requires_md_review).toBe(false);
   });
 });

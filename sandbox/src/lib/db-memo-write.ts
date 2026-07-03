@@ -1,6 +1,39 @@
-import type { MemoRecord, ReadActionStatus } from "./approval";
+import {
+  getApprovalRecommendation,
+  type ApprovalCategory,
+  type BudgetStatus,
+  type MemoRecord,
+  type ReadActionStatus,
+} from "./approval";
 import { memoToDbSeedRow, toMysqlUtcDateTime, type MemoSeedRow } from "./db-seed";
 import { formatTimestamp } from "./format-timestamp";
+
+// requiresMdReview decides whether a memo must pass the MD-review blocking gate
+// (raw-material / fixed-asset price adjustments per Book1). It is a compliance
+// control, so the server must never trust the client's value — recompute it from
+// the memo's business fields with the exact same rule engine the client used
+// (getApprovalRecommendation). This closes both the bypass (client sends false on
+// a qualifying memo) and the false-positive (client sends true on a memo that
+// should not be gated). Callers pass raw MemoRecord/MemoSeedRow field shapes.
+function computeRequiresMdReview(input: {
+  category: string;
+  amount: number;
+  budgetStatus?: string | null;
+  isPriceAdjustment?: boolean | null;
+  followsProductionPlan?: boolean | null;
+  isDeadStockOrSlowMovement?: boolean | null;
+  departmentMonthlyOverBudgetTotal?: number | null;
+}): boolean {
+  return getApprovalRecommendation({
+    category: input.category as ApprovalCategory,
+    amount: input.amount,
+    budgetStatus: (input.budgetStatus as BudgetStatus | null | undefined) ?? "in-budget",
+    isPriceAdjustment: input.isPriceAdjustment ?? undefined,
+    followsProductionPlan: input.followsProductionPlan ?? undefined,
+    isDeadStockOrSlowMovement: input.isDeadStockOrSlowMovement ?? undefined,
+    departmentMonthlyOverBudgetTotal: input.departmentMonthlyOverBudgetTotal ?? undefined,
+  }).requiresMdReview;
+}
 
 export type NewMemoValidationResult =
   | { ok: true; memo: MemoRecord }
@@ -28,6 +61,16 @@ export function sanitizeNewMemoInput(
       status: memo.status,
       currentStep: memo.selectedRoute?.[0] ?? "Manager / Top Section",
       workflowState: "Issued",
+      // Server recomputes the MD-review gate flag; never trust the client's value.
+      requiresMdReview: computeRequiresMdReview({
+        category: memo.category,
+        amount: memo.amount,
+        budgetStatus: memo.budgetStatus,
+        isPriceAdjustment: memo.isPriceAdjustment,
+        followsProductionPlan: memo.followsProductionPlan,
+        isDeadStockOrSlowMovement: memo.isDeadStockOrSlowMovement,
+        departmentMonthlyOverBudgetTotal: memo.departmentMonthlyOverBudgetTotal,
+      }),
       revisionNo: 0,
       revisionNote: undefined,
       revisionSubmittedAt: undefined,
@@ -522,6 +565,17 @@ export function buildSubmitRevisionPayload(body: SubmitRevisionBody): SubmitRevi
     memoUpdate: {
       ...body.nextMemoRow,
       revision_no: newRevisionNo,
+      // Edit-and-resubmit lets the client change category/isPriceAdjustment, so the
+      // MD-review gate flag must be recomputed server-side here too, not trusted.
+      requires_md_review: computeRequiresMdReview({
+        category: body.nextMemoRow.category,
+        amount: body.nextMemoRow.amount,
+        budgetStatus: body.nextMemoRow.budget_status,
+        isPriceAdjustment: body.nextMemoRow.is_price_adjustment,
+        followsProductionPlan: body.nextMemoRow.follows_production_plan,
+        isDeadStockOrSlowMovement: body.nextMemoRow.is_dead_stock,
+        departmentMonthlyOverBudgetTotal: body.nextMemoRow.dept_monthly_over_budget_total,
+      }),
       md_review_status: null,
       md_review_resume_step: null,
       md_review_comment: null,
