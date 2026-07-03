@@ -21,6 +21,28 @@ function Shot({ url, caption, children }: { url: string; caption: string; childr
   );
 }
 
+// A real screen recording (not a CSS mockup) — served from /public, so no
+// self-contained/base64 constraint here unlike the standalone Artifact draft.
+export function CreateMdReviewDemoGif() {
+  return (
+    <>
+      <figure className="man-shot">
+        <div className="man-shot-chrome">
+          <i /><i /><i />
+          <span>memo.car-1996.com/create</span>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- animated GIF; next/image re-encodes and drops animation */}
+        <img
+          src="/manual/create-memo-md-review-demo.gif"
+          alt="วิดีโอสาธิตการกรอกแบบฟอร์มสร้างเมโม เลือกหมวดวัตถุดิบแล้วติ๊ก Supplier ปรับราคา จนแผง MD Review ปรากฏขึ้น"
+          style={{ display: "block", width: "100%", height: "auto" }}
+        />
+      </figure>
+      <p className="man-figcaption">วิดีโอสาธิตจริง — กรอกเรื่อง เลือกหมวด &ldquo;วัตถุดิบ&rdquo; แล้วติ๊ก &ldquo;Supplier ปรับราคา&rdquo; จนระบบขึ้นเงื่อนไข MD Review ให้เห็นแบบเรียลไทม์</p>
+    </>
+  );
+}
+
 export function LoginShot() {
   return (
     <Shot url="memo.car-1996.com/login" caption="ภาพประกอบจำลองหน้าจอเข้าสู่ระบบ (โครงสร้างและข้อความตรงกับระบบจริง)">
@@ -124,23 +146,6 @@ export function CreateDetailsShot() {
             <div className="man-field-lbl">สถานะงบประมาณ *</div>
             <div className="man-field filled">● ในงบ &nbsp;&nbsp;○ เกินงบ &nbsp;&nbsp;○ ไม่มีงบ</div>
           </div>
-        </div>
-      </div>
-    </Shot>
-  );
-}
-
-export function MdReviewShot() {
-  return (
-    <Shot url="memo.car-1996.com/create — เงื่อนไขเพิ่มเติม" caption='ภาพประกอบจำลอง — เมื่อติ๊ก "Supplier ปรับราคา" ระบบจะเตือนด้วยกล่องสีทอง'>
-      <div style={{ padding: "16px 18px" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>เงื่อนไขเพิ่มเติม (Book1)</div>
-        <div className="man-chk-row"><div className="man-chk-box" /><div><b>ซื้อตามแผนการผลิต (Book1 ข้อ 1.1)</b><br /><span>ระบบจะแนะนำ GM โดยไม่ผูกจำนวนเงิน</span></div></div>
-        <div className="man-chk-row"><div className="man-chk-box" /><div><b>Dead stock / Slow movement &lt; KPI</b><br /><span>แสดงเป็นแท็กให้ผู้อนุมัติทราบ — ไม่กำหนด flow อัตโนมัติ</span></div></div>
-        <div className="man-chk-row"><div className="man-chk-box on" /><div><b>Supplier ปรับราคา (Book1 หมวด 1/2)</b><br /><span>ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ - flow จะหยุดรอจนกว่า MD จะตอบกลับ</span></div></div>
-        <div className="man-callout-mini" style={{ marginTop: 10 }}>
-          <div className="ic">★</div>
-          <div><b style={{ display: "block", fontSize: 10.5 }}>ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ</b>Supplier ปรับราคา ต้องผ่านการพิจารณาของ MD ก่อนอนุมัติ (Book1 หมวด 1/2)</div>
         </div>
       </div>
     </Shot>

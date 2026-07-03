@@ -7,7 +7,7 @@ import {
   LoginShot,
   DashboardShot,
   CreateDetailsShot,
-  MdReviewShot,
+  CreateMdReviewDemoGif,
   RoutingShot,
   QueueShot,
   HistoryShot,
@@ -76,7 +76,7 @@ export function ManualSections() {
         <h3 className="man-step-title" id="sec-mdreview"><span className="man-step-badge warn">!</span> เงื่อนไขพิเศษตาม Book1</h3>
         <p>ถ้ารายการของคุณเข้าเงื่อนไขพิเศษตามระเบียบ Book1 ให้ติ๊กช่องที่เกี่ยวข้องในกล่อง &ldquo;เงื่อนไขเพิ่มเติม (Book1)&rdquo; ข้อที่ควรรู้จักไว้ที่สุดคือ <b>Supplier ปรับราคา</b> ซึ่งเป็นฟีเจอร์ที่เพิ่งเปิดใช้งานล่าสุด</p>
 
-        <MdReviewShot />
+        <CreateMdReviewDemoGif />
 
         <div className="man-callout gold">
           <div className="ic">★</div>
