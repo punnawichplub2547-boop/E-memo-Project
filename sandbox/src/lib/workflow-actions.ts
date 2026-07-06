@@ -57,7 +57,7 @@ async function loadMemoForUpdate(
 ): Promise<WorkflowMemoRow> {
   const [rows] = await connection.execute<MemoRowResult[]>(
     `SELECT id, memo_no, status, current_step, revision_no,
-        selected_route_json, deleted_at, department_name,
+        selected_route_json, deleted_at, department_name, requester_user_id,
         requires_md_review, md_review_status, md_review_resume_step
    FROM memos WHERE memo_no = ? FOR UPDATE`,
     [memoNo],

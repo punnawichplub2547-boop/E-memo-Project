@@ -20,8 +20,8 @@ describe("canActOnStep", () => {
   it("manager can act at Manager / Top Section step for their own department's memo", () => {
     expect(
       canActOnStep(
-        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
-        { current_step: "Manager / Top Section", department_name: "IT" },
+        { id: 1, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 99 },
       ),
     ).toBe(true);
   });
@@ -29,8 +29,8 @@ describe("canActOnStep", () => {
   it("manager cannot act at General Manager step", () => {
     expect(
       canActOnStep(
-        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
-        { current_step: "General Manager", department_name: "IT" },
+        { id: 1, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "General Manager", department_name: "IT", requester_user_id: 99 },
       ),
     ).toBe(false);
   });
@@ -41,8 +41,8 @@ describe("canActOnStep", () => {
     // approve/return/reject a memo they can't even see in their queue.
     expect(
       canActOnStep(
-        { roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
-        { current_step: "Manager / Top Section", department_name: "QA" },
+        { id: 1, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "QA", requester_user_id: 99 },
       ),
     ).toBe(false);
   });
@@ -50,8 +50,8 @@ describe("canActOnStep", () => {
   it("GM can act at General Manager step regardless of department", () => {
     expect(
       canActOnStep(
-        { roles: ["general-manager"], approval_level: "General Manager", department: "IT" },
-        { current_step: "General Manager", department_name: "QA" },
+        { id: 1, roles: ["general-manager"], approval_level: "General Manager", department: "IT" },
+        { current_step: "General Manager", department_name: "QA", requester_user_id: 99 },
       ),
     ).toBe(true);
   });
@@ -59,8 +59,8 @@ describe("canActOnStep", () => {
   it("MD can act at Managing Director step regardless of department", () => {
     expect(
       canActOnStep(
-        { roles: ["managing-director"], approval_level: "Managing Director", department: "IT" },
-        { current_step: "Managing Director", department_name: "QA" },
+        { id: 1, roles: ["managing-director"], approval_level: "Managing Director", department: "IT" },
+        { current_step: "Managing Director", department_name: "QA", requester_user_id: 99 },
       ),
     ).toBe(true);
   });
@@ -68,8 +68,8 @@ describe("canActOnStep", () => {
   it("admin can act at any step regardless of department", () => {
     expect(
       canActOnStep(
-        { roles: ["admin", "requester"], approval_level: null, department: "IT" },
-        { current_step: "Managing Director", department_name: "QA" },
+        { id: 1, roles: ["admin", "requester"], approval_level: null, department: "IT" },
+        { current_step: "Managing Director", department_name: "QA", requester_user_id: 99 },
       ),
     ).toBe(true);
   });
@@ -77,8 +77,8 @@ describe("canActOnStep", () => {
   it("null approval_level without admin role grants nothing", () => {
     expect(
       canActOnStep(
-        { roles: ["requester"], approval_level: null, department: "IT" },
-        { current_step: "Manager / Top Section", department_name: "IT" },
+        { id: 1, roles: ["requester"], approval_level: null, department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 99 },
       ),
     ).toBe(false);
   });
@@ -89,10 +89,59 @@ describe("canActOnStep", () => {
     // Department is only ever used to RESTRICT the Manager tier, never to grant.
     expect(
       canActOnStep(
-        { roles: ["requester", "read-recipient"], approval_level: null, department: "HR&GA" },
-        { current_step: "General Manager", department_name: "HR&GA" },
+        { id: 1, roles: ["requester", "read-recipient"], approval_level: null, department: "HR&GA" },
+        { current_step: "General Manager", department_name: "HR&GA", requester_user_id: 99 },
       ),
     ).toBe(false);
+  });
+
+  // Self-approval gap (found in code review 2026-07-06): a requester whose own
+  // approval_level happens to match their own memo's current_step (e.g. a
+  // department Manager submitting their own memo — every route's mandatory
+  // first step) must never be allowed to act on it themselves.
+  it("blocks the requester from acting on their own memo even when approval_level matches the step (Manager / Top Section)", () => {
+    expect(
+      canActOnStep(
+        { id: 5, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 5 },
+      ),
+    ).toBe(false);
+  });
+
+  it("blocks the requester from acting on their own memo at a company-wide level (General Manager)", () => {
+    expect(
+      canActOnStep(
+        { id: 5, roles: ["general-manager"], approval_level: "General Manager", department: "IT" },
+        { current_step: "General Manager", department_name: "QA", requester_user_id: 5 },
+      ),
+    ).toBe(false);
+  });
+
+  it("admin bypass still overrides the self-action block (admin can act on their own memo)", () => {
+    expect(
+      canActOnStep(
+        { id: 5, roles: ["admin"], approval_level: null, department: "IT" },
+        { current_step: "Managing Director", department_name: "QA", requester_user_id: 5 },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not block when requester_user_id is null (legacy/seed memo with no FK — never treat as self)", () => {
+    expect(
+      canActOnStep(
+        { id: 5, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: null },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not block a different actor from acting on someone else's memo", () => {
+    expect(
+      canActOnStep(
+        { id: 1, roles: ["manager"], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 5 },
+      ),
+    ).toBe(true);
   });
 });
 
@@ -204,6 +253,7 @@ function makeMemo(overrides: Partial<WorkflowMemoRow> = {}): WorkflowMemoRow {
     selected_route_json: JSON.stringify(FULL_ROUTE),
     deleted_at: null,
     department_name: "IT",
+    requester_user_id: 99,
     requires_md_review: false,
     md_review_status: null,
     md_review_resume_step: null,

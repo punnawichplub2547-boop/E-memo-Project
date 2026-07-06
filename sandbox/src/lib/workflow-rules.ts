@@ -14,6 +14,7 @@ export type WorkflowMemoRow = {
   selected_route_json: unknown;
   deleted_at: string | Date | null;
   department_name: string;
+  requester_user_id: number | null;
   requires_md_review: boolean;
   md_review_status: "pending" | "completed" | "escalated" | null;
   md_review_resume_step: string | null;
@@ -34,11 +35,18 @@ export type WorkflowActorRow = {
 // what a Manager can SEE to their own department. Action permission must match,
 // or a Manager could approve/return/reject a memo from a department they can't
 // even see in their queue. GM and MD stay global (no department restriction).
+//
+// A non-admin actor can never act on their own memo, even when their
+// approval_level happens to match the memo's current step (e.g. a department
+// Manager submitting their own memo — every route's mandatory first step is
+// "Manager / Top Section"). requester_user_id null (legacy/seed memo with no
+// FK) is never treated as a self-match.
 export function canActOnStep(
-  actor: Pick<WorkflowActorRow, "roles" | "approval_level" | "department">,
-  memo: Pick<WorkflowMemoRow, "current_step" | "department_name">,
+  actor: Pick<WorkflowActorRow, "id" | "roles" | "approval_level" | "department">,
+  memo: Pick<WorkflowMemoRow, "current_step" | "department_name" | "requester_user_id">,
 ): boolean {
   if (actor.roles.includes("admin")) return true;
+  if (memo.requester_user_id !== null && memo.requester_user_id === actor.id) return false;
   if (actor.approval_level === null || actor.approval_level !== memo.current_step) return false;
   if (actor.approval_level === "Manager / Top Section") {
     return actor.department === memo.department_name;
