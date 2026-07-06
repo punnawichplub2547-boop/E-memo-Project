@@ -131,6 +131,46 @@ export default function LoginPage() {
         }
         .em-login-btn:active:not(:disabled) { transform: translateY(0); }
 
+        @keyframes emCtaIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes emCtaIconPulse {
+          0%, 100% { transform: scale(1); }
+          50%      { transform: scale(1.08); }
+        }
+        .em-manual-cta {
+          position: relative;
+          overflow: hidden;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #475569;
+          text-decoration: none;
+          background: rgba(37, 99, 235, 0.06);
+          border: 1px solid rgba(37, 99, 235, 0.14);
+          border-radius: 999px;
+          padding: 6px 12px;
+          animation: emCtaIn 550ms cubic-bezier(0.22, 1, 0.36, 1) 700ms both;
+        }
+        .em-manual-cta svg {
+          animation: emCtaIconPulse 500ms ease-in-out 900ms both;
+        }
+        .em-manual-cta::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(120deg, transparent 30%, rgba(37,99,235,0.18) 50%, transparent 70%);
+          transform: translateX(-100%);
+          pointer-events: none;
+        }
+        .em-manual-cta:hover::after,
+        .em-manual-cta:focus-visible::after {
+          animation: emShimmer 700ms ease-out;
+        }
+
         .em-feat { animation: em-fade-up 0.55s ease both; }
         .em-feat:nth-child(1) { animation-delay: 0.15s; }
         .em-feat:nth-child(2) { animation-delay: 0.25s; }
@@ -372,7 +412,8 @@ export default function LoginPage() {
         @media (prefers-reduced-motion: reduce) {
           .em-login-streak, .em-mobile-atmos .em-orb-top, .em-mobile-atmos .em-orb-bottom,
           .em-mb-logo, .em-car-logo-square, .em-car-logo-square::after,
-          .em-car-logo-square img, .em-feat, .em-form-wrap { animation: none !important; }
+          .em-car-logo-square img, .em-feat, .em-form-wrap,
+          .em-manual-cta, .em-manual-cta svg, .em-manual-cta::after { animation: none !important; }
         }
       `}</style>
 
@@ -668,13 +709,7 @@ export default function LoginPage() {
 
             {/* First-time help — public manual, no login required */}
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #EEF2F9", textAlign: "center" }}>
-              <Link
-                href="/manual"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 7,
-                  fontSize: 13, color: "#475569", textDecoration: "none", fontWeight: 600,
-                }}
-              >
+              <Link href="/manual" className="em-manual-cta">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M8 2.6c-1.1-.7-2.6-1-4.2-1-.5 0-.9.4-.9.9v8.7c0 .5.4.9.9.9 1.6 0 3.1.3 4.2 1 1.1-.7 2.6-1 4.2-1 .5 0 .9-.4.9-.9V2.5c0-.5-.4-.9-.9-.9-1.6 0-3.1.3-4.2 1Z" stroke="#2563EB" strokeWidth="1.2" strokeLinejoin="round" />
                   <path d="M8 2.6v9.9" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round" />
