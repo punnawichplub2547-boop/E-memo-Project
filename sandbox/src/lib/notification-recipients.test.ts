@@ -26,15 +26,15 @@ function ccPool(labelRows: unknown, userRows: unknown) {
 
 describe("resolveApprovalStepRecipients", () => {
   it("returns user ids for active users at approval level", async () => {
-    const result = await resolveApprovalStepRecipients("General Manager", pool1([{ id: 7 }, { id: 8 }]));
+    const result = await resolveApprovalStepRecipients("General Manager", "IT", pool1([{ id: 7 }, { id: 8 }]));
     expect(result).toEqual([7, 8]);
   });
   it("returns empty array when no match", async () => {
-    expect(await resolveApprovalStepRecipients("MD", pool1([]))).toEqual([]);
+    expect(await resolveApprovalStepRecipients("MD", "IT", pool1([]))).toEqual([]);
   });
   it("warns (so the miss is visible, not silent) when no active user has the approval level", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await resolveApprovalStepRecipients("Managing Director", pool1([]));
+    await resolveApprovalStepRecipients("Managing Director", "IT", pool1([]));
     expect(warn).toHaveBeenCalled();
     const logged = warn.mock.calls.map((c) => c.map(String).join(" ")).join(" ");
     expect(logged).toContain("Managing Director");
@@ -42,9 +42,40 @@ describe("resolveApprovalStepRecipients", () => {
   });
   it("does NOT warn when recipients are found", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await resolveApprovalStepRecipients("General Manager", pool1([{ id: 7 }]));
+    await resolveApprovalStepRecipients("General Manager", "IT", pool1([{ id: 7 }]));
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  // Manager / Top Section is department-scoped (mirrors canActOnStep in workflow-rules.ts —
+  // a Manager may only act on their own department's memo, so notifying them must match).
+  // Without this, two departments' managers sharing the same approval_level label would
+  // cross-notify each other's memos on every single submission.
+  it("scopes the query to the memo's department when approval level is Manager / Top Section", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [[{ id: 9 }], undefined];
+      },
+    } as unknown as Pool;
+    const result = await resolveApprovalStepRecipients("Manager / Top Section", "HR&GA", pool);
+    expect(result).toEqual([9]);
+    expect(calls[0].sql).toContain("department = ?");
+    expect(calls[0].params).toEqual(["Manager / Top Section", "HR&GA"]);
+  });
+
+  it("does NOT scope by department for company-wide levels (General Manager / Managing Director)", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [[{ id: 7 }], undefined];
+      },
+    } as unknown as Pool;
+    await resolveApprovalStepRecipients("General Manager", "HR&GA", pool);
+    expect(calls[0].sql).not.toContain("department = ?");
+    expect(calls[0].params).toEqual(["General Manager"]);
   });
 });
 

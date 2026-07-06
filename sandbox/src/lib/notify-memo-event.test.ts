@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { buildMdReviewButtonPlan, computeReadNotifyRecipients, computeWatcherRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { buildMdReviewButtonPlan, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
 
 function chatPool(rows: unknown[]): Pool {
   return {
@@ -30,6 +30,29 @@ describe("computeWatcherRecipients", () => {
   it("drops excludeIds (approver who is also a CC is not doubled up)", () => {
     const r = computeWatcherRecipients({ requesterId: 1, ccIds: [2, 3], actorId: null, excludeActor: false, excludeIds: [3] });
     expect(r.sort()).toEqual([1, 2]);
+  });
+  it("never lets excludeIds drop the actor when excludeActor is false (requester who is also an approver must still get their submission confirmation)", () => {
+    const r = computeWatcherRecipients({ requesterId: 7, ccIds: [], actorId: 7, excludeActor: false, excludeIds: [7] });
+    expect(r).toEqual([7]);
+  });
+  it("still drops excludeIds normally when the excluded id is not the actor", () => {
+    const r = computeWatcherRecipients({ requesterId: 7, ccIds: [3], actorId: 7, excludeActor: false, excludeIds: [3] });
+    expect(r).toEqual([7]);
+  });
+});
+
+describe("excludeActorFromRecipients", () => {
+  it("removes the actor's own id from an approver recipient list (no self-approve prompt)", () => {
+    expect(excludeActorFromRecipients([3, 7, 9], 7)).toEqual([3, 9]);
+  });
+  it("leaves the list untouched when the actor is not in it", () => {
+    expect(excludeActorFromRecipients([3, 9], 7)).toEqual([3, 9]);
+  });
+  it("leaves the list untouched when actorId is null (e.g. an unauthenticated/system-triggered event)", () => {
+    expect(excludeActorFromRecipients([3, 9], null)).toEqual([3, 9]);
+  });
+  it("returns an empty list when the actor was the only recipient", () => {
+    expect(excludeActorFromRecipients([7], 7)).toEqual([]);
   });
 });
 

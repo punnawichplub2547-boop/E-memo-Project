@@ -25,6 +25,7 @@ import type { RowDataPacket } from "mysql2";
 type MemoRow = RowDataPacket & {
   id: number; memo_no: string; title: string; requester_name: string;
   requester_user_id: number | null;
+  department_name: string;
   current_step: string; status: string; revision_no: number;
   md_review_status: "pending" | "completed" | "escalated" | null;
   md_review_resume_step: string | null;
@@ -49,7 +50,14 @@ export function computeWatcherRecipients(input: {
   if (input.requesterId != null) set.add(input.requesterId);
   for (const id of input.ccIds) if (id != null) set.add(id);
   if (input.excludeActor && input.actorId != null) set.delete(input.actorId);
-  for (const id of input.excludeIds ?? []) set.delete(id);
+  for (const id of input.excludeIds ?? []) {
+    // excludeIds exists to dedup an approver who is also a CC — it must never be able
+    // to drop the actor when excludeActor is false, or a requester who happens to also
+    // be resolved as their memo's own approver would silently lose their submission
+    // confirmation (contradicting the caller's explicit excludeActor=false intent).
+    if (!input.excludeActor && id === input.actorId) continue;
+    set.delete(id);
+  }
   return [...set];
 }
 
@@ -94,12 +102,22 @@ export async function getPendingReadLabels(
 async function getMemo(memoNo: string): Promise<MemoRow | null> {
   const pool = getDbPool();
   const [rows] = await pool.query<MemoRow[]>(
-    `SELECT id, memo_no, title, requester_name, requester_user_id, current_step, status, revision_no,
+    `SELECT id, memo_no, title, requester_name, requester_user_id, department_name,
+            current_step, status, revision_no,
             md_review_status, md_review_resume_step
      FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1`,
     [memoNo],
   );
   return rows[0] ?? null;
+}
+
+// Pure: never send an actionable "please approve" notification (with a one-tap
+// approve button) to the user who triggered this event — a person should not be
+// prompted to approve their own action, e.g. a Manager submitting their own memo
+// that routes to their own "Manager / Top Section" step.
+export function excludeActorFromRecipients(recipientIds: number[], actorUserId: number | null): number[] {
+  if (actorUserId == null) return recipientIds;
+  return recipientIds.filter(id => id !== actorUserId);
 }
 
 // Batch-load active Telegram chat ids. Bad/missing chat ids are skipped (not fatal)
@@ -187,9 +205,11 @@ const BUTTON_LABELS: Record<ReviewTokenActionType, string> = {
 
 // Actionable: notify the approvers at the memo's current step, with an approve button.
 // Returns the approver user ids so the caller can exclude them from the watcher fan-out.
-async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string): Promise<number[]> {
+// actorUserId is excluded from the recipients — see excludeActorFromRecipients.
+async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string, actorUserId: number | null): Promise<number[]> {
   const pool = getDbPool();
-  const recipientIds = await resolveApprovalStepRecipients(memo.current_step, pool);
+  const allRecipientIds = await resolveApprovalStepRecipients(memo.current_step, memo.department_name, pool);
+  const recipientIds = excludeActorFromRecipients(allRecipientIds, actorUserId);
   if (recipientIds.length === 0) return [];
   const chatIds = await getChatIds(pool, recipientIds);
   const emailEnabled = getEmailConfig() !== null;
@@ -330,13 +350,13 @@ export async function notifyMemoEvent(
     const statusUpdate = { requesterType: "memo_status_update", ccType: "memo_status_update" };
 
     if (eventType === "submitted") {
-      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl, actorUserId);
       await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl, approverIds);
       await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
       return;
     }
     if (eventType === "resubmitted") {
-      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl, actorUserId);
       await notifyWatchers(memo, statusUpdate, actorUserId, true, queuePath, queueUrl, approverIds);
       await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
       return;
@@ -346,7 +366,7 @@ export async function notifyMemoEvent(
       return;
     }
     if (eventType === "advanced") {
-      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl, actorUserId);
       await notifyWatchers(memo, statusUpdate, actorUserId, true, queuePath, queueUrl, approverIds);
       return;
     }
