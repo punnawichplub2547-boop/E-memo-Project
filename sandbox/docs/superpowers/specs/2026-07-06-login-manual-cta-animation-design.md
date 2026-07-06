@@ -16,7 +16,8 @@
 - Hover/focus reward: shimmer sweep (reuse `emShimmer` keyframes เดิม) ทำงานครั้งเดียวต่อการ
   hover-enter/focus-enter หนึ่งครั้ง ไม่ loop ค้าง
 - `:focus-visible` ต้องได้ effect เท่า `:hover` (คนใช้คีย์บอร์ด tab ไม่ตกหล่น)
-- เคารพ `@media (prefers-reduced-motion: reduce)` ที่มี block นี้อยู่แล้วใน `globals.css` (~line 813)
+- เคารพ `@media (prefers-reduced-motion: reduce)` ที่มี block นี้อยู่แล้วในไฟล์เดียวกัน (ดู
+  section 2 — ไม่ใช่ block ใน `globals.css`, หน้า login มี block ของตัวเองแยกต่างหาก)
 
 **ไม่ทำ:**
 - ไม่แตะหน้า `/manual` เอง (cover, sections) — คนที่เปิดหน้านั้นแล้วคือกดเข้ามาแล้ว ไม่ต้องชวนซ้ำ
@@ -37,10 +38,18 @@
 ห่อ SVG icon + ข้อความเดิมไว้ข้างใน ไม่เปลี่ยนข้อความ/ไอคอน/href (`/manual`) ไม่เปลี่ยน logic
 ของหน้า login แต่อย่างใด — เปลี่ยนแค่วิธี style ตัว element เดียวนี้
 
-## 2. CSS — `src/app/globals.css`
+## 2. CSS — `src/app/login/page.tsx` (inline `<style>{`...`}</style>` ที่มีอยู่แล้ว, บรรทัด 39-377)
 
-Class ใหม่ `.em-manual-cta` (ตาม pattern `em-` ที่ใช้ทั้งไฟล์) วางต่อจากกลุ่ม CSS ที่เกี่ยวกับ
-login card ที่มีอยู่แล้ว:
+> **แก้ไขจากร่างแรก:** ตอนเขียน spec รอบแรกเข้าใจผิดว่าหน้า login ใช้ class จาก `globals.css`
+> แต่จริงๆ หน้านี้มี `<style>` ของตัวเองฝังอยู่ใน component (เก็บ keyframes/`.em-*` class
+> เฉพาะของหน้า login ล้วนๆ เช่น `.em-form-wrap`, `.em-feat`, `.em-login-streak`) รวมถึงมี
+> `@media (prefers-reduced-motion: reduce)` เป็นของตัวเองที่บรรทัด 372-376 (ไม่ใช่ตัวเดียวกับ
+> `globals.css:813` ที่ใช้กับหน้า create-memo) — Section นี้แก้ให้ตรงกับของจริงในโค้ดแล้ว
+> ยังคง reuse keyframes `emShimmer` ได้ตามเดิม เพราะ `globals.css` ถูก import ที่ root
+> `layout.tsx` ทำให้ keyframes ของมัน available ทั่วทั้งแอปอยู่แล้ว ไม่ต้อง duplicate
+
+Class ใหม่ `.em-manual-cta` (ตาม pattern `em-` ที่ใช้ทั้งไฟล์นี้) เพิ่มเข้าไปในกลุ่ม CSS ที่มีอยู่แล้ว
+(ต่อจาก `.em-login-btn` ก่อนถึง `.em-feat`):
 
 **Static shape (ตัวดึงสายตาหลัก ไม่ใช้ motion):**
 - `display: inline-flex; align-items: center; gap: 7px;`
@@ -88,17 +97,17 @@ login card ที่มีอยู่แล้ว:
   animation: emShimmer 700ms ease-out;
 }
 ```
-ใช้ keyframes `emShimmer` เดิมที่มีอยู่แล้ว (`globals.css:207`) — ไม่ต้องเพิ่ม keyframe ใหม่สำหรับส่วนนี้
-`:focus-visible` ประกาศคู่กับ `:hover` เสมอทุกเส้น เพื่อไม่ให้คีย์บอร์ดตกหล่น
+ใช้ keyframes `emShimmer` เดิมที่มีอยู่แล้วใน `globals.css:207` (available ทั่วแอปตามที่อธิบายข้างบน)
+— ไม่ต้องเพิ่ม keyframe ใหม่สำหรับส่วนนี้ `:focus-visible` ประกาศคู่กับ `:hover` เสมอทุกเส้น
+เพื่อไม่ให้คีย์บอร์ดตกหล่น
 
-**Reduced motion (เพิ่มเข้า block ที่มีอยู่แล้ว บรรทัด ~813):**
+**Reduced motion (ต่อรายการ class เดิมใน local block ของไฟล์นี้ที่บรรทัด 372-376):**
 ```css
 @media (prefers-reduced-motion: reduce) {
-  .em-manual-cta,
-  .em-manual-cta svg,
-  .em-manual-cta::after {
-    animation: none;
-  }
+  .em-login-streak, .em-mobile-atmos .em-orb-top, .em-mobile-atmos .em-orb-bottom,
+  .em-mb-logo, .em-car-logo-square, .em-car-logo-square::after,
+  .em-car-logo-square img, .em-feat, .em-form-wrap,
+  .em-manual-cta, .em-manual-cta svg, .em-manual-cta::after { animation: none !important; }
 }
 ```
 Chip ยังคงแสดงผล static (พื้นหลัง tint + border) ครบถ้วน สื่อความหมายได้โดยไม่ต้องขยับ
@@ -131,7 +140,7 @@ Pure CSS + markup class เปลี่ยนแค่ elemenet เดียว 
 - Mobile viewport (390px): chip อ่านออกและกดง่ายโดยไม่ต้อง hover
 - Keyboard: Tab ไปถึงลิงก์ → เห็น shimmer/focus effect เหมือน hover
 - DevTools "Emulate CSS prefers-reduced-motion: reduce" → ไม่มี motion เหลือ, chip ยังอ่านออกปกติ
-- `npm.cmd run lint` + `npm.cmd run build` ผ่าน (กัน syntax error ใน globals.css/JSX)
+- `npm.cmd run lint` + `npm.cmd run build` ผ่าน (กัน syntax error ใน inline `<style>`/JSX)
 
 ## ความเสี่ยง / หมายเหตุ
 
