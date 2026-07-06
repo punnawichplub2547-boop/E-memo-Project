@@ -330,7 +330,8 @@ export async function notifyMemoEvent(
     const statusUpdate = { requesterType: "memo_status_update", ccType: "memo_status_update" };
 
     if (eventType === "submitted") {
-      await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl);
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl);
+      await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl, approverIds);
       await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
       return;
     }
