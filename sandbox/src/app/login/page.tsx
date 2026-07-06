@@ -155,6 +155,9 @@ export default function LoginPage() {
           padding: 6px 12px;
           animation: emCtaIn 550ms cubic-bezier(0.22, 1, 0.36, 1) 700ms both;
         }
+        .em-manual-cta:focus-visible {
+          border-radius: 999px;
+        }
         .em-manual-cta svg {
           animation: emCtaIconPulse 500ms ease-in-out 900ms both;
         }
