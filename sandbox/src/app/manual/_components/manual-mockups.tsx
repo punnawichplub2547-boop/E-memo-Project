@@ -26,7 +26,7 @@ function Shot({ url, caption, children }: { url: string; caption: string; childr
 function DemoGif({ url, filename, alt, caption }: { url: string; filename: string; alt: string; caption: string }) {
   return (
     <>
-      <figure className="man-shot">
+      <figure className="man-shot man-shot-media">
         <div className="man-shot-chrome">
           <i /><i /><i />
           <span>{url}</span>
@@ -38,7 +38,10 @@ function DemoGif({ url, filename, alt, caption }: { url: string; filename: strin
           style={{ display: "block", width: "100%", height: "auto" }}
         />
       </figure>
-      <p className="man-figcaption">{caption}</p>
+      <p className="man-figcaption">
+        <span className="man-scroll-hint" aria-hidden="true">⟷ ปัดแนวนอนเพื่อดูภาพชัดขึ้น</span>
+        {caption}
+      </p>
     </>
   );
 }

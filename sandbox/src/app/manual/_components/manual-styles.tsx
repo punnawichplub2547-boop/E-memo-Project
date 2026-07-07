@@ -175,6 +175,13 @@ export function ManualStyles() {
       .man-shot-chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); display: block; }
       .man-shot-chrome span { margin-left: 8px; font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
       .man-figcaption { font-size: 12.5px; color: var(--muted-2); margin: 0 0 4px; padding-left: 2px; }
+      /* Mobile-only hint that a desktop-recording GIF scrolls horizontally; hidden on desktop. */
+      .man-scroll-hint {
+        display: none; align-items: center; gap: 5px; vertical-align: middle;
+        font-size: 11px; font-weight: 700; color: var(--primary);
+        background: var(--primary-grad-soft); border: 1px solid var(--ice-200);
+        padding: 2px 9px; border-radius: 999px; margin-right: 8px;
+      }
 
       /* ── Mini UI kit used inside the illustrations ─────────── */
       .man-mock { font-size: 12px; }
@@ -276,6 +283,39 @@ export function ManualStyles() {
       }
       .man-footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
       .man-footer a:hover { text-decoration: underline; }
+
+      /* ── Mobile polish (≤640px) ───────────────────────────────
+         Tap targets to ~44px, iPhone safe-area insets, tighter
+         gutters, and legible desktop-recording GIFs. Desktop (the
+         real ≥1100px layout) is untouched — everything is scoped
+         here and mirrors the base values it overrides. */
+      @media (max-width: 640px) {
+        .man-cover {
+          padding-top: 34px; padding-bottom: 40px;
+          padding-left: max(20px, env(safe-area-inset-left));
+          padding-right: max(20px, env(safe-area-inset-right));
+        }
+        .man-cover-back { padding: 8px 14px 8px 11px; }
+        .man-shell {
+          padding-left: max(18px, env(safe-area-inset-left));
+          padding-right: max(18px, env(safe-area-inset-right));
+          padding-bottom: 64px;
+        }
+        .man-toc a { padding-top: 11px; padding-bottom: 11px; }
+        .man-section { margin-bottom: 46px; }
+        .man-footer {
+          padding-left: max(18px, env(safe-area-inset-left));
+          padding-right: max(18px, env(safe-area-inset-right));
+          padding-bottom: max(28px, env(safe-area-inset-bottom));
+        }
+        /* Raster screen recordings can't reflow: let them stay legible
+           and scroll horizontally inside their own frame instead of
+           shrinking to an unreadable ~320px. Page never scrolls sideways
+           — the overflow is clipped to the figure. */
+        .man-shot-media { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .man-shot-media > img { min-width: 480px; }
+        .man-scroll-hint { display: inline-flex; }
+      }
 
       @media (prefers-reduced-motion: reduce) { .man-root * { animation: none !important; transition: none !important; } }
     `}</style>
