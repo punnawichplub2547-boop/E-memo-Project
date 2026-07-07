@@ -896,4 +896,65 @@ describe("evaluateReviewAction", () => {
     });
     expect(result.ok).toBe(true);
   });
+
+  // Self-review gap (found in code review 2026-07-07): the requester of a memo
+  // that requires MD review must not be able to review/approve it themselves
+  // just because they also hold the Managing Director approval_level.
+  it("blocks the MD reviewer from acting on their own memo", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ requester_user_id: 9 }),
+      actor: mdActor({ id: 9 }),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      message: "คุณไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้",
+    });
+  });
+
+  it("blocks self-review for every response type, not just acknowledged_no_objection", () => {
+    const escalate = evaluateReviewAction({
+      memo: reviewMemo({ requester_user_id: 9 }),
+      actor: mdActor({ id: 9 }),
+      response: "escalate_to_md_approval",
+      source: "web",
+      now: NOW,
+    });
+    expect(escalate.ok).toBe(false);
+
+    const requestRevision = evaluateReviewAction({
+      memo: reviewMemo({ requester_user_id: 9 }),
+      actor: mdActor({ id: 9 }),
+      response: "request_revision",
+      reason: "เหตุผล",
+      source: "web",
+      now: NOW,
+    });
+    expect(requestRevision.ok).toBe(false);
+  });
+
+  it("admin bypass still overrides the self-review block", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ requester_user_id: 9 }),
+      actor: makeActor({ id: 9, roles: ["admin"], approval_level: null }),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("does not block when requester_user_id is null (legacy/seed memo with no FK)", () => {
+    const result = evaluateReviewAction({
+      memo: reviewMemo({ requester_user_id: null }),
+      actor: mdActor({ id: 9 }),
+      response: "acknowledged_no_objection",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+  });
 });

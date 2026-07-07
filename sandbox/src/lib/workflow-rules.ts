@@ -31,22 +31,30 @@ export type WorkflowActorRow = {
   status: "pending" | "active" | "suspended";
 };
 
+// A non-admin actor can never act on their own memo — approve/return/reject via
+// canActOnStep below, or MD-review via evaluateReviewAction further down — even
+// when their approval_level/tier happens to match the memo's current step (e.g.
+// a department Manager submitting their own memo, or an MD submitting a memo
+// that requires MD review). requester_user_id null (legacy/seed memo with no
+// FK) is never treated as a self-match.
+function isSelfRequester(
+  actor: Pick<WorkflowActorRow, "id" | "roles">,
+  memo: Pick<WorkflowMemoRow, "requester_user_id">,
+): boolean {
+  if (actor.roles.includes("admin")) return false;
+  return memo.requester_user_id !== null && memo.requester_user_id === actor.id;
+}
+
 // Manager / Top Section is department-scoped — memo-visibility.ts already limits
 // what a Manager can SEE to their own department. Action permission must match,
 // or a Manager could approve/return/reject a memo from a department they can't
 // even see in their queue. GM and MD stay global (no department restriction).
-//
-// A non-admin actor can never act on their own memo, even when their
-// approval_level happens to match the memo's current step (e.g. a department
-// Manager submitting their own memo — every route's mandatory first step is
-// "Manager / Top Section"). requester_user_id null (legacy/seed memo with no
-// FK) is never treated as a self-match.
 export function canActOnStep(
   actor: Pick<WorkflowActorRow, "id" | "roles" | "approval_level" | "department">,
   memo: Pick<WorkflowMemoRow, "current_step" | "department_name" | "requester_user_id">,
 ): boolean {
   if (actor.roles.includes("admin")) return true;
-  if (memo.requester_user_id !== null && memo.requester_user_id === actor.id) return false;
+  if (isSelfRequester(actor, memo)) return false;
   if (actor.approval_level === null || actor.approval_level !== memo.current_step) return false;
   if (actor.approval_level === "Manager / Top Section") {
     return actor.department === memo.department_name;
@@ -415,6 +423,9 @@ export function evaluateReviewAction(input: {
   }
   if (input.memo.md_review_status !== "pending") {
     return { ok: false, status: 409, message: "เมโมนี้ไม่มีการรอพิจารณาจาก MD อยู่" };
+  }
+  if (isSelfRequester(input.actor, input.memo)) {
+    return { ok: false, status: 403, message: "คุณไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้" };
   }
   const isMdOrAdmin =
     input.actor.roles.includes("admin") || input.actor.approval_level === "Managing Director";
