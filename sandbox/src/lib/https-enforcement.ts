@@ -20,3 +20,17 @@ export function shouldRedirectToHttps(
   if (forwardedProto === null) return false;
   return forwardedProto.toLowerCase() !== "https";
 }
+
+// Do NOT build the redirect target from req.nextUrl.host - in Next.js
+// standalone mode (compose.yaml sets HOSTNAME=0.0.0.0 / PORT=3000 for the
+// server's own bind address), request.nextUrl resolved to that bind address
+// instead of the public hostname when running behind cloudflared, sending
+// browsers to an unreachable "https://0.0.0.0:3000". x-forwarded-host is the
+// proxy's explicit signal of the original hostname; the raw Host header is
+// the fallback for a direct/simpler proxy that doesn't set it.
+export function resolveRedirectHost(
+  forwardedHost: string | null,
+  hostHeader: string | null,
+): string | null {
+  return forwardedHost ?? hostHeader ?? null;
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth-jwt";
-import { shouldRedirectToHttps } from "@/lib/https-enforcement";
+import { shouldRedirectToHttps, resolveRedirectHost } from "@/lib/https-enforcement";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -19,9 +19,11 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (shouldRedirectToHttps(req.headers.get("x-forwarded-proto"), process.env.NODE_ENV)) {
-    const httpsUrl = req.nextUrl.clone();
-    httpsUrl.protocol = "https:";
-    return NextResponse.redirect(httpsUrl, 308);
+    const host = resolveRedirectHost(req.headers.get("x-forwarded-host"), req.headers.get("host"));
+    if (host) {
+      const httpsUrl = new URL(`https://${host}${req.nextUrl.pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(httpsUrl, 308);
+    }
   }
 
   const isPublic = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
