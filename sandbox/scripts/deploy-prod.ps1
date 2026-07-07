@@ -53,7 +53,18 @@ $Migrations = [ordered]@{
 # Ordered map: "table.column" marker -> migration file. For ALTER TABLE ADD COLUMN
 # migrations, which aren't self-idempotent (re-running errors on duplicate column).
 # A migration runs ONLY if its column is absent. Add future ALTER migrations here.
+#
+# The first 4 entries predate this script (2026-06-30) and were added here
+# retroactively (2026-07-07) after discovering they were never tracked - same
+# gap class as the md-review columns incident. requester_user_id in particular
+# is READ by every approve/return/reject action as of commit ad8309c, so a prod
+# DB missing it would fail every workflow action, not just the new self-action
+# guard - this map makes the script self-healing regardless of prod's history.
 $ColumnMigrations = [ordered]@{
+    'memos.deleted_at'         = '2026-06-05-add-memos-deleted-at.sql'
+    'memos.attachments_json'   = '2026-06-08-add-memo-attachments-json.sql'
+    'memos.closing_remark'     = '2026-06-10-add-closing-remark.sql'
+    'memos.requester_user_id'  = '2026-06-19-add-memo-requester-user-id.sql'
     'memos.requires_md_review' = '2026-07-01-add-md-review-columns.sql'
 }
 
