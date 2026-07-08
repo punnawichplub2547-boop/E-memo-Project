@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { IconEye, IconEyeOff } from "@/components/icons";
+import { CursorGlow } from "./_components/CursorGlow";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -111,6 +112,32 @@ export default function LoginPage() {
           width: 50%;
           animation: em-streak 12s ease-in-out infinite;
           animation-delay: -6s;
+        }
+
+        /* ── Cursor glow (left panel decoration) ── */
+        .em-cursor-glow-wrap {
+          position: absolute; inset: 0; z-index: 0;
+          opacity: 0; transition: opacity 0.6s ease;
+          pointer-events: none;
+        }
+        .em-cursor-glow-wrap.is-active { opacity: 1; transition: opacity 0.3s ease; }
+        .em-cursor-glow-orb {
+          position: absolute; top: 0; left: 0;
+          width: 340px; height: 340px; border-radius: 50%;
+          background: radial-gradient(circle,
+            rgba(96,165,250,0.22) 0%,
+            rgba(37,99,235,0.10) 45%,
+            transparent 70%);
+          will-change: transform;
+        }
+        .em-cursor-glow-grid {
+          position: absolute; inset: 0;
+          background-image: radial-gradient(rgba(191,219,254,0.45) 1px, transparent 1px);
+          background-size: 26px 26px;
+          -webkit-mask-image: radial-gradient(circle 170px at var(--glow-x, -999px) var(--glow-y, -999px),
+            rgba(0,0,0,0.9), transparent 70%);
+          mask-image: radial-gradient(circle 170px at var(--glow-x, -999px) var(--glow-y, -999px),
+            rgba(0,0,0,0.9), transparent 70%);
         }
 
         .em-login-input {
@@ -442,6 +469,9 @@ export default function LoginPage() {
           <div className="em-login-streak em-login-streak-1" />
           <div className="em-login-streak em-login-streak-2" />
           <div className="em-login-streak em-login-streak-3" />
+
+          {/* Cursor-trailing light */}
+          <CursorGlow />
 
           {/* Dot-grid texture */}
           <div style={{
