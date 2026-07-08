@@ -3,11 +3,11 @@
 Source context:
 - Workbook: `D:\Hrproject\Book1.xlsx`
 - Existing requirement extraction: `docs/requirements-from-excel.md`
-- Prototype app: `sandbox/`
+- Active app: `sandbox/` (trial-grade system with real MySQL persistence, JWT auth, notifications, SMTP email delivery, Telegram hooks, attachments, and env-gated AI endpoints)
 - Discussion date: 2026-05-27
 - Target database direction: MySQL
 
-This document is a working SA draft for implementing the HR&GA E-Memo system beyond the current prototype. It captures the flexible workflow decisions, DFD, ERD, MySQL-oriented table design, and open remarks needed for future implementation or for another AI agent/developer to continue safely.
+This document is a working SA draft for the HR&GA E-Memo system. It captures the flexible workflow decisions, DFD, ERD, MySQL-oriented table design, and open remarks needed for future implementation or for another AI agent/developer to continue safely. It is a design reference, not the source of truth for current implementation status; cross-check `CLAUDE.md`, `sandbox/PROJECT-CONTEXT.md`, `sandbox/db/init/`, `sandbox/db/migrations/`, and code before treating an implementation-status remark as current.
 
 ## 1. Project Overview
 
@@ -21,7 +21,7 @@ The system should support:
 - Flexible workflow adjustment for real-world coordination.
 - Dashboard queues and in-app notifications for prototype validation.
 - Search/history/audit tracking.
-- Future MySQL persistence, authentication, email, and optional AI features.
+- MySQL persistence, authentication, notifications, SMTP email, Telegram, attachments, and optional env-gated AI features.
 
 Initial implementation should remain flexible. `Book1.xlsx` should guide recommendations, not become an overly rigid hardcoded chain that prevents real working patterns.
 
@@ -69,12 +69,11 @@ Business targets:
 
 ### Out Of Initial Scope
 
-- Real email delivery.
-- Full production authentication/SSO.
 - ERP/accounting/procurement integration.
+- Full production SSO and enterprise identity lifecycle hardening.
 - Post-approval execution tracking such as payment, purchase order, asset disposal, or task completion.
 - Production AI integration.
-- Real file storage implementation.
+- Production document storage/DMS, object storage, virus scanning, and retention policy.
 
 REMARK: Approved memo handling ends in E-Memo for now. After approval, the system notifies the Issued Person to continue the next business process outside the E-Memo system, such as expense disbursement, purchasing, asset sale, or related operation. Future phases may add post-approval tracking.
 
@@ -161,7 +160,7 @@ Use this list as the starting selectable master for departments/recipient units 
 
 REMARK: `MD`, `SGM`, `GM`, and `FM` may represent executive roles or recipient groups rather than normal departments. Because the paper form exposes them in the same recipient checkbox area, the system should initially support them as selectable routing/recipient units. During real master-data setup, confirm whether each item is a department, role, executive office, or recipient group.
 
-REMARK: The current prototype department dropdown has only 6 options (`HR&GA`, `Production`, `IT`, `Engineering`, `GA`, `Maintenance`). Future implementation should replace this hardcoded dropdown with database-backed master data based on the confirmed department/recipient list.
+REMARK: An early prototype had only 6 department options (`HR&GA`, `Production`, `IT`, `Engineering`, `GA`, `Maintenance`). The current create form already uses the paper-form department/recipient list; future master-data work should still confirm whether each item is a department, role, executive office, or recipient group before making it fully database-backed.
 
 ## 6. Key Business Rules
 
@@ -489,9 +488,9 @@ flowchart TD
   MD["MD / Executive Reviewer"]
   Approver["GM / MD / Approver"]
   Admin["HR/Admin / System Admin"]
-  Email["Email System Future"]
-  AI["AI Service Future"]
-  FileStore["File Storage Future"]
+  Email["SMTP Email System"]
+  AI["AI Service (Env-Gated)"]
+  FileStore["File Storage / DMS"]
   System["HR&GA E-Memo System"]
   DB[("MySQL Database")]
 
@@ -505,9 +504,9 @@ flowchart TD
   Admin -->|"Master data / permissions / rules"| System
 
   System <--> DB
-  System -.->|"Future email notification"| Email
-  System -.->|"Future file binary storage"| FileStore
-  System -.->|"Future AI draft/search/PDF extraction"| AI
+  System -.->|"Best-effort email notification when enabled"| Email
+  System -.->|"Current local attachments; future DMS/object storage"| FileStore
+  System -.->|"AI draft/search/PDF extraction when keys are configured"| AI
 ```
 
 ## 12. DFD Level 1
@@ -615,7 +614,7 @@ Stores active users who can access the system. Every active user can act as Issu
 | id | BIGINT PK | Auto increment |
 | employee_code | VARCHAR(50) UNIQUE | Employee code if available |
 | full_name | VARCHAR(255) | Display name |
-| email | VARCHAR(255) UNIQUE NULL | For future email notification/login |
+| email | VARCHAR(255) UNIQUE NULL | Login and notification delivery |
 | department_id | BIGINT FK | Current department |
 | position_title | VARCHAR(255) NULL | Job title |
 | is_active | BOOLEAN | Active user can create memo |
@@ -914,16 +913,15 @@ Optional materialized access table/view for performance and clarity.
 
 ## 16. Notification Strategy
 
-Initial prototype:
+Current implementation:
 - In-app notifications.
 - Dashboard queue.
 - Sidebar/action badges.
 - Memo timeline.
-
-Do not implement real email in the initial system.
+- SMTP email delivery is available best-effort when `EMAIL_NOTIFICATIONS_ENABLED=true` and required SMTP env vars are configured.
+- Telegram push/action messages are available when bot env vars and webhook are configured.
 
 Future phase:
-- Email notification.
 - Reminder/escalation email.
 - Daily/weekly digest.
 - Email links back to memo detail.
@@ -941,7 +939,7 @@ Notification events:
 - Memo rejected with revision allowed.
 - Revision resubmitted.
 
-REMARK: Book1/project requirement mentions email notification, but prototype should validate workflow with in-app notification first.
+REMARK: Book1/project requirement mentions email notification. The implemented system keeps in-app notification as the primary channel and treats email/Telegram as best-effort delivery channels layered on top.
 
 REMARK: AI Search should be treated as an assistive layer, not the authoritative search engine. Basic search and permission-filtered database queries must remain the source of truth. If AI Search is kept or expanded, the system must filter visible memos by user permission before sending candidates to any AI provider.
 
@@ -981,7 +979,7 @@ Optional / collapsible:
 - PDF quote extraction.
 - Advanced route override.
 
-REMARK: As of prototype Stage 5B, `readActions` blocks Approve for memos created with read recipients — Approve is disabled until all entries are `"read"` or `"skipped"`. A Skip All Reads mode with required reason is implemented. However, this enforcement is prototype-grade only: there are no identity checks (any drawer viewer can acknowledge or skip for any recipient). For the real system, Read Recipient enforcement must be backed by authentication and the `workflow_step_actions` permission model in §14.16. The second prototype gap — Read Recipient placement in the create form — remains open: it is still inside the budget card rather than in a dedicated Workflow/Routing section.
+IMPLEMENTATION NOTE: The current app has moved beyond the early UI-only read-action snapshot. Read/skip routes now verify session identity and write audit rows server-side; cross-check `sandbox/src/app/api/memos/[id]/read/route.ts`, `skip-reads/route.ts`, `workflow-actions.ts`, and `CLAUDE.md` before treating any older read-recipient REMARK as current behavior. The design principle remains: Read is acknowledgement-only and must not grant approval authority.
 
 ## 18. Approval Matrix Summary From Book1
 
@@ -1089,33 +1087,14 @@ Still may change:
 
 ## 21. Suggested Next Deliverables
 
-Before implementation:
+Before the next major workflow or database design change:
 1. Review this SA with HR&GA / IT / representative users.
-2. Confirm department master list.
-3. Confirm role names and approval hierarchy.
-4. Convert ERD draft into MySQL DDL.
-5. Create implementation plan for database + workflow engine.
-6. Refactor `sandbox/src/app/create/page.tsx` before adding more workflow behavior.
+2. Confirm department master data and whether MD/SGM/GM/FM are roles, departments, offices, or recipient groups.
+3. Confirm role names and approval hierarchy against the live `users.approval_level` values.
+4. Cross-check proposed schema changes against `sandbox/db/init/`, `sandbox/db/migrations/`, and live route handlers.
+5. Update `CLAUDE.md` and `sandbox/PROJECT-CONTEXT.md` when implementation status changes.
+6. Refactor `sandbox/src/app/create/page.tsx` only when the next create-flow behavior change requires it.
 
-## 22. Prototype Implementation Status (as of Stage 5B, 2026-05-28)
+## 22. Implementation Status Reference
 
-This section records which workflow behaviors from the real-system design above are now prototype-implemented in `sandbox/`. All implementations are frontend-only, in-memory, without database persistence, and without identity or permission checks. This section is informational — it does not change any design decisions above.
-
-| Feature | Design Reference | Prototype Status |
-| --- | --- | --- |
-| Return For Revision with required reason | §6.7, UC-11 | **Live (Stage 4A).** `RETURN_MEMO` action. Requires non-empty return reason. Memo moves to `returned` status. Returned tab visible in queue. `returnReason` displayed in drawer. |
-| Resubmit after Return with optional correction note | §6.7 | **Live (Stage 4B).** `RESUBMIT_MEMO` action. Resets step to `selectedRoute[0]`. Preserves `returnReason` for audit trail. Optional `revisionNote` shown as green banner. `readActions` reset to pending. |
-| Step-by-step approval advancement | §6.1, §7, UC-10 | **Live (Stage 4C).** `ADVANCE_STEP` walks `currentStep` through `selectedRoute`; approves terminally at last step. `workflowState` → `"Checked"` on intermediate steps, `"Approved"` on final. Non-pending memos are never touched. |
-| Read recipient acknowledgement tracking | §6.2, §6.3, UC-07 | **Live (Stage 5A/5B).** `readActions` populated on pending submit. `MARK_READ` per recipient. Timeline entries in drawer with `รับทราบ (Prototype)` button. Approve disabled while any entry is `"pending"`. |
-| Authorized Skip Read with required reason | §6.3, UC-08 | **Live (Stage 5B).** `SKIP_ALL_READS` with required skip reason. Does not overwrite already-`"read"` entries. Displayed in timeline as "ข้าม · {reason}". |
-
-Not yet implemented in prototype (for reference):
-
-- Revision number increment on resubmit (§6.7, §14.10 `memo_revisions`)
-- Reject With Revision Allowed vs. Reject & Close distinction (§6.8, UC-12)
-- MD Review / Opinion step (§6.5, UC-09)
-- Merged READ + APPROVE action for same-user scenario (§6.4)
-- Permission/identity checks on any workflow action (§5, §14.5–§14.6)
-- Read Recipient section moved to Workflow/Routing in create form (§17)
-- Supervisor/Manager Check as a distinct logged action (§6.1, UC-06)
-- Reject disposition: currently `UPDATE_STATUS → rejected` with no Reject & Close / Revision Allowed choice
+The old prototype-status table was removed on 2026-07-07 because it described a UI-only, in-memory system and contradicted the live MySQL/JWT/workflow implementation. Do not re-create implementation status in this SA document. For current status, read `CLAUDE.md`, `sandbox/PROJECT-CONTEXT.md`, code, migrations, and tests.

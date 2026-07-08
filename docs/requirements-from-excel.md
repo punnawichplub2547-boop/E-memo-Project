@@ -8,11 +8,11 @@ Source workbook: `D:\Hrproject\Book1.xlsx`
 - Project: Develop an E-Memo document creation system and online approval workflow.
 - Owner: นางสาวอำภา หิงคำ
 - Rollout: Start with a few departments, then expand to all departments.
-- Prototype phase: UI prototype only. Do not build database, authentication, email delivery, or live AI integration until the user approves the next phase.
+- Phase/status note: this file records the workbook requirement extraction, not current implementation status. The original UI-only gate has been superseded; the sandbox now includes MySQL persistence, JWT auth, SMTP email delivery, Telegram integration, and env-gated AI endpoints. Use `CLAUDE.md` and `sandbox/PROJECT-CONTEXT.md` for current status.
 
 ## Confirmed User Clarifications
 
-- The current phase is a prototype only.
+- The system is still trial/prototype-grade, but backend persistence, auth, email, and AI scaffolding have already been approved and implemented in the sandbox.
 - The system should eventually be usable by everyone in the company.
 - Executives and high-level managers need special approval views or privileged windows.
 - Approval behavior should follow the Excel workbook first.

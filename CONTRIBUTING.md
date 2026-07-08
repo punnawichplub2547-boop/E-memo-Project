@@ -37,5 +37,5 @@ git commit -m "docs: update Gemini prototype notes"
 
 - Keep `Book1.xlsx` as the current requirement source of truth.
 - Ask before changing approval rules when the workbook is ambiguous.
-- Keep this phase prototype-only unless the user approves backend, auth, email, database, or live AI integrations.
+- The sandbox already has MySQL persistence, JWT auth, SMTP email delivery, Telegram hooks, and env-gated AI endpoints. Confirm with the user before adding any new external provider or exposing a new integration surface.
 - Never commit `.env.local` or API keys.

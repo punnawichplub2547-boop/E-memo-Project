@@ -1,6 +1,6 @@
 # HR&GA E-Memo Sandbox
 
-Next.js 16 + React 19 prototype for the HR&GA E-Memo and online approval workflow described in `../Book1.xlsx`.
+Next.js 16 + React 19 trial-grade app for the HR&GA E-Memo and online approval workflow described in `../Book1.xlsx`.
 
 ## Run
 
@@ -107,6 +107,10 @@ Remove-Item Env:\CONFIRM_DB_SEED
 - Empty DB Trial Mode is supported: when `GET /api/memos` returns an empty array, the app shows an intentionally empty workspace instead of falling back to demo seeds.
 - If the DB/API is unavailable, the app falls back to static `seedMemos` so the prototype remains usable.
 - Email notification delivery is available through SMTP when `EMAIL_NOTIFICATIONS_ENABLED=true` and the SMTP env vars are configured; in-app notifications remain the default/fallback.
+- Password reset is implemented through `/forgot-password` and `/reset-password`; delivery of reset links depends on SMTP configuration.
+- Telegram account linking, approval callbacks, and MD-review callbacks/replies are implemented when bot env vars and webhook are configured.
+- Admin includes user approval, memo void/restore/destroy, item subcategories, audit log, issue reports, and system checks.
+- MD Review is a blocking workflow gate for price-adjustment memos in the qualifying categories.
 - No production AI integration yet.
 
 ## Email Notifications
@@ -128,10 +132,10 @@ EMAIL_REPLY_TO=hr@example.com
 
 If any required email setting is missing, workflow actions continue normally and no email delivery row is created.
 
-## Confirmed Prototype Direction
+## Project Direction
 
-- Prototype only for the current phase.
-- Future target users are all company employees.
+- Trial/prototype-grade for validation; real persistence/auth/email/Telegram paths exist, but production hardening is still separate work.
+- Target users are all company employees.
 - Executives and high-level managers should receive special approval views.
 - Approval rules should follow `../Book1.xlsx` first.
 - Gemini API may be used later through a server-side `GEMINI_API_KEY`, with mock AI retained as fallback.

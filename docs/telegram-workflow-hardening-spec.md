@@ -33,7 +33,7 @@ This is acceptable for prototype UI simulation, but unsafe for Telegram or produ
 
 Create a server-side workflow action service that becomes the single trusted path for approve, return, and reject actions.
 
-Both web routes and a future Telegram webhook should call this service. The client must no longer be trusted to decide actor name, step, next step, status, or permission.
+Both web routes and the Telegram webhook should call this service. The client must no longer be trusted to decide actor name, step, next step, status, or permission.
 
 ## Scope
 
