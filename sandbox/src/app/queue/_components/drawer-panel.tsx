@@ -436,9 +436,9 @@ export function DrawerPanel({
               {memo.isPriceAdjustment && (
                 <span className="em-tier" style={{ background: "var(--gold-soft)", color: "#7C5E0F", borderColor: "rgba(201,168,76,0.40)" }}>Supplier ปรับราคา</span>
               )}
-              {memo.notifyMD && (
+              {(memo.requiresMdReview || memo.notifyMD) && (
                 <span className="em-tier md" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <IconBell size={10} /> แจ้ง MD เพื่อทราบ
+                  <IconBell size={10} /> ต้องผ่าน MD Review
                 </span>
               )}
               {memo.departmentMonthlyOverBudgetTotal !== undefined && memo.departmentMonthlyOverBudgetTotal > 0 && (
