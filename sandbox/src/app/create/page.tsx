@@ -368,7 +368,7 @@ function CreatePageContent() {
       });
       const data = await res.json();
       if (data.error === "not_configured") {
-        setAiError("ยังไม่ได้ตั้งค่า GEMINI_API_KEY ใน .env.local");
+        setAiError("ยังไม่ได้ตั้งค่า THAILLM_API_KEY ใน .env.local");
       } else if (data.error === "quota_exceeded") {
         setAiError("Rate limit — รอ 1 นาทีแล้วลองใหม่");
       } else if (data.error === "parse_error") {
