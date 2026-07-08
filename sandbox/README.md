@@ -105,7 +105,7 @@ Remove-Item Env:\CONFIRM_DB_SEED
 - DB-1 read path is active: `MemoProvider` hydrates initial memos from `GET /api/memos` when MySQL is available.
 - DB-2 complete: all eight write actions are persisted to MySQL — new memo creation (`ADD_MEMO`), approval advancement (`ADVANCE_STEP`), return-for-revision (`RETURN_MEMO`), rejection (`REJECT_MEMO`), read acknowledgement actions (`MARK_READ`, `SKIP_ALL_READS`), quick resubmit (`RESUBMIT_MEMO`), and edit-and-resubmit (`SUBMIT_REVISION`).
 - Empty DB Trial Mode is supported: when `GET /api/memos` returns an empty array, the app shows an intentionally empty workspace instead of falling back to demo seeds.
-- If the DB/API is unavailable, the app falls back to static `seedMemos` so the prototype remains usable.
+- If the DB/API is unavailable, development builds fall back to static `seedMemos` so local work stays usable; production builds show an empty workspace instead of demo data.
 - Email notification delivery is available through SMTP when `EMAIL_NOTIFICATIONS_ENABLED=true` and the SMTP env vars are configured; in-app notifications remain the default/fallback.
 - Password reset is implemented through `/forgot-password` and `/reset-password`; delivery of reset links depends on SMTP configuration.
 - Telegram account linking, approval callbacks, and MD-review callbacks/replies are implemented when bot env vars and webhook are configured.

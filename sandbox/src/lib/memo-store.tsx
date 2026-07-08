@@ -7,6 +7,7 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import { memoToDbSeedRow } from "./db-seed";
+import { allowSeedFallbackOnDbError } from "./seed-fallback";
 import { usePrototypeUser } from "./prototype-user-context";
 import type {
   AdvanceStepBody,
@@ -499,13 +500,23 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
           if (!cancelled) reducerDispatch({ type: "HYDRATE_MEMOS", memos: [] });
           return;
         }
-        if (!response.ok) return; // 5xx / unexpected — keep seedMemos for dev/DB-unavailable fallback
+        if (!response.ok) {
+          // 5xx / unexpected — seedMemos fallback is a dev convenience only;
+          // production shows an empty workspace instead of demo data.
+          if (!cancelled && !allowSeedFallbackOnDbError(process.env.NODE_ENV)) {
+            reducerDispatch({ type: "HYDRATE_MEMOS", memos: [] });
+          }
+          return;
+        }
         const dbMemos = await response.json() as MemoRecord[];
         if (!cancelled && Array.isArray(dbMemos)) {
           reducerDispatch({ type: "HYDRATE_MEMOS", memos: dbMemos });
         }
       } catch {
-        // Network error or DB unavailable — keep seedMemos as prototype fallback.
+        // Network error or DB unavailable — keep seedMemos in dev only (see above).
+        if (!cancelled && !allowSeedFallbackOnDbError(process.env.NODE_ENV)) {
+          reducerDispatch({ type: "HYDRATE_MEMOS", memos: [] });
+        }
       } finally {
         if (!cancelled) setHydrated(true);
       }
