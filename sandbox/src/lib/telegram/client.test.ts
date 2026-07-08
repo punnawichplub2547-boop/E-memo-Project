@@ -25,14 +25,43 @@ describe("sendTelegramMessage", () => {
     expect(result).toEqual({ message_id: 99 });
   });
   it("returns null on ok:false", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ ok: false }), { status: 200 }),
     );
     await expect(sendTelegramMessage(1n, "x")).resolves.toBeNull();
   });
   it("returns null on network error", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("net"));
     await expect(sendTelegramMessage(1n, "x")).resolves.toBeNull();
+  });
+  it("logs the API error description when Telegram rejects the send", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          error_code: 400,
+          description: "Bad Request: inline keyboard button URL 'http://localhost:3000/queue' is invalid",
+        }),
+        { status: 200 },
+      ),
+    );
+    await sendTelegramMessage(1n, "x");
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const logged = errSpy.mock.calls[0].map(String).join(" ");
+    expect(logged).toContain("[telegram]");
+    expect(logged).toContain("inline keyboard button URL");
+  });
+  it("logs the thrown error on network failure", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+    await sendTelegramMessage(1n, "x");
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const logged = errSpy.mock.calls[0].map(String).join(" ");
+    expect(logged).toContain("[telegram]");
+    expect(logged).toContain("ECONNREFUSED");
   });
 });
 
@@ -47,8 +76,11 @@ describe("answerCallbackQuery", () => {
       expect.objectContaining({ method: "POST" }),
     );
   });
-  it("does not throw on failure", async () => {
+  it("does not throw on failure but logs the error", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("fail"));
     await expect(answerCallbackQuery("id", "text")).resolves.toBeUndefined();
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(errSpy.mock.calls[0].map(String).join(" ")).toContain("[telegram]");
   });
 });

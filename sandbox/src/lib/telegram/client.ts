@@ -35,9 +35,16 @@ export async function sendTelegramMessage(
       text,
       parse_mode: "HTML",
       ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {}),
-    })) as { ok: boolean; result?: TelegramMessage };
-    return data.ok ? (data.result ?? null) : null;
-  } catch {
+    })) as { ok: boolean; result?: TelegramMessage; error_code?: number; description?: string };
+    if (data.ok) return data.result ?? null;
+    // Surface the API rejection reason — e.g. an invalid inline-button URL when
+    // APP_PUBLIC_BASE_URL points at localhost — instead of failing silently.
+    console.error(
+      `[telegram] sendMessage rejected (error_code=${data.error_code ?? "?"}): ${data.description ?? "no description"}`,
+    );
+    return null;
+  } catch (err) {
+    console.error("[telegram] sendMessage failed:", err);
     return null;
   }
 }
@@ -52,7 +59,8 @@ export async function answerCallbackQuery(
       callback_query_id: callbackQueryId,
       ...(text ? { text, show_alert: showAlert } : {}),
     });
-  } catch {
+  } catch (err) {
     // Best-effort; must not throw to keep webhook response intact.
+    console.error("[telegram] answerCallbackQuery failed:", err);
   }
 }
