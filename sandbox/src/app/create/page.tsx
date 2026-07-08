@@ -20,6 +20,7 @@ import {
 } from "@/lib/approval";
 import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
+import { newClientRowId } from "@/lib/client-row-id";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
 import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
@@ -180,7 +181,7 @@ function CreatePageContent() {
 
   const addRequestItem = () => {
     setRequestItems(prev => [...prev, {
-      id: String(Date.now()), name: "", unit: "ชิ้น", qty: 1, unitPrice: 0,
+      id: newClientRowId(), name: "", unit: "ชิ้น", qty: 1, unitPrice: 0,
     }]);
   };
   const removeRequestItem = (id: string) => {
@@ -197,7 +198,7 @@ function CreatePageContent() {
 
   const addVendorRow = () => {
     setPriceComparisons(prev => [...prev, {
-      id: String(Date.now()), vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: false,
+      id: newClientRowId(), vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: false,
     }]);
   };
   const removeVendorRow = (id: string) => {
@@ -422,7 +423,7 @@ function CreatePageContent() {
           // VAT defaults to disabled — extracted PDF totals are ambiguous re: VAT inclusion.
           // User can toggle the per-row VAT 7% pill if the quote explicitly excludes VAT.
           const newVendorRow: PriceComparison = {
-            id: String(Date.now()),
+            id: newClientRowId(),
             vendorName: data.vendor ?? "",
             offeredPrice: vendorPrice,
             discount: 0,
@@ -444,8 +445,8 @@ function CreatePageContent() {
         if (Array.isArray(data.items) && data.items.length > 0) {
           const isFirstItemBlank =
             requestItems.length === 1 && !requestItems[0].name && requestItems[0].unitPrice === 0;
-          const newItems = data.items.map((it: { name: string; qty: number; unit: string; unitPrice: number }, idx: number) => ({
-            id: String(Date.now() + idx + 1),
+          const newItems = data.items.map((it: { name: string; qty: number; unit: string; unitPrice: number }) => ({
+            id: newClientRowId(),
             name: it.name,
             unit: it.unit || "ชิ้น",
             qty: coercePositiveInteger(it.qty),
