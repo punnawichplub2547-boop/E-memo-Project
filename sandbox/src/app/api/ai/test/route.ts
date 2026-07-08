@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { callThaiLLM } from "@/lib/ai/thaillm";
 import { callGroq } from "@/lib/ai/groq";
 
 export async function POST(req: NextRequest) {
+  const session = await getActiveSessionUserFromToken(req.cookies.get(COOKIE_NAME)?.value);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   let body: unknown;
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
