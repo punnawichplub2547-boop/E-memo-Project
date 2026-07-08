@@ -4,8 +4,8 @@
  * (e.g. en-GB with combined date+time options inserts a comma after the year
  * in modern V8, which breaks string-split grouping in history/page.tsx).
  *
- * This is the canonical in-memory timestamp format for the prototype.
- * Seed memos in approval.ts use the same pattern for consistency.
+ * This is the canonical memo display timestamp format used by the client state,
+ * seed memos, and DB serializers.
  */
 export function formatTimestamp(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-GB", {

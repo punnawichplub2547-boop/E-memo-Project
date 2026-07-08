@@ -819,13 +819,13 @@ export default function AdminPage() {
               </div>
 
               <div className="em-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Prototype State</div>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Clears all localStorage keys used by this prototype (selected user, assistant panel state, admin user overrides).</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Local Trial State</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Clears localStorage keys used by the trial fallback state (selected user, assistant panel state, admin user overrides).</div>
                 {!confirmReset ? (
                   <button className="em-btn" style={{ color: "#EF4444" }} onClick={() => setConfirmReset(true)}><IconRefresh size={14} /> Clear localStorage &amp; Reload</button>
                 ) : (
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 13, color: "#EF4444", fontWeight: 600 }}>This will reset all prototype state. Are you sure?</span>
+                    <span style={{ fontSize: 13, color: "#EF4444", fontWeight: 600 }}>This will reset local trial state. Are you sure?</span>
                     <button className="em-btn" style={{ color: "#EF4444" }} onClick={() => {
                       const keys = ["hr-ememo-prototype-user", "em-admin-users", "em-create-assistant-open", "em-create-assistant-tab"];
                       keys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
@@ -837,9 +837,9 @@ export default function AdminPage() {
               </div>
 
               <div className="em-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Still Deferred</div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Production Hardening</div>
                 <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>
-                  Login, hashed passwords, user approval, and role management are now active for the trial. Remaining production work: password reset, email notifications, full server-side permission coverage, and production-grade auth/session hardening.
+                  Login, hashed passwords, user approval, role management, password reset, email delivery, audit, and Telegram hooks are active for the trial. Remaining production work: SSO/identity lifecycle hardening, email verification, production document storage, virus scanning, monitoring, and operational backup/retention policy.
                 </div>
               </div>
             </div>

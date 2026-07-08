@@ -1,5 +1,5 @@
 // Server-trusted workflow action service. The single path for approve / return /
-// reject — web routes and the future Telegram webhook must both go through here.
+// reject / MD review — web routes and the Telegram webhook must both go through here.
 // Decision logic lives in workflow-rules.ts; this file owns transactions and SQL.
 import type { PoolConnection } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
@@ -79,7 +79,7 @@ async function loadActor(
   );
   // Routes already validate the session user; this fires only on a TOCTOU
   // window (user deleted mid-request) or direct service invocation (e.g.
-  // a future Telegram webhook), where existence must not be revealed.
+  // Telegram webhook), where existence must not be revealed.
   const user = rows[0];
   if (!user) {
     throw new WorkflowActionError(403, "ไม่มีสิทธิ์เข้าถึง");

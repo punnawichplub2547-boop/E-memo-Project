@@ -530,7 +530,7 @@ export function DrawerPanel({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="em-flow-title">
                       {isRead ? (
-                        <span>รับทราบแล้ว (Prototype){" "}
+                        <span>รับทราบแล้ว{" "}
                           <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 11 }}>· {ra.actedAt}</span>
                         </span>
                       ) : isSkipped ? (
@@ -555,7 +555,7 @@ export function DrawerPanel({
                         title={canMarkRead ? "Mark read" : "ไม่มีสิทธิ์รับทราบแทนผู้รับรายนี้"}
                         onClick={() => onMarkRead(memo.id, ra.recipient)}
                       >
-                        {canMarkRead ? "รับทราบ (Prototype)" : "รับทราบ (ไม่มีสิทธิ์)"}
+                        {canMarkRead ? "รับทราบ" : "รับทราบ (ไม่มีสิทธิ์)"}
                       </button>
                     )}
                   </div>
