@@ -908,6 +908,7 @@ function CreatePageContent() {
                       requestItemsGrandTotal={requestItemsGrandTotal}
                       cleanOverrideReason={cleanOverrideReason}
                       issuerName={user.name}
+                      closingRemark={closingRemark}
                     />
                   </div>
                   <div className="em-create-tab-pane" data-pane="remark">

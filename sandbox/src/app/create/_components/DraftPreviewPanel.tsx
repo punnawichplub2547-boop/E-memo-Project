@@ -19,6 +19,7 @@ interface DraftPreviewPanelProps {
   requestItemsGrandTotal: number;
   cleanOverrideReason: string;
   issuerName: string;
+  closingRemark: string;
 }
 
 export function DraftPreviewPanel({
@@ -37,6 +38,7 @@ export function DraftPreviewPanel({
   requestItemsGrandTotal,
   cleanOverrideReason,
   issuerName,
+  closingRemark,
 }: DraftPreviewPanelProps) {
   return (
     <div className="em-card">
@@ -93,6 +95,13 @@ export function DraftPreviewPanel({
                   </tr>
                 </tfoot>
               </table>
+            </>
+          )}
+          {closingRemark.trim() && (
+            <>
+              <hr className="em-divider" style={{ margin: "10px 0 14px" }} />
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: "var(--ink)" }}>หมายเหตุ</div>
+              <p style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{closingRemark.trim()}</p>
             </>
           )}
         </div>
