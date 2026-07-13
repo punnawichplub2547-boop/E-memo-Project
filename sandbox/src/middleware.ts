@@ -17,11 +17,11 @@ const PUBLIC_PATHS = [
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const effectiveHost = resolveRedirectHost(req.headers.get("x-forwarded-host"), req.headers.get("host"));
 
-  if (shouldRedirectToHttps(req.headers.get("x-forwarded-proto"), process.env.NODE_ENV)) {
-    const host = resolveRedirectHost(req.headers.get("x-forwarded-host"), req.headers.get("host"));
-    if (host) {
-      const httpsUrl = new URL(`https://${host}${req.nextUrl.pathname}${req.nextUrl.search}`);
+  if (shouldRedirectToHttps(req.headers.get("x-forwarded-proto"), process.env.NODE_ENV, effectiveHost)) {
+    if (effectiveHost) {
+      const httpsUrl = new URL(`https://${effectiveHost}${req.nextUrl.pathname}${req.nextUrl.search}`);
       return NextResponse.redirect(httpsUrl, 308);
     }
   }

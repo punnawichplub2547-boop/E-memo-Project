@@ -15,8 +15,15 @@
 export function shouldRedirectToHttps(
   forwardedProto: string | null,
   nodeEnv: string | undefined,
+  host?: string | null,
 ): boolean {
   if (nodeEnv !== "production") return false;
+  if (host) {
+    const cleanHost = host.toLowerCase().trim();
+    if (cleanHost.startsWith("localhost") || cleanHost.startsWith("127.0.0.1")) {
+      return false;
+    }
+  }
   if (forwardedProto === null) return false;
   return forwardedProto.toLowerCase() !== "https";
 }

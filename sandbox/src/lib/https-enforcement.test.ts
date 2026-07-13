@@ -21,6 +21,13 @@ describe("shouldRedirectToHttps", () => {
     expect(shouldRedirectToHttps(null, "production")).toBe(false);
   });
 
+  it("does not redirect when accessing localhost or 127.0.0.1 even in production", () => {
+    expect(shouldRedirectToHttps("http", "production", "localhost")).toBe(false);
+    expect(shouldRedirectToHttps("http", "production", "localhost:3000")).toBe(false);
+    expect(shouldRedirectToHttps("http", "production", "127.0.0.1")).toBe(false);
+    expect(shouldRedirectToHttps("http", "production", "127.0.0.1:3000")).toBe(false);
+  });
+
   it("treats any non-https forwarded value as insecure, case-insensitively", () => {
     expect(shouldRedirectToHttps("HTTP", "production")).toBe(true);
     expect(shouldRedirectToHttps("", "production")).toBe(true);
