@@ -31,7 +31,7 @@ const ACTION_CONFIG: Record<HistoryAction, { icon: React.ReactNode; color: strin
 
 export default function HistoryPage() {
   const { memos } = useMemos();
-  const [tabFilter, setTabFilter] = useState<"all" | "approved" | "rejected" | "returned" | "md" | "slow">("all");
+  const [tabFilter, setTabFilter] = useState<"all" | "approved" | "rejected" | "returned" | "md" | "slow" | "draft" | "pending">("all");
   const [actorTier, setActorTier] = useState("");
   const [dateDays, setDateDays] = useState("0");
   const now = new Date();
@@ -114,13 +114,27 @@ export default function HistoryPage() {
                 </div>
               ))}
             </div>
-            {(tabFilter === "md" || tabFilter === "slow") && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.35)", fontSize: 12, color: "#7C5E0F", fontWeight: 600 }}>
-                <IconCrown size={12} />
-                {tabFilter === "md" ? "MD-tier memos" : `Over-target cycle (>24h) · ${filtered.length}`}
-                <button onClick={() => setTabFilter("all")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 2, color: "#7C5E0F", display: "flex" }}><IconX size={12} /></button>
-              </div>
-            )}
+            {(tabFilter === "md" || tabFilter === "slow" || tabFilter === "draft" || tabFilter === "pending") && (() => {
+              const theme =
+                tabFilter === "md" ? { bg: "rgba(201,168,76,0.12)", border: "rgba(201,168,76,0.35)", text: "#7C5E0F", icon: <IconCrown size={12} /> } :
+                tabFilter === "slow" ? { bg: "rgba(217,119,6,0.12)", border: "rgba(217,119,6,0.35)", text: "#B45309", icon: <IconClock size={12} /> } :
+                tabFilter === "draft" ? { bg: "rgba(71,85,105,0.08)", border: "rgba(71,85,105,0.22)", text: "#475569", icon: <IconPen size={12} /> } :
+                { bg: "rgba(37,99,235,0.08)", border: "rgba(37,99,235,0.22)", text: "var(--primary)", icon: <IconClock size={12} /> };
+              
+              const label =
+                tabFilter === "md" ? "MD-tier memos" :
+                tabFilter === "slow" ? "Over-target cycle (>24h)" :
+                tabFilter === "draft" ? "Draft memos" : "Pending memos";
+
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: theme.bg, border: `1px solid ${theme.border}`, fontSize: 12, color: theme.text, fontWeight: 600 }}>
+                  {theme.icon}
+                  <span>{label}</span>
+                  <span style={{ opacity: 0.65, fontWeight: 400 }}>· {filtered.length}</span>
+                  <button onClick={() => setTabFilter("all")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 2, color: theme.text, display: "flex", alignItems: "center" }}><IconX size={12} /></button>
+                </div>
+              );
+            })()}
             <div style={{ flex: 1 }} />
             <FilterDropdown
               icon={<IconCalendar size={13} />}
@@ -228,10 +242,34 @@ export default function HistoryPage() {
                   <div><h3 style={{ fontSize: 13 }}>Action breakdown</h3><div className="em-sub" style={{ fontSize: 11.5 }}>All time</div></div>
                 </div>
                 <div className="em-card-body" style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
-                  <BarChart label="Approved" pct={approvalRate} color="#10B981" />
-                  <BarChart label="Rejected" pct={totalProcessed ? Math.round(rejectedCount / totalProcessed * 100) : 0} color="#F43F5E" />
-                  <BarChart label="Draft" pct={totalProcessed ? Math.round(memos.filter(m => m.status === "draft").length / totalProcessed * 100) : 0} color="#3B82F6" />
-                  <BarChart label="Pending" pct={totalProcessed ? Math.round(memos.filter(m => m.status === "pending").length / totalProcessed * 100) : 0} color="#F59E0B" />
+                  <BarChart
+                    label="Approved"
+                    pct={approvalRate}
+                    color="#10B981"
+                    active={tabFilter === "approved"}
+                    onClick={() => setTabFilter(tabFilter === "approved" ? "all" : "approved")}
+                  />
+                  <BarChart
+                    label="Rejected"
+                    pct={totalProcessed ? Math.round(rejectedCount / totalProcessed * 100) : 0}
+                    color="#F43F5E"
+                    active={tabFilter === "rejected"}
+                    onClick={() => setTabFilter(tabFilter === "rejected" ? "all" : "rejected")}
+                  />
+                  <BarChart
+                    label="Draft"
+                    pct={totalProcessed ? Math.round(memos.filter(m => m.status === "draft").length / totalProcessed * 100) : 0}
+                    color="#3B82F6"
+                    active={tabFilter === "draft"}
+                    onClick={() => setTabFilter(tabFilter === "draft" ? "all" : "draft")}
+                  />
+                  <BarChart
+                    label="Pending"
+                    pct={totalProcessed ? Math.round(memos.filter(m => m.status === "pending").length / totalProcessed * 100) : 0}
+                    color="#F59E0B"
+                    active={tabFilter === "pending"}
+                    onClick={() => setTabFilter(tabFilter === "pending" ? "all" : "pending")}
+                  />
                 </div>
               </div>
 
@@ -240,9 +278,31 @@ export default function HistoryPage() {
                   <div><h3 style={{ fontSize: 13 }}>By tier</h3><div className="em-sub" style={{ fontSize: 11.5 }}>Routing distribution</div></div>
                 </div>
                 <div className="em-card-body" style={{ paddingTop: 4 }}>
-                  <TierRow label="Manager" count={managerCount} pct={totalProcessed ? Math.round(managerCount/totalProcessed*100) : 0} color="#2563EB" />
-                  <TierRow label="General Manager" count={gmCount} pct={totalProcessed ? Math.round(gmCount/totalProcessed*100) : 0} color="#7C3AED" />
-                  <TierRow label="Managing Director" count={mdCount} pct={totalProcessed ? Math.round(mdCount/totalProcessed*100) : 0} color="#C9A84C" md />
+                  <TierRow
+                    label="Manager"
+                    count={managerCount}
+                    pct={totalProcessed ? Math.round(managerCount/totalProcessed*100) : 0}
+                    color="#2563EB"
+                    active={actorTier === "Manager / Top Section"}
+                    onClick={() => setActorTier(actorTier === "Manager / Top Section" ? "" : "Manager / Top Section")}
+                  />
+                  <TierRow
+                    label="General Manager"
+                    count={gmCount}
+                    pct={totalProcessed ? Math.round(gmCount/totalProcessed*100) : 0}
+                    color="#7C3AED"
+                    active={actorTier === "General Manager"}
+                    onClick={() => setActorTier(actorTier === "General Manager" ? "" : "General Manager")}
+                  />
+                  <TierRow
+                    label="Managing Director"
+                    count={mdCount}
+                    pct={totalProcessed ? Math.round(mdCount/totalProcessed*100) : 0}
+                    color="#C9A84C"
+                    md
+                    active={actorTier === "Managing Director"}
+                    onClick={() => setActorTier(actorTier === "Managing Director" ? "" : "Managing Director")}
+                  />
                 </div>
               </div>
 
@@ -299,30 +359,51 @@ function SummaryBlock({ label, value, sub, icon, accent, trendDir, last, active,
   );
 }
 
-function BarChart({ label, pct, color }: { label: string; pct: number; color: string }) {
+function BarChart({ label, pct, color, active, onClick }: { label: string; pct: number; color: string; active?: boolean; onClick?: () => void }) {
   return (
-    <div>
+    <div
+      onClick={onClick}
+      style={{
+        cursor: onClick ? "pointer" : "default",
+        padding: "6px 8px",
+        margin: "0 -8px",
+        background: active ? "rgba(37,99,235,0.08)" : "transparent",
+        borderRadius: "var(--r-sm)",
+        transition: "all 0.15s ease",
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
-        <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{label}</span>
-        <span style={{ color: "var(--muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+        <span style={{ color: active ? "var(--primary)" : "var(--ink-2)", fontWeight: active ? 700 : 500 }}>{label}</span>
+        <span style={{ color: active ? "var(--primary)" : "var(--muted)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
       </div>
-      <div style={{ height: 6, background: "var(--surface-soft)", borderRadius: 999, overflow: "hidden" }}>
+      <div style={{ height: 6, background: active ? "rgba(37,99,235,0.12)" : "var(--surface-soft)", borderRadius: 999, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
       </div>
     </div>
   );
 }
 
-function TierRow({ label, count, pct, color, md }: { label: string; count: number; pct: number; color: string; md?: boolean }) {
+function TierRow({ label, count, pct, color, md, active, onClick }: { label: string; count: number; pct: number; color: string; md?: boolean; active?: boolean; onClick?: () => void }) {
   return (
-    <div style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+    <div
+      onClick={onClick}
+      style={{
+        padding: "10px 12px",
+        margin: "0 -12px",
+        borderBottom: "1px solid var(--line)",
+        cursor: onClick ? "pointer" : "default",
+        background: active ? "rgba(37,99,235,0.08)" : "transparent",
+        borderRadius: "var(--r-sm)",
+        transition: "all 0.15s ease",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <div style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
         {md && <IconCrown size={12} style={{ color: "var(--gold)" }} />}
-        <span style={{ fontSize: 12.5, color: "var(--ink)", fontWeight: 500 }}>{label}</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{count} · {pct}%</span>
+        <span style={{ fontSize: 12.5, color: active ? "var(--primary)" : "var(--ink)", fontWeight: active ? 700 : 500 }}>{label}</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: active ? "var(--primary)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{count} · {pct}%</span>
       </div>
-      <div style={{ height: 4, background: "var(--surface-soft)", borderRadius: 999, overflow: "hidden" }}>
+      <div style={{ height: 4, background: active ? "rgba(37,99,235,0.12)" : "var(--surface-soft)", borderRadius: 999, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} />
       </div>
     </div>

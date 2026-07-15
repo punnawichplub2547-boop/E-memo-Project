@@ -1536,6 +1536,7 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   }
   /* When fewer than 3 fit, let it scroll */
   .em-summary-block {
+    padding: 12px 14px;
     min-width: 110px;
   }
 
