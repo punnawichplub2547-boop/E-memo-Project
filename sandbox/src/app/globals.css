@@ -2035,3 +2035,113 @@ a:focus-visible, .em-nav-item:focus-visible, .em-tab:focus-visible, .em-chip:foc
   /* Report KPI: 2 col */
   .rpt-kpi-grid { grid-template-columns: 1fr 1fr !important; }
 }
+
+/* ── E-Memo Template System Modal & Selector Styles ── */
+.em-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 15, 30, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: em-fadeIn 0.2s ease-out;
+}
+
+.em-modal-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  animation: em-slideUp 0.2s ease-out;
+}
+
+.em-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.em-modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.em-modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.em-modal-close:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.em-modal-body {
+  padding: 20px;
+}
+
+.em-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+
+.em-template-chip {
+  transition: all 0.15s ease;
+}
+
+.em-template-chip:hover {
+  background: var(--ice-50) !important;
+  border-color: var(--ice-200) !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.04);
+}
+
+.em-template-chip button:hover {
+  color: var(--primary) !important;
+}
+
+.em-template-delete {
+  transition: all 0.15s ease;
+}
+
+.em-template-delete:hover {
+  background: var(--rose-soft) !important;
+  color: var(--rose) !important;
+}
+
+@keyframes em-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes em-slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+

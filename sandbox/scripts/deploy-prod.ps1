@@ -48,6 +48,7 @@ $Migrations = [ordered]@{
     'issue_reports'         = '2026-06-24-issue-reports-table.sql'
     'item_subcategories'    = '2026-06-25-item-subcategories.sql'
     'password_reset_tokens' = '2026-06-29-password-reset-tokens.sql'
+    'memo_templates'        = '2026-07-13-add-memo-templates-table.sql'
 }
 
 # Ordered map: "table.column" marker -> migration file. For ALTER TABLE ADD COLUMN

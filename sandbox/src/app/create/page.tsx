@@ -24,9 +24,8 @@ import { newClientRowId } from "@/lib/client-row-id";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
 import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
-import { showErrorToast } from "@/lib/toast";
 import {
-  IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles,
+  IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles, IconBookmark
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
@@ -43,6 +42,11 @@ import { usePrototypeUser } from "@/lib/prototype-user-context";
 import { canResubmitMemo } from "@/lib/prototype-users";
 import { ReadRecipientPicker } from "./_components/ReadRecipientPicker";
 import type { ItemSubcategory } from "@/lib/item-subcategories";
+import { SaveTemplateModal } from "./_components/SaveTemplateModal";
+import { TemplateSelectorCard } from "./_components/TemplateSelectorCard";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import type { MemoTemplate } from "@/lib/db-templates";
+
 
 
 function getEffectiveRequestQty(qty: number) {
@@ -159,6 +163,133 @@ function CreatePageContent() {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Template states and helpers ──
+  const [templates, setTemplates] = useState<MemoTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch("/api/templates");
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch templates", e);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isRevisionMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchTemplates();
+    } else {
+      setTemplatesLoading(false);
+    }
+  }, [isRevisionMode]);
+
+  const handleLoadTemplate = (data: Record<string, unknown>) => {
+    if (!data) return;
+    if (data.title) setSubject(data.title as string);
+    if (data.category) {
+      setCategory(data.category as ApprovalCategory);
+      setItemSubcategoryId(data.itemSubcategoryId as number | undefined);
+    }
+    if (data.department) setDepartment(data.department as string);
+    if (data.amount !== undefined) setAmount(data.amount as number);
+    if (data.budgetStatus) setBudgetStatus(data.budgetStatus as BudgetStatus);
+    if (data.description) setDescription(data.description as string);
+    if (data.closingRemark) setClosingRemark(data.closingRemark as string);
+    if (data.isPriceAdjustment !== undefined) setIsPriceAdjustment(data.isPriceAdjustment as boolean);
+    if (data.followsProductionPlan !== undefined) setFollowsProductionPlan(data.followsProductionPlan as boolean);
+    if (data.isDeadStockOrSlowMovement !== undefined) setIsDeadStockOrSlowMovement(data.isDeadStockOrSlowMovement as boolean);
+    if (data.accountCode) setAccountCode(data.accountCode as string);
+    if (data.budgetPlan !== undefined) setBudgetPlan(data.budgetPlan as number);
+    if (data.budgetUsed !== undefined) setBudgetUsed(data.budgetUsed as number);
+    if (data.priceComparisons && (data.priceComparisons as Array<unknown>).length > 0) {
+      setPriceComparisons(data.priceComparisons as PriceComparison[]);
+    }
+    if (data.selectedVendorReason) setSelectedVendorReason(data.selectedVendorReason as string);
+    if (data.requestItems && (data.requestItems as Array<unknown>).length > 0) {
+      setRequestItems(data.requestItems as RequestItem[]);
+    }
+    if (data.priceAdjustmentReason) setPriceAdjustmentReason(data.priceAdjustmentReason as string);
+    if (data.readRecipients) setReadRecipients(data.readRecipients as string[]);
+
+    showSuccessToast("โหลดแม่แบบเรียบร้อยแล้ว");
+  };
+
+  const handleSaveTemplate = async (name: string) => {
+    try {
+      setIsSavingTemplate(true);
+      const templateData = {
+        title: subject,
+        category,
+        itemSubcategoryId,
+        department,
+        amount,
+        budgetStatus,
+        description,
+        closingRemark,
+        isPriceAdjustment,
+        followsProductionPlan,
+        isDeadStockOrSlowMovement,
+        accountCode,
+        budgetPlan,
+        budgetUsed,
+        priceComparisons,
+        selectedVendorReason,
+        requestItems,
+        priceAdjustmentReason,
+        readRecipients,
+      };
+
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, template: templateData }),
+      });
+
+      if (res.ok) {
+        showSuccessToast("บันทึกแม่แบบเรียบร้อยแล้ว");
+        setSaveModalOpen(false);
+        setTemplatesLoading(true);
+        fetchTemplates();
+      } else {
+        const err = await res.json();
+        showErrorToast(err.error || "บันทึกแม่แบบไม่สำเร็จ");
+      }
+    } catch (e) {
+      console.error("Failed to save template", e);
+      showErrorToast("ระบบเกิดข้อผิดพลาดในการบันทึกแม่แบบ");
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: number) => {
+    try {
+      const res = await fetch(`/api/templates/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showSuccessToast("ลบแม่แบบเรียบร้อยแล้ว");
+        setTemplatesLoading(true);
+        fetchTemplates();
+      } else {
+        const err = await res.json();
+        showErrorToast(err.error || "ลบแม่แบบไม่สำเร็จ");
+      }
+    } catch (e) {
+      console.error("Failed to delete template", e);
+      showErrorToast("ระบบเกิดข้อผิดพลาดในการลบแม่แบบ");
+    }
+  };
 
   // ── Assistant panel state — extracted to hook for localStorage persistence ──
   const { assistantExpanded, assistantTab, assistantHydrated, setAssistantExpanded, setAssistantTab } =
@@ -621,8 +752,8 @@ function CreatePageContent() {
           title={isRevisionMode ? "แก้ไขและส่งใหม่" : "สร้าง E-Memo"}
           actions={<>
             {!isRevisionMode && (
-              <button className="em-btn" disabled={isSubmitting} onClick={() => handleSubmit("draft")}>
-                <IconFileText size={15} /> Save Draft
+              <button type="button" className="em-btn" disabled={isSubmitting} onClick={() => setSaveModalOpen(true)}>
+                <IconBookmark size={15} /> Save Template
               </button>
             )}
             <button className="em-btn primary" disabled={!canSubmitPending || isSubmitting} onClick={() => handleSubmit("pending")}>
@@ -708,6 +839,14 @@ function CreatePageContent() {
 
           <div className={`em-create-top-shell ${assistantExpanded ? "is-expanded" : "is-collapsed"}${assistantHydrated ? " is-ready" : ""}`}>
             <div className="em-create-main-col">
+              {!isRevisionMode && (
+                <TemplateSelectorCard
+                  templates={templates}
+                  onSelectTemplate={handleLoadTemplate}
+                  onDeleteTemplate={handleDeleteTemplate}
+                  isLoading={templatesLoading}
+                />
+              )}
               <MemoDetailsCard
                 subject={subject}
                 category={category}
@@ -991,9 +1130,49 @@ function CreatePageContent() {
               onSelectedVendorReasonChange={setSelectedVendorReason}
             />
 
+            {/* Form Actions Footer */}
+            <div className="em-card em-create-footer-actions" style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 12,
+              padding: "16px 24px",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: "var(--r-lg)",
+            }}>
+              {!isRevisionMode && (
+                <button
+                  type="button"
+                  className="em-btn"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmit("draft")}
+                  style={{ minWidth: 120 }}
+                >
+                  <IconFileText size={15} /> Save Draft
+                </button>
+              )}
+              <button
+                type="button"
+                className="em-btn primary"
+                disabled={!canSubmitPending || isSubmitting}
+                onClick={() => handleSubmit("pending")}
+                style={{ minWidth: 160 }}
+              >
+                <IconMail size={15} />
+                {isRevisionMode
+                  ? `ส่งแก้ไข (Rev.${(reviseMemo!.revisionNo ?? 0) + 1})`
+                  : "Send to Approval"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      <SaveTemplateModal
+        isOpen={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        onSave={handleSaveTemplate}
+        isSaving={isSavingTemplate}
+      />
     </div>
   );
 }

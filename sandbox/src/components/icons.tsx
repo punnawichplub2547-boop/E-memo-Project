@@ -69,3 +69,5 @@ export const IconUserPlus = (p: IconProps) => <Ic {...p}><path d="M16 21v-2a4 4 
 export const IconSort = (p: IconProps) => <Ic {...p}><path d="M8 7v14M4 17l4 4 4-4"/><path d="M16 17V3M20 7l-4-4-4 4"/></Ic>;
 export const IconDownload = (p: IconProps) => <Ic {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></Ic>;
 export const IconWallet = (p: IconProps) => <Ic {...p}><path d="M21 12V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><circle cx="17.5" cy="13.5" r="1.5"/></Ic>;
+export const IconBookmark = (p: IconProps) => <Ic {...p}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></Ic>;
+
