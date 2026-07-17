@@ -94,7 +94,23 @@ describe("useMemoSubmit", () => {
       })
     );
     await act(async () => { await result.current.handleSubmit("pending"); });
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "ADD_MEMO" }));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ADD_MEMO",
+        memo: expect.objectContaining({
+          title: "เรื่องทดสอบ",
+          description: "รายละเอียด",
+          closingRemark: undefined,
+          requestItems: expect.arrayContaining([
+            expect.objectContaining({ id: "1", name: "กระดาษ", unit: "รีม", qty: 1, unitPrice: 1000 })
+          ]),
+          requester: "สมชาย ใจดี",
+          department: "IT",
+          amount: 1000,
+          category: "general-purchase",
+        })
+      })
+    );
     expect(push).toHaveBeenCalledWith("/queue");
   });
 
@@ -109,7 +125,19 @@ describe("useMemoSubmit", () => {
       })
     );
     await act(async () => { await result.current.handleSubmit("pending"); });
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "SUBMIT_REVISION", id: "MEMO-9" }));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SUBMIT_REVISION",
+        id: "MEMO-9",
+        title: "เรื่องทดสอบ",
+        description: "รายละเอียด",
+        closingRemark: undefined,
+        requestItems: expect.arrayContaining([
+          expect.objectContaining({ id: "1", name: "กระดาษ", unit: "รีม", qty: 1, unitPrice: 1000 })
+        ]),
+        department: "IT",
+      })
+    );
     expect(push).toHaveBeenCalledWith("/queue");
   });
 
