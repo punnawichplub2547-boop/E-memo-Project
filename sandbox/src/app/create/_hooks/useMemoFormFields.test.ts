@@ -46,10 +46,13 @@ afterEach(() => {
 });
 
 describe("useMemoFormFields", () => {
-  it("defaults to blank fields for a brand-new memo", () => {
+  it("defaults to blank fields for a brand-new memo", async () => {
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.isRevisionMode).toBe(false);
     expect(result.current.subject).toBe("");
     expect(result.current.amount).toBe(0);
@@ -58,29 +61,38 @@ describe("useMemoFormFields", () => {
     expect(result.current.requestItems).toHaveLength(1);
   });
 
-  it("prefills from reviseMemo when the memo is returned and requester matches", () => {
+  it("prefills from reviseMemo when the memo is returned and requester matches", async () => {
     const memo = makeMemo({ id: "MEMO-2", title: "ซื้อกระดาษ", amount: 2500, status: "returned" });
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [memo], reviseId: "MEMO-2", user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.isRevisionMode).toBe(true);
     expect(result.current.subject).toBe("ซื้อกระดาษ");
     expect(result.current.amount).toBe(2500);
     expect(result.current.reviseMemo?.id).toBe("MEMO-2");
   });
 
-  it("does not enter revision mode for a rejected memo with disposition close", () => {
+  it("does not enter revision mode for a rejected memo with disposition close", async () => {
     const memo = makeMemo({ id: "MEMO-3", status: "rejected", rejectDisposition: "close" });
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [memo], reviseId: "MEMO-3", user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.isRevisionMode).toBe(false);
   });
 
-  it("removeVendorRow reassigns isSelected and refuses to go below 1 row", () => {
+  it("removeVendorRow reassigns isSelected and refuses to go below 1 row", async () => {
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     act(() => result.current.addVendorRow());
     const [firstId, secondId] = result.current.priceComparisons.map(r => r.id);
     act(() => result.current.handleSelectVendor(firstId));
@@ -93,19 +105,25 @@ describe("useMemoFormFields", () => {
     expect(result.current.priceComparisons).toHaveLength(1);
   });
 
-  it("removeRequestItem refuses to go below 1 row", () => {
+  it("removeRequestItem refuses to go below 1 row", async () => {
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     const onlyId = result.current.requestItems[0].id;
     act(() => result.current.removeRequestItem(onlyId));
     expect(result.current.requestItems).toHaveLength(1);
   });
 
-  it("applyBulkData writes only present keys; snapshotFormData reads them back", () => {
+  it("applyBulkData writes only present keys; snapshotFormData reads them back", async () => {
     const { result } = renderHook(() =>
       useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     act(() => result.current.applyBulkData({ title: "หัวข้อใหม่", amount: 5000 }));
     expect(result.current.subject).toBe("หัวข้อใหม่");
     expect(result.current.amount).toBe(5000);
@@ -116,13 +134,19 @@ describe("useMemoFormFields", () => {
     expect(snapshot.amount).toBe(5000);
   });
 
-  it("recomputes the recommendation when category or amount changes", () => {
+  it("recomputes the recommendation when category or amount changes", async () => {
     const { result, rerender } = renderHook(
       ({ user }) => useMemoFormFields({ memos: [], reviseId: null, user }),
       { initialProps: { user: makeUser() } }
     );
+    await act(async () => {
+      await Promise.resolve();
+    });
     const before = result.current.recommendation.recommendedFinalApprover;
     act(() => result.current.applyBulkData({ category: "raw-material", amount: 50000 }));
+    await act(async () => {
+      await Promise.resolve();
+    });
     rerender({ user: makeUser() });
     expect(result.current.recommendation.recommendedFinalApprover).not.toBe(before);
   });
