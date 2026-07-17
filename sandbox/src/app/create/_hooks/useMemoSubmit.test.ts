@@ -48,7 +48,6 @@ function makeFields(overrides: Partial<MemoFormFieldsResult> = {}): MemoFormFiel
     firstCheckingStep: "Manager / Top Section",
     canSubmitPending: true,
     // Unused-by-useMemoSubmit fields still required by the type; harmless placeholders.
-    ...({} as Record<string, unknown>),
     ...overrides,
   } as unknown as MemoFormFieldsResult;
 }

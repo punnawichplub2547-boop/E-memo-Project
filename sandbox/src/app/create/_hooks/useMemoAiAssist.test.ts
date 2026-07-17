@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import type { PriceComparison, RequestItem } from "@/lib/approval";
 import { useMemoAiAssist } from "./useMemoAiAssist";
 
