@@ -1,29 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
-import {
-  ApprovalCategory,
-  ApprovalLevel,
-  analyzeApprovalRoute,
-  buildApprovalFlow,
-  BudgetStatus,
-  computePriceRowTotals,
-  getApprovalRecommendation,
-  MemoAttachment,
-  PriceComparison,
-  ReadAction,
-  RequestItem,
-} from "@/lib/approval";
-import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments";
-import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
-import { newClientRowId } from "@/lib/client-row-id";
-import { formatTimestamp } from "@/lib/format-timestamp";
-import { generateMemoId } from "@/lib/memo-id";
-import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
 import {
   IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles, IconBookmark
 } from "@/components/icons";
@@ -38,20 +19,14 @@ import { MemoDetailsCard } from "./_components/MemoDetailsCard";
 import { RoutingCard } from "./_components/RoutingCard";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
 import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
+import { useMemoFormFields } from "./_hooks/useMemoFormFields";
+import { useMemoTemplates } from "./_hooks/useMemoTemplates";
+import { useMemoAiAssist } from "./_hooks/useMemoAiAssist";
+import { useMemoSubmit } from "./_hooks/useMemoSubmit";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
-import { canResubmitMemo } from "@/lib/prototype-users";
 import { ReadRecipientPicker } from "./_components/ReadRecipientPicker";
-import type { ItemSubcategory } from "@/lib/item-subcategories";
 import { SaveTemplateModal } from "./_components/SaveTemplateModal";
 import { TemplateSelectorCard } from "./_components/TemplateSelectorCard";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import type { MemoTemplate } from "@/lib/db-templates";
-
-
-
-function getEffectiveRequestQty(qty: number) {
-  return qty > 0 ? qty : 1;
-}
 
 const ASSISTANT_TABS_ID = "create-assistant-tabs";
 const ASSISTANT_PANEL_ID = "create-assistant-tabpanel";
@@ -62,705 +37,82 @@ function CreatePageContent() {
   const { memos, dispatch } = useMemos();
   const { user } = usePrototypeUser();
   const router = useRouter();
-  const issuer = {
-    name: user.name,
-    department: user.department,
-    role: user.roleLabel,
-  };
 
-  // Compute revision context before any useState so lazy initializers can reference it.
-  // reviseMemo is null when reviseId is absent, not found, or not in a resubmittable state.
-  const reviseMemo = reviseId ? (memos.find(m => m.id === reviseId) ?? null) : null;
-  const isRevisionMode = reviseMemo !== null && (
-    reviseMemo.status === "returned" ||
-    (reviseMemo.status === "rejected" && reviseMemo.rejectDisposition === "revision-allowed")
-  ) && canResubmitMemo(user, reviseMemo);
+  const formFields = useMemoFormFields({ memos, reviseId, user });
+  const {
+    issuer, reviseMemo, isRevisionMode,
+    subject, setSubject,
+    category, setCategory, itemSubcategoryId, setItemSubcategoryId,
+    itemSubcategories, itemSubcategoriesError,
+    department, setDepartment,
+    amount, setAmount,
+    budgetStatus, setBudgetStatus,
+    description, setDescription,
+    closingRemark, setClosingRemark,
+    isPriceAdjustment, setIsPriceAdjustment,
+    followsProductionPlan, setFollowsProductionPlan,
+    isDeadStockOrSlowMovement, setIsDeadStockOrSlowMovement,
+    deptMonthlyOverBudgetTotal, setDeptMonthlyOverBudgetTotal,
+    readRecipients, setReadRecipients,
+    accountCode, setAccountCode,
+    budgetPlan, setBudgetPlan,
+    budgetUsed, setBudgetUsed,
+    priceComparisons, selectedVendorReason, setSelectedVendorReason,
+    requestItems,
+    priceAdjustmentReason, setPriceAdjustmentReason,
+    setChosenApprover,
+    skipGmStep, setSkipGmStep,
+    routeOverrideReason, setRouteOverrideReason,
+    clockDateLabel, clockTimeLabel, currentDateLabel,
+    supportsPriceAdjustment, supportsProductionPlan, supportsDeadStock, showDeptMonthly,
+    effectiveIsPriceAdjustment, effectiveIsDeadStock,
+    recommendation,
+    effectiveApprover,
+    selectedRoute,
+    routeReview,
+    tierClass,
+    isOverridden,
+    budgetRemaining,
+    cleanOverrideReason,
+    orderedReadRecipients,
+    selectedVendor,
+    hasPricedVendor,
+    lowestNetPrice,
+    lowestOfferSummary,
+    selectedVendorSummary,
+    selectedNotLowest,
+    selectedVendorVat,
+    selectedVendorVatAmount,
+    canSubmitPending,
+    requestItemsGrandTotal,
+    addRequestItem, removeRequestItem, updateRequestItem,
+    addVendorRow, removeVendorRow, updateVendorRow, handleSelectVendor,
+    applyBulkData, snapshotFormData,
+  } = formFields;
 
-  // ── Content fields — seed from reviseMemo in revision mode, else use defaults ──
-  const [subject, setSubject] = useState(() =>
-    isRevisionMode ? (reviseMemo!.title ?? "") : ""
-  );
-  const [category, setCategory] = useState<ApprovalCategory>(() =>
-    isRevisionMode ? (reviseMemo!.category ?? "general-purchase") : "general-purchase"
-  );
-  const [itemSubcategoryId, setItemSubcategoryId] = useState<number | undefined>(() =>
-    isRevisionMode ? reviseMemo!.itemSubcategoryId : undefined
-  );
-  const [itemSubcategories, setItemSubcategories] = useState<ItemSubcategory[]>([]);
-  const [itemSubcategoriesError, setItemSubcategoriesError] = useState("");
-  const [department, setDepartment] = useState(() =>
-    isRevisionMode ? (reviseMemo!.department ?? issuer.department) : issuer.department
-  );
-  const [amount, setAmount] = useState(() =>
-    isRevisionMode ? (reviseMemo!.amount ?? 0) : 0
-  );
-  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus>(() =>
-    isRevisionMode ? (reviseMemo!.budgetStatus ?? "in-budget") : "in-budget"
-  );
-  const [description, setDescription] = useState(() =>
-    isRevisionMode ? (reviseMemo!.description ?? "") : ""
-  );
-  const [closingRemark, setClosingRemark] = useState(() =>
-    isRevisionMode ? (reviseMemo!.closingRemark ?? "") : ""
-  );
-  const [isPriceAdjustment, setIsPriceAdjustment] = useState(() =>
-    isRevisionMode ? (reviseMemo!.isPriceAdjustment ?? false) : false
-  );
-  const [followsProductionPlan, setFollowsProductionPlan] = useState(() =>
-    isRevisionMode ? (reviseMemo!.followsProductionPlan ?? false) : false
-  );
-  const [isDeadStockOrSlowMovement, setIsDeadStockOrSlowMovement] = useState(() =>
-    isRevisionMode ? (reviseMemo!.isDeadStockOrSlowMovement ?? false) : false
-  );
-  const [deptMonthlyOverBudgetTotal, setDeptMonthlyOverBudgetTotal] = useState(() =>
-    isRevisionMode ? (reviseMemo!.departmentMonthlyOverBudgetTotal ?? 0) : 0
-  );
-  const [readRecipients, setReadRecipients] = useState<string[]>(() =>
-    isRevisionMode ? (reviseMemo!.readRecipients ?? []) : []
-  );
-  const [accountCode, setAccountCode] = useState(() =>
-    isRevisionMode ? (reviseMemo!.accountCode ?? "") : ""
-  );
-  const [budgetPlan, setBudgetPlan] = useState(() =>
-    isRevisionMode ? (reviseMemo!.budgetPlan ?? 0) : 0
-  );
-  const [budgetUsed, setBudgetUsed] = useState(() =>
-    isRevisionMode ? (reviseMemo!.budgetUsed ?? 0) : 0
-  );
-  const [priceComparisons, setPriceComparisons] = useState<PriceComparison[]>(() => {
-    if (isRevisionMode && (reviseMemo!.priceComparisons?.length ?? 0) > 0) {
-      return reviseMemo!.priceComparisons!;
-    }
-    return [{ id: "1", vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: true }];
+  const {
+    templates, templatesLoading, saveModalOpen, setSaveModalOpen, isSavingTemplate,
+    loadedTemplateId, loadedTemplateName, clearLoadedTemplate,
+    handleLoadTemplate, handleSaveTemplate, handleDeleteTemplate,
+  } = useMemoTemplates({ isRevisionMode, applyBulkData, snapshotFormData });
+
+  const {
+    isAiLoading, aiError, setAiError,
+    isPdfLoading, pdfError, setPdfError,
+    pdfInputRef,
+    handleAiSuggest, handlePdfUpload,
+  } = useMemoAiAssist({
+    category, amount, department, budgetStatus, priceComparisons, requestItems, applyBulkData,
   });
-  const [selectedVendorReason, setSelectedVendorReason] = useState(() =>
-    isRevisionMode ? (reviseMemo!.selectedVendorReason ?? "") : ""
-  );
-  const [requestItems, setRequestItems] = useState<RequestItem[]>(() => {
-    if (isRevisionMode && (reviseMemo!.requestItems?.length ?? 0) > 0) {
-      return reviseMemo!.requestItems!;
-    }
-    return [{ id: "1", name: "", unit: "ชิ้น", qty: 1, unitPrice: 0 }];
-  });
-  const [priceAdjustmentReason, setPriceAdjustmentReason] = useState(() =>
-    isRevisionMode ? (reviseMemo!.priceAdjustmentReason ?? "") : ""
-  );
 
-  // ── Routing fields — always default to fresh recommendation (user decision) ──
-  // The recommendation is recomputed from the prefilled content fields, so the
-  // routing card shows the correct Book1 recommendation for the revised data.
-  const [chosenApprover, setChosenApprover] = useState<ApprovalLevel | null>(null);
-  const [skipGmStep, setSkipGmStep] = useState(false);
-  const [routeOverrideReason, setRouteOverrideReason] = useState("");
-
-  // ── UI / AI state — always defaults ──
-  const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Template states and helpers ──
-  const [templates, setTemplates] = useState<MemoTemplate[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-  const [loadedTemplateId, setLoadedTemplateId] = useState<number | null>(null);
-  const [loadedTemplateName, setLoadedTemplateName] = useState<string>("");
-
-  const fetchTemplates = async () => {
-    try {
-      const res = await fetch("/api/templates");
-      if (res.ok) {
-        const data = await res.json();
-        setTemplates(data.templates || []);
-      }
-    } catch (e) {
-      console.error("Failed to fetch templates", e);
-    } finally {
-      setTemplatesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isRevisionMode) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      fetchTemplates();
-    } else {
-      setTemplatesLoading(false);
-    }
-  }, [isRevisionMode]);
-
-  const handleLoadTemplate = (id: number, name: string, data: Record<string, unknown>) => {
-    if (!data) return;
-    setLoadedTemplateId(id);
-    setLoadedTemplateName(name);
-    if (data.title) setSubject(data.title as string);
-    if (data.category) {
-      setCategory(data.category as ApprovalCategory);
-      setItemSubcategoryId(data.itemSubcategoryId as number | undefined);
-    }
-    if (data.department) setDepartment(data.department as string);
-    if (data.amount !== undefined) setAmount(data.amount as number);
-    if (data.budgetStatus) setBudgetStatus(data.budgetStatus as BudgetStatus);
-    if (data.description) setDescription(data.description as string);
-    if (data.closingRemark) setClosingRemark(data.closingRemark as string);
-    if (data.isPriceAdjustment !== undefined) setIsPriceAdjustment(data.isPriceAdjustment as boolean);
-    if (data.followsProductionPlan !== undefined) setFollowsProductionPlan(data.followsProductionPlan as boolean);
-    if (data.isDeadStockOrSlowMovement !== undefined) setIsDeadStockOrSlowMovement(data.isDeadStockOrSlowMovement as boolean);
-    if (data.accountCode) setAccountCode(data.accountCode as string);
-    if (data.budgetPlan !== undefined) setBudgetPlan(data.budgetPlan as number);
-    if (data.budgetUsed !== undefined) setBudgetUsed(data.budgetUsed as number);
-    if (data.priceComparisons && (data.priceComparisons as Array<unknown>).length > 0) {
-      setPriceComparisons(data.priceComparisons as PriceComparison[]);
-    }
-    if (data.selectedVendorReason) setSelectedVendorReason(data.selectedVendorReason as string);
-    if (data.requestItems && (data.requestItems as Array<unknown>).length > 0) {
-      setRequestItems(data.requestItems as RequestItem[]);
-    }
-    if (data.priceAdjustmentReason) setPriceAdjustmentReason(data.priceAdjustmentReason as string);
-    if (data.readRecipients) setReadRecipients(data.readRecipients as string[]);
-
-    showSuccessToast("โหลดแม่แบบเรียบร้อยแล้ว");
-  };
-
-  const handleSaveTemplate = async (name: string, overwriteId?: number | null) => {
-    try {
-      setIsSavingTemplate(true);
-      const templateData = {
-        title: subject,
-        category,
-        itemSubcategoryId,
-        department,
-        amount,
-        budgetStatus,
-        description,
-        closingRemark,
-        isPriceAdjustment,
-        followsProductionPlan,
-        isDeadStockOrSlowMovement,
-        accountCode,
-        budgetPlan,
-        budgetUsed,
-        priceComparisons,
-        selectedVendorReason,
-        requestItems,
-        priceAdjustmentReason,
-        readRecipients,
-      };
-
-      const isOverwrite = typeof overwriteId === "number" && overwriteId > 0;
-      const url = isOverwrite ? `/api/templates/${overwriteId}` : "/api/templates";
-      const method = isOverwrite ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, template: templateData }),
-      });
-
-      if (res.ok) {
-        showSuccessToast(isOverwrite ? "อัปเดตแม่แบบเรียบร้อยแล้ว" : "บันทึกแม่แบบเรียบร้อยแล้ว");
-        setSaveModalOpen(false);
-        if (isOverwrite) {
-          setLoadedTemplateName(name);
-        } else {
-          const body = await res.json();
-          if (body.id) {
-            setLoadedTemplateId(body.id);
-            setLoadedTemplateName(name);
-          }
-        }
-        setTemplatesLoading(true);
-        fetchTemplates();
-      } else {
-        const err = await res.json();
-        showErrorToast(err.error || (isOverwrite ? "อัปเดตแม่แบบไม่สำเร็จ" : "บันทึกแม่แบบไม่สำเร็จ"));
-      }
-    } catch (e) {
-      console.error("Failed to save template", e);
-      showErrorToast("ระบบเกิดข้อผิดพลาดในการบันทึกแม่แบบ");
-    } finally {
-      setIsSavingTemplate(false);
-    }
-  };
-
-  const handleDeleteTemplate = async (id: number) => {
-    try {
-      const res = await fetch(`/api/templates/${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        showSuccessToast("ลบแม่แบบเรียบร้อยแล้ว");
-        if (loadedTemplateId === id) {
-          setLoadedTemplateId(null);
-          setLoadedTemplateName("");
-        }
-        setTemplatesLoading(true);
-        fetchTemplates();
-      } else {
-        const err = await res.json();
-        showErrorToast(err.error || "ลบแม่แบบไม่สำเร็จ");
-      }
-    } catch (e) {
-      console.error("Failed to delete template", e);
-      showErrorToast("ระบบเกิดข้อผิดพลาดในการลบแม่แบบ");
-    }
-  };
+  const {
+    attachmentFiles, attachmentError, isSubmitting,
+    addAttachmentFiles, removeAttachmentFile, handleSubmit,
+  } = useMemoSubmit(formFields, { user, dispatch, router });
 
   // ── Assistant panel state — extracted to hook for localStorage persistence ──
   const { assistantExpanded, assistantTab, assistantHydrated, setAssistantExpanded, setAssistantTab } =
     useCreateMemoAssistant();
-
-  const addAttachmentFiles = (files: File[]) => {
-    setAttachmentError(null);
-    const invalid = files.find((file) => file.size > MAX_ATTACHMENT_BYTES || !isAllowedAttachmentFile(file.name, file.type));
-    if (invalid) {
-      setAttachmentError(`${invalid.name} is not allowed or exceeds 10 MB.`);
-      return;
-    }
-    setAttachmentFiles((prev) => [...prev, ...files]);
-  };
-
-  const removeAttachmentFile = (index: number) => {
-    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
-    setAttachmentError(null);
-  };
-
-  const addRequestItem = () => {
-    setRequestItems(prev => [...prev, {
-      id: newClientRowId(), name: "", unit: "ชิ้น", qty: 1, unitPrice: 0,
-    }]);
-  };
-  const removeRequestItem = (id: string) => {
-    setRequestItems(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
-  };
-  const updateRequestItem = (id: string, updates: Partial<Omit<RequestItem, "id">>) => {
-    const normalizedUpdates = {
-      ...updates,
-      ...(updates.qty !== undefined ? { qty: coercePositiveInteger(updates.qty) } : {}),
-      ...(updates.unitPrice !== undefined ? { unitPrice: coerceNonNegativeNumber(updates.unitPrice) } : {}),
-    };
-    setRequestItems(prev => prev.map(r => r.id === id ? { ...r, ...normalizedUpdates } : r));
-  };
-
-  const addVendorRow = () => {
-    setPriceComparisons(prev => [...prev, {
-      id: newClientRowId(), vendorName: "", offeredPrice: 0, discount: 0, vatEnabled: false, netPrice: 0, remark: "", isSelected: false,
-    }]);
-  };
-  const removeVendorRow = (id: string) => {
-    setPriceComparisons(prev => {
-      if (prev.length === 1) return prev;
-      const removingSelected = prev.find(r => r.id === id)?.isSelected ?? false;
-      const next = prev.filter(r => r.id !== id);
-      if (removingSelected && next.length > 0) next[0] = { ...next[0], isSelected: true };
-      return next;
-    });
-  };
-  const updateVendorRow = (id: string, updates: Partial<PriceComparison>) => {
-    setPriceComparisons(prev => prev.map(row => {
-      if (row.id !== id) return row;
-      const normalizedUpdates = {
-        ...updates,
-        ...(updates.offeredPrice !== undefined ? { offeredPrice: coerceNonNegativeNumber(updates.offeredPrice) } : {}),
-        ...(updates.discount !== undefined ? { discount: coerceNonNegativeNumber(updates.discount) } : {}),
-      };
-      const merged: PriceComparison = {
-        ...row,
-        ...normalizedUpdates,
-        // isSelected is owned by handleSelectVendor, not the per-field updater
-        isSelected: row.isSelected,
-      };
-      const { netPrice } = computePriceRowTotals(merged);
-      return { ...merged, netPrice };
-    }));
-  };
-  const handleSelectVendor = (id: string) => {
-    setPriceComparisons(prev => prev.map(row => ({ ...row, isSelected: row.id === id })));
-    // Only wipe the override reason when the selected vendor actually changes.
-    const currentSelected = priceComparisons.find(r => r.isSelected);
-    if (currentSelected?.id !== id) setSelectedVendorReason("");
-  };
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/item-subcategories?category=${encodeURIComponent(category)}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
-      .then((body: { items: ItemSubcategory[] }) => {
-        if (!controller.signal.aborted) {
-          setItemSubcategories(body.items);
-          setItemSubcategoriesError("");
-        }
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setItemSubcategories([]);
-        setItemSubcategoriesError("โหลดหมวดรายการย่อยไม่สำเร็จ");
-      });
-    return () => controller.abort();
-  }, [category]);
-
-  const supportsPriceAdjustment = category === "raw-material" || category === "fixed-asset";
-  const supportsProductionPlan = category === "raw-material";
-  const supportsDeadStock = category === "raw-material";
-  const showDeptMonthly = budgetStatus !== "in-budget";
-
-  const effectiveIsPriceAdjustment = supportsPriceAdjustment && isPriceAdjustment;
-  const effectiveFollowsProductionPlan = supportsProductionPlan && followsProductionPlan;
-  const effectiveIsDeadStock = supportsDeadStock && isDeadStockOrSlowMovement;
-
-  const recommendation = useMemo(
-    () =>
-      getApprovalRecommendation({
-        category, amount, budgetStatus,
-        isPriceAdjustment: effectiveIsPriceAdjustment,
-        followsProductionPlan: effectiveFollowsProductionPlan,
-        isDeadStockOrSlowMovement: effectiveIsDeadStock,
-        departmentMonthlyOverBudgetTotal: showDeptMonthly ? deptMonthlyOverBudgetTotal : 0,
-      }),
-    [category, amount, budgetStatus, effectiveIsPriceAdjustment, effectiveFollowsProductionPlan,
-      effectiveIsDeadStock, deptMonthlyOverBudgetTotal, showDeptMonthly]
-  );
-
-  const effectiveApprover: ApprovalLevel = chosenApprover ?? recommendation.recommendedFinalApprover;
-  const selectedRoute = useMemo(
-    () =>
-      effectiveApprover === "Managing Director" && skipGmStep
-        ? buildApprovalFlow(effectiveApprover, { respectChosenOnly: true })
-        : buildApprovalFlow(effectiveApprover),
-    [effectiveApprover, skipGmStep]
-  );
-  const routeReview = useMemo(
-    () =>
-      analyzeApprovalRoute(
-        recommendation.recommendedFinalApprover,
-        selectedRoute
-      ),
-    [recommendation.recommendedFinalApprover, selectedRoute]
-  );
-  const flow = selectedRoute;
-  const tierClass = effectiveApprover === "Managing Director" ? "md" : effectiveApprover === "General Manager" ? "gm" : "mgr";
-  const isOverridden = routeReview.mode !== "recommended";
-  const budgetRemaining = budgetPlan - budgetUsed - amount;
-  const cleanOverrideReason = routeOverrideReason.trim();
-  const orderedReadRecipients = readRecipients;
-  const firstCheckingStep = selectedRoute[0] ?? "Manager / Top Section";
-  const selectedVendor = priceComparisons.find(r => r.isSelected) ?? priceComparisons[0];
-  const selectedItemSubcategory = itemSubcategories.find(item => item.id === itemSubcategoryId);
-  const itemSubcategoryLabel =
-    selectedItemSubcategory?.labelTh ??
-    (itemSubcategoryId === reviseMemo?.itemSubcategoryId ? reviseMemo?.itemSubcategoryLabel : undefined);
-  const hasPricedVendor = priceComparisons.some(r => r.offeredPrice > 0);
-  const validPrices = priceComparisons.filter(r => r.offeredPrice > 0).map(r => r.netPrice);
-  const lowestNetPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
-  const lowestOfferVendorNames = priceComparisons
-    .filter((row) => row.offeredPrice > 0 && row.netPrice === lowestNetPrice)
-    .map((row) => row.vendorName.trim())
-    .filter(Boolean);
-  const lowestOfferSummary =
-    lowestNetPrice > 0
-      ? `${lowestOfferVendorNames.length > 0 ? `${lowestOfferVendorNames.join(", ")} · ` : ""}฿${lowestNetPrice.toLocaleString()}`
-      : "—";
-  const selectedVendorSummary =
-    selectedVendor && selectedVendor.vendorName.trim().length > 0
-      ? `${selectedVendor.vendorName.trim()} · ฿${selectedVendor.netPrice.toLocaleString()}`
-      : selectedVendor && selectedVendor.netPrice > 0
-        ? `฿${selectedVendor.netPrice.toLocaleString()}`
-        : "—";
-  const selectedNotLowest = priceComparisons.length > 1 && lowestNetPrice > 0 && (selectedVendor?.netPrice ?? 0) > lowestNetPrice;
-  const selectedVendorTotals = selectedVendor ? computePriceRowTotals(selectedVendor) : null;
-  const selectedVendorVat = Boolean(selectedVendor?.vatEnabled);
-  const selectedVendorVatAmount = selectedVendorTotals?.vatAmount ?? 0;
-  const cleanVendorReason = selectedVendorReason.trim();
-  const canSubmitPending = (!routeReview.requiresReason || cleanOverrideReason.length > 0) && (!selectedNotLowest || cleanVendorReason.length > 0);
-  const currentDateLabel = useMemo(
-    () => currentDateTime
-      ? new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeStyle: "short" }).format(currentDateTime)
-      : "",
-    [currentDateTime]
-  );
-  const clockDateLabel = useMemo(
-    () => currentDateTime
-      ? new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(currentDateTime)
-      : "",
-    [currentDateTime]
-  );
-  const clockTimeLabel = useMemo(
-    () => currentDateTime
-      ? new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(currentDateTime)
-      : "--:--:--",
-    [currentDateTime]
-  );
-  const requestItemsGrandTotal = useMemo(
-    () => requestItems.reduce((sum, r) => sum + Math.round(getEffectiveRequestQty(r.qty) * r.unitPrice), 0),
-    [requestItems]
-  );
-  const handleAiSuggest = async () => {
-    setIsAiLoading(true);
-    setAiError(null);
-    try {
-      const res = await fetch("/api/ai-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, amount, department, budgetStatus }),
-      });
-      const data = await res.json();
-      if (data.error === "not_configured") {
-        setAiError("ยังไม่ได้ตั้งค่า THAILLM_API_KEY ใน .env.local");
-      } else if (data.error === "quota_exceeded") {
-        setAiError("Rate limit — รอ 1 นาทีแล้วลองใหม่");
-      } else if (data.error === "parse_error") {
-        setAiError("AI ตอบผิดรูปแบบ — ลองใหม่อีกครั้ง");
-      } else if (data.error) {
-        setAiError(`AI ไม่พร้อมใช้งานขณะนี้${data.detail ? ` (${data.detail})` : ""}`);
-      } else {
-        if (data.subject) setSubject(data.subject);
-        if (data.description) setDescription(data.description);
-      }
-    } catch {
-      setAiError("เชื่อมต่อ AI ไม่ได้");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
-  const handlePdfUpload = async (file: File) => {
-    setPdfError(null);
-    setIsPdfLoading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/pdf-extract", { method: "POST", body: form });
-      const data = await res.json();
-      if (data.error === "not_configured") {
-        setPdfError("ยังไม่ได้ตั้งค่า AI API key");
-      } else if (data.error === "quota_exceeded") {
-        setPdfError("Rate limit — รอ 1 นาทีแล้วลองใหม่");
-      } else if (data.error === "pdf_only") {
-        setPdfError("รองรับเฉพาะไฟล์ PDF เท่านั้น");
-      } else if (data.error === "file_too_large") {
-        setPdfError("ไฟล์ใหญ่เกิน 10 MB");
-      } else if (data.error === "no_text_in_pdf") {
-        setPdfError("PDF นี้ไม่มีข้อความ (อาจเป็น scan) — กรอกด้วยตนเอง");
-      } else if (data.error) {
-        setPdfError("ดึงข้อมูลจาก PDF ไม่สำเร็จ — ลองใหม่");
-      } else {
-        // Pre-fill vendor row
-        if (data.vendor || data.items?.length > 0) {
-          const totalFromItems = (data.items ?? []).reduce(
-            (s: number, it: { qty: number; unitPrice: number }) =>
-              s + Math.round(coercePositiveInteger(it.qty) * coerceNonNegativeNumber(it.unitPrice)),
-            0
-          );
-          const vendorPrice = coerceNonNegativeNumber(data.totalAmount || totalFromItems);
-          const isFirstBlank =
-            priceComparisons.length === 1 &&
-            !priceComparisons[0].vendorName &&
-            priceComparisons[0].offeredPrice === 0;
-          // VAT defaults to disabled — extracted PDF totals are ambiguous re: VAT inclusion.
-          // User can toggle the per-row VAT 7% pill if the quote explicitly excludes VAT.
-          const newVendorRow: PriceComparison = {
-            id: newClientRowId(),
-            vendorName: data.vendor ?? "",
-            offeredPrice: vendorPrice,
-            discount: 0,
-            vatEnabled: false,
-            netPrice: vendorPrice,
-            remark: file.name,
-            isSelected: true,
-          };
-          if (isFirstBlank) {
-            setPriceComparisons([newVendorRow]);
-          } else {
-            setPriceComparisons(prev => [
-              ...prev.map(r => ({ ...r, isSelected: false })),
-              newVendorRow,
-            ]);
-          }
-        }
-        // Pre-fill request items
-        if (Array.isArray(data.items) && data.items.length > 0) {
-          const isFirstItemBlank =
-            requestItems.length === 1 && !requestItems[0].name && requestItems[0].unitPrice === 0;
-          const newItems = data.items.map((it: { name: string; qty: number; unit: string; unitPrice: number }) => ({
-            id: newClientRowId(),
-            name: it.name,
-            unit: it.unit || "ชิ้น",
-            qty: coercePositiveInteger(it.qty),
-            unitPrice: coerceNonNegativeNumber(it.unitPrice),
-          }));
-          if (isFirstItemBlank) {
-            setRequestItems(newItems);
-          } else {
-            setRequestItems(prev => [...prev, ...newItems]);
-          }
-        }
-      }
-    } catch {
-      setPdfError("เชื่อมต่อ server ไม่ได้");
-    } finally {
-      setIsPdfLoading(false);
-      if (pdfInputRef.current) pdfInputRef.current.value = "";
-    }
-  };
-
-  const uploadSelectedAttachments = async (memoId: string): Promise<MemoAttachment[] | undefined> => {
-    if (attachmentFiles.length === 0) return undefined;
-    const formData = new FormData();
-    formData.append("memoId", memoId);
-    for (const file of attachmentFiles) formData.append("files", file);
-
-    const response = await fetch("/api/attachments", {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: "Unable to upload attachments" }));
-      throw new Error(String(body.error ?? "Unable to upload attachments"));
-    }
-    const body = await response.json() as { attachments: MemoAttachment[] };
-    return body.attachments.length > 0 ? body.attachments : undefined;
-  };
-
-  const handleSubmit = async (status: "draft" | "pending") => {
-    if (status === "draft" && isRevisionMode) return; // Save Draft is not available in revision mode
-    if (isSubmitting) return;
-
-    // 🔴 VALIDATION: Only validate mandatory fields when sending to approval (pending status)
-    if (status === "pending") {
-      if (!canSubmitPending) return;
-
-      const validation = validateMemoFormForApproval({
-        subject,
-        description,
-        requestItems,
-        priceComparisons,
-      });
-
-      if (!validation.valid) {
-        // Show toast error with all validation errors
-        validation.errors.forEach((error) => {
-          showErrorToast(error, 5000);
-        });
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    const now = new Date();
-    const stamp = formatTimestamp(now);
-    setIsSubmitting(true);
-    setAttachmentError(null);
-
-    if (isRevisionMode) {
-      // Dispatch SUBMIT_REVISION — applies new content to the existing memo and increments revision.
-      dispatch({
-        type: "SUBMIT_REVISION",
-        id: reviseMemo!.id,
-        title: subject,
-        category,
-        itemSubcategoryId,
-        itemSubcategoryLabel,
-        department,
-        amount,
-        description: description.trim() || undefined,
-        closingRemark: closingRemark.trim() || undefined,
-        budgetStatus,
-        accountCode: accountCode.trim() || undefined,
-        budgetPlan,
-        budgetUsed,
-        requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
-        priceComparisons,
-        selectedVendorId: selectedVendor?.id,
-        selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
-        priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
-        isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
-        followsProductionPlan: effectiveFollowsProductionPlan || undefined,
-        isDeadStockOrSlowMovement: effectiveIsDeadStock || undefined,
-        departmentMonthlyOverBudgetTotal: showDeptMonthly && deptMonthlyOverBudgetTotal > 0 ? deptMonthlyOverBudgetTotal : undefined,
-        readRecipients: orderedReadRecipients,
-        readActions: orderedReadRecipients.length > 0
-          ? orderedReadRecipients.map((r): ReadAction => ({ recipient: r, status: "pending" }))
-          : undefined,
-        recommendedFinalApprover: recommendation.recommendedFinalApprover,
-        recommendedRoute: routeReview.recommendedRoute,
-        selectedRoute,
-        routeMode: routeReview.mode,
-        routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
-        notifyMD: recommendation.notifyMD,
-        requiresMdReview: recommendation.requiresMdReview,
-        updatedAt: stamp,
-      });
-      router.push("/queue");
-      return;
-    }
-
-    // Normal new-memo path
-    const id = generateMemoId(now);
-    const createdTimestamp = formatTimestamp(now);
-    let attachments: MemoAttachment[] | undefined;
-    try {
-      attachments = await uploadSelectedAttachments(id);
-    } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : "Unable to upload attachments");
-      setIsSubmitting(false);
-      return;
-    }
-    dispatch({
-      type: "ADD_MEMO",
-      memo: {
-        id, title: subject, requester: user.name, department, category, amount, status,
-        itemSubcategoryId,
-        itemSubcategoryLabel,
-        currentStep: firstCheckingStep,
-        workflowState: "Issued",
-        recommendedFinalApprover: recommendation.recommendedFinalApprover,
-        recommendedRoute: routeReview.recommendedRoute,
-        selectedRoute,
-        routeMode: routeReview.mode,
-        routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
-        readRecipients: orderedReadRecipients,
-        readActions: status === "pending" && orderedReadRecipients.length > 0
-          ? orderedReadRecipients.map((r): ReadAction => ({ recipient: r, status: "pending" }))
-          : undefined,
-        description: description.trim() || undefined,
-        closingRemark: closingRemark.trim() || undefined,
-        budgetStatus,
-        accountCode: accountCode.trim() || undefined,
-        budgetPlan,
-        budgetUsed,
-        notifyMD: recommendation.notifyMD,
-        requiresMdReview: recommendation.requiresMdReview,
-        priceComparisons,
-        selectedVendorId: selectedVendor?.id,
-        selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
-        requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
-        attachments,
-        priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
-        isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
-        followsProductionPlan: effectiveFollowsProductionPlan || undefined,
-        isDeadStockOrSlowMovement: effectiveIsDeadStock || undefined,
-        departmentMonthlyOverBudgetTotal: showDeptMonthly && deptMonthlyOverBudgetTotal > 0 ? deptMonthlyOverBudgetTotal : undefined,
-        cycleHours: 0, createdAt: createdTimestamp, updatedAt: createdTimestamp,
-      },
-    });
-    router.push(status === "pending" ? "/queue" : "/");
-  };
 
   return (
     <div className="em-art">
@@ -892,7 +244,7 @@ function CreatePageContent() {
                 showDeptMonthly={showDeptMonthly}
                 effectiveIsPriceAdjustment={effectiveIsPriceAdjustment}
                 onSubjectChange={setSubject}
-                onCategoryChange={(v) => { setCategory(v); setItemSubcategoryId(undefined); setChosenApprover(null); setLoadedTemplateId(null); setLoadedTemplateName(""); }}
+                onCategoryChange={(v) => { setCategory(v); setItemSubcategoryId(undefined); setChosenApprover(null); clearLoadedTemplate(); }}
                 onItemSubcategoryChange={setItemSubcategoryId}
                 onDepartmentChange={setDepartment}
                 onAmountChange={(v) => { setAmount(v); setChosenApprover(null); }}
@@ -1027,7 +379,7 @@ function CreatePageContent() {
                       routeOverrideReason={routeOverrideReason}
                       routeReview={routeReview}
                       recommendation={recommendation}
-                      flow={flow}
+                      flow={selectedRoute}
                       onApproverChange={(v) => { setChosenApprover(v); setSkipGmStep(false); }}
                       onReset={() => { setChosenApprover(null); setSkipGmStep(false); setRouteOverrideReason(""); }}
                       onSkipGmChange={setSkipGmStep}
