@@ -9,12 +9,13 @@ vi.mock("@/lib/db-templates", () => ({
   createTemplate: vi.fn(),
   getTemplatesByUserId: vi.fn(),
   deleteTemplate: vi.fn(),
+  updateTemplate: vi.fn(),
 }));
 
 import { GET, POST } from "./route";
-import { DELETE } from "./[id]/route";
+import { DELETE, PUT } from "./[id]/route";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
-import { createTemplate, getTemplatesByUserId, deleteTemplate } from "@/lib/db-templates";
+import { createTemplate, getTemplatesByUserId, deleteTemplate, updateTemplate } from "@/lib/db-templates";
 import type { MemoTemplate } from "@/lib/db-templates";
 
 const USER = { userId: 1, firstName: "Test", lastName: "User", roles: ["requester"] };
@@ -131,6 +132,70 @@ describe("Templates API Routes", () => {
       vi.mocked(deleteTemplate).mockResolvedValue(false);
       const req = new NextRequest("http://localhost/api/templates/202", { method: "DELETE" });
       const res = await DELETE(req, ctx);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("PUT /api/templates/[id]", () => {
+    const ctx = { params: Promise.resolve({ id: "202" }) };
+
+    it("returns 401 when no session", async () => {
+      vi.mocked(getActiveSessionUserFromToken).mockResolvedValue(null);
+      const req = new NextRequest("http://localhost/api/templates/202", {
+        method: "PUT",
+        body: JSON.stringify({ name: "Updated", template: {} }),
+      });
+      const res = await PUT(req, ctx);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 400 when ID is invalid", async () => {
+      const req = new NextRequest("http://localhost/api/templates/abc", {
+        method: "PUT",
+        body: JSON.stringify({ name: "Updated", template: {} }),
+      });
+      const res = await PUT(req, { params: Promise.resolve({ id: "abc" }) });
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when name is missing", async () => {
+      const req = new NextRequest("http://localhost/api/templates/202", {
+        method: "PUT",
+        body: JSON.stringify({ template: {} }),
+      });
+      const res = await PUT(req, ctx);
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when template is missing", async () => {
+      const req = new NextRequest("http://localhost/api/templates/202", {
+        method: "PUT",
+        body: JSON.stringify({ name: "Updated" }),
+      });
+      const res = await PUT(req, ctx);
+      expect(res.status).toBe(400);
+    });
+
+    it("updates owned template successfully", async () => {
+      vi.mocked(updateTemplate).mockResolvedValue(true);
+      const req = new NextRequest("http://localhost/api/templates/202", {
+        method: "PUT",
+        body: JSON.stringify({ name: "Updated Name", template: { val: 2 } }),
+      });
+      const res = await PUT(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(updateTemplate).toHaveBeenCalledWith(202, 1, "Updated Name", { val: 2 });
+    });
+
+    it("returns 404 when template not owned or not found", async () => {
+      vi.mocked(updateTemplate).mockResolvedValue(false);
+      const req = new NextRequest("http://localhost/api/templates/202", {
+        method: "PUT",
+        body: JSON.stringify({ name: "Updated Name", template: { val: 2 } }),
+      });
+      const res = await PUT(req, ctx);
       expect(res.status).toBe(404);
     });
   });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./db", () => ({ getDbPool: vi.fn() }));
 import { getDbPool } from "./db";
-import { createTemplate, getTemplatesByUserId, getTemplateById, deleteTemplate } from "./db-templates";
+import { createTemplate, getTemplatesByUserId, getTemplateById, deleteTemplate, updateTemplate } from "./db-templates";
 
 describe("db-templates helpers", () => {
   let query: ReturnType<typeof vi.fn>;
@@ -76,6 +76,24 @@ describe("db-templates helpers", () => {
     it("returns false if affectedRows is 0", async () => {
       query.mockResolvedValue([{ affectedRows: 0 }]);
       const ok = await deleteTemplate(99, 1);
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe("updateTemplate", () => {
+    it("updates template and returns true if affectedRows > 0", async () => {
+      query.mockResolvedValue([{ affectedRows: 1 }]);
+      const ok = await updateTemplate(101, 1, "New Name", { title: "Updated" });
+      expect(ok).toBe(true);
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql, params] = query.mock.calls[0];
+      expect(sql).toMatch(/UPDATE memo_templates SET name = \?, template_json = \? WHERE id = \? AND user_id = \?/i);
+      expect(params).toEqual(["New Name", JSON.stringify({ title: "Updated" }), 101, 1]);
+    });
+
+    it("returns false if affectedRows is 0", async () => {
+      query.mockResolvedValue([{ affectedRows: 0 }]);
+      const ok = await updateTemplate(101, 1, "New Name", { title: "Updated" });
       expect(ok).toBe(false);
     });
   });

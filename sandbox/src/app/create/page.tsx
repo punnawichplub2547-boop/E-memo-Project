@@ -169,6 +169,8 @@ function CreatePageContent() {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [loadedTemplateId, setLoadedTemplateId] = useState<number | null>(null);
+  const [loadedTemplateName, setLoadedTemplateName] = useState<string>("");
 
   const fetchTemplates = async () => {
     try {
@@ -193,8 +195,10 @@ function CreatePageContent() {
     }
   }, [isRevisionMode]);
 
-  const handleLoadTemplate = (data: Record<string, unknown>) => {
+  const handleLoadTemplate = (id: number, name: string, data: Record<string, unknown>) => {
     if (!data) return;
+    setLoadedTemplateId(id);
+    setLoadedTemplateName(name);
     if (data.title) setSubject(data.title as string);
     if (data.category) {
       setCategory(data.category as ApprovalCategory);
@@ -224,7 +228,7 @@ function CreatePageContent() {
     showSuccessToast("โหลดแม่แบบเรียบร้อยแล้ว");
   };
 
-  const handleSaveTemplate = async (name: string) => {
+  const handleSaveTemplate = async (name: string, overwriteId?: number | null) => {
     try {
       setIsSavingTemplate(true);
       const templateData = {
@@ -249,20 +253,33 @@ function CreatePageContent() {
         readRecipients,
       };
 
-      const res = await fetch("/api/templates", {
-        method: "POST",
+      const isOverwrite = typeof overwriteId === "number" && overwriteId > 0;
+      const url = isOverwrite ? `/api/templates/${overwriteId}` : "/api/templates";
+      const method = isOverwrite ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, template: templateData }),
       });
 
       if (res.ok) {
-        showSuccessToast("บันทึกแม่แบบเรียบร้อยแล้ว");
+        showSuccessToast(isOverwrite ? "อัปเดตแม่แบบเรียบร้อยแล้ว" : "บันทึกแม่แบบเรียบร้อยแล้ว");
         setSaveModalOpen(false);
+        if (isOverwrite) {
+          setLoadedTemplateName(name);
+        } else {
+          const body = await res.json();
+          if (body.id) {
+            setLoadedTemplateId(body.id);
+            setLoadedTemplateName(name);
+          }
+        }
         setTemplatesLoading(true);
         fetchTemplates();
       } else {
         const err = await res.json();
-        showErrorToast(err.error || "บันทึกแม่แบบไม่สำเร็จ");
+        showErrorToast(err.error || (isOverwrite ? "อัปเดตแม่แบบไม่สำเร็จ" : "บันทึกแม่แบบไม่สำเร็จ"));
       }
     } catch (e) {
       console.error("Failed to save template", e);
@@ -279,6 +296,10 @@ function CreatePageContent() {
       });
       if (res.ok) {
         showSuccessToast("ลบแม่แบบเรียบร้อยแล้ว");
+        if (loadedTemplateId === id) {
+          setLoadedTemplateId(null);
+          setLoadedTemplateName("");
+        }
         setTemplatesLoading(true);
         fetchTemplates();
       } else {
@@ -871,7 +892,7 @@ function CreatePageContent() {
                 showDeptMonthly={showDeptMonthly}
                 effectiveIsPriceAdjustment={effectiveIsPriceAdjustment}
                 onSubjectChange={setSubject}
-                onCategoryChange={(v) => { setCategory(v); setItemSubcategoryId(undefined); setChosenApprover(null); }}
+                onCategoryChange={(v) => { setCategory(v); setItemSubcategoryId(undefined); setChosenApprover(null); setLoadedTemplateId(null); setLoadedTemplateName(""); }}
                 onItemSubcategoryChange={setItemSubcategoryId}
                 onDepartmentChange={setDepartment}
                 onAmountChange={(v) => { setAmount(v); setChosenApprover(null); }}
@@ -1172,6 +1193,8 @@ function CreatePageContent() {
         onClose={() => setSaveModalOpen(false)}
         onSave={handleSaveTemplate}
         isSaving={isSavingTemplate}
+        loadedTemplateId={loadedTemplateId}
+        loadedTemplateName={loadedTemplateName}
       />
     </div>
   );

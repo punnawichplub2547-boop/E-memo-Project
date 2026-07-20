@@ -12,7 +12,7 @@ interface MemoTemplate {
 
 interface TemplateSelectorCardProps {
   templates: MemoTemplate[];
-  onSelectTemplate: (template: Record<string, unknown>) => void;
+  onSelectTemplate: (id: number, name: string, template: Record<string, unknown>) => void;
   onDeleteTemplate: (id: number) => void;
   isLoading: boolean;
 }
@@ -70,7 +70,7 @@ export function TemplateSelectorCard({
               >
                 <button
                   type="button"
-                  onClick={() => onSelectTemplate(data)}
+                  onClick={() => onSelectTemplate(tpl.id, tpl.name, data)}
                   style={{
                     background: "none",
                     border: "none",

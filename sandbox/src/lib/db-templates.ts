@@ -61,3 +61,13 @@ export async function deleteTemplate(id: number, userId: number): Promise<boolea
   );
   return result.affectedRows > 0;
 }
+
+export async function updateTemplate(id: number, userId: number, name: string, templateJson: object): Promise<boolean> {
+  const pool = getDbPool();
+  const [result] = await pool.query<ResultSetHeader>(
+    "UPDATE memo_templates SET name = ?, template_json = ? WHERE id = ? AND user_id = ?",
+    [name, JSON.stringify(templateJson), id, userId]
+  );
+  return result.affectedRows > 0;
+}
+
