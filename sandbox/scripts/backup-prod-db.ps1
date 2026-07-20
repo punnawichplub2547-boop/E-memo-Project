@@ -85,7 +85,11 @@ $attachBackupFile = Join-Path $Destination "attachments_$Timestamp.tar.gz"
 docker run --rm -v "${AttachVolume}:/data" -v "${Destination}:/backup" alpine `
     tar czf "/backup/attachments_$Timestamp.tar.gz" -C /data .
 if ($LASTEXITCODE -ne 0) { throw "attachments archive failed (exit $LASTEXITCODE)." }
-Write-Ok "wrote $attachBackupFile ($([math]::Round((Get-Item $attachBackupFile).Length / 1MB, 2)) MB)"
+$attachBytes = (Get-Item $attachBackupFile).Length
+Write-Ok "wrote $attachBackupFile ($([math]::Round($attachBytes / 1MB, 2)) MB)"
+if ($attachBytes -lt 200) {
+    Write-Warn2 "archive looks empty (only $attachBytes bytes) - this is EXPECTED if no attachments have been uploaded yet, not a script failure. Verify with: tar tzf `"$attachBackupFile`""
+}
 
 # --- 3. Prune old backups ---------------------------------------------------
 Write-Step "Pruning backups older than $RetentionDays days in $Destination"
