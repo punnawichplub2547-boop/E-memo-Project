@@ -10,6 +10,7 @@ vi.mock("@/lib/db-users", () => ({
   updateUserStatus: vi.fn(),
   approveUser: vi.fn(),
   rejectUser: vi.fn(),
+  findActiveUsersByApprovalLevel: vi.fn(),
 }));
 
 import { PUT } from "./roles/route";

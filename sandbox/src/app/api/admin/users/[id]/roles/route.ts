@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
-import { updateUserRoles, updateUserStatus } from "@/lib/db-users";
+import { updateUserRoles, updateUserStatus, findActiveUsersByApprovalLevel } from "@/lib/db-users";
 
 const ALLOWED_ROLES = new Set(["requester", "manager", "general-manager", "senior-general-manager", "managing-director", "read-recipient", "admin"]);
 const ALLOWED_APPROVAL_LEVELS = new Set(["Manager / Top Section", "General Manager", "Managing Director"]);
@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       roles?: string[];
       approvalLevel?: string | null;
       status?: "active" | "suspended";
+      confirmDuplicateApprovalLevel?: boolean;
     };
     if (body.roles !== undefined) {
       if (!Array.isArray(body.roles) || body.roles.length === 0 || body.roles.some(role => !ALLOWED_ROLES.has(role))) {
@@ -28,6 +29,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
       if (body.approvalLevel !== undefined && body.approvalLevel !== null && !ALLOWED_APPROVAL_LEVELS.has(body.approvalLevel)) {
         return NextResponse.json({ error: "Invalid approval level" }, { status: 400 });
+      }
+      if (body.approvalLevel === "Managing Director" && !body.confirmDuplicateApprovalLevel) {
+        const others = await findActiveUsersByApprovalLevel("Managing Director", userId);
+        if (others.length > 0) {
+          return NextResponse.json({
+            error: "duplicate-approval-level",
+            conflictWith: others.map(u => ({ email: u.email, firstName: u.first_name, lastName: u.last_name })),
+          }, { status: 409 });
+        }
       }
       await updateUserRoles(userId, body.roles, body.approvalLevel ?? null);
     }

@@ -129,6 +129,18 @@ export type UserSearchResult = {
   department: string;
 };
 
+export async function findActiveUsersByApprovalLevel(
+  approvalLevel: string,
+  excludeId: number
+): Promise<PublicUser[]> {
+  const pool = getDbPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT id, employee_card_id, email, first_name, last_name, department, roles_json, approval_level, status, created_at, updated_at FROM users WHERE approval_level = ? AND status = 'active' AND id != ?",
+    [approvalLevel, excludeId]
+  );
+  return rows as PublicUser[];
+}
+
 // MD is excluded — they have their own notifyMD notification path.
 // Requires q.length >= 2 to prevent full-list enumeration.
 export async function searchActiveUsers(q: string): Promise<UserSearchResult[]> {

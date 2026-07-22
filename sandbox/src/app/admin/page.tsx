@@ -347,7 +347,15 @@ export default function AdminPage() {
                                   )}
                                   <div style={{ display: "flex", gap: 6 }}>
                                     <button className="em-btn primary" style={{ fontSize: 12 }} onClick={async () => {
-                                      await fetch(`/api/admin/users/${u.id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: approveRoles, approvalLevel: approveLevel || null }) });
+                                      const payload: { roles: string[]; approvalLevel: string | null; confirmDuplicateApprovalLevel?: boolean } = { roles: approveRoles, approvalLevel: approveLevel || null };
+                                      let res = await fetch(`/api/admin/users/${u.id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                                      if (res.status === 409) {
+                                        const conflict = await res.json() as { conflictWith: { email: string; firstName: string; lastName: string }[] };
+                                        const names = conflict.conflictWith.map(c => `${c.firstName} ${c.lastName} (${c.email})`).join(", ");
+                                        const proceed = window.confirm(`${names} already holds "${approveLevel}". Assign it to ${u.first_name} ${u.last_name} as well?`);
+                                        if (!proceed) return;
+                                        res = await fetch(`/api/admin/users/${u.id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, confirmDuplicateApprovalLevel: true }) });
+                                      }
                                       setApprovingId(null);
                                       setApproveRoles(["requester"]);
                                       setApproveLevel("");
@@ -437,7 +445,15 @@ export default function AdminPage() {
                                     <div style={{ display: "flex", gap: 6 }}>
                                       <button className="em-btn primary" style={{ fontSize: 12 }} onClick={async () => {
                                         if (changeRoleRoles.length === 0) return;
-                                        await fetch(`/api/admin/users/${u.id}/roles`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roles: changeRoleRoles, approvalLevel: changeRoleLevel || null }) });
+                                        const payload: { roles: string[]; approvalLevel: string | null; confirmDuplicateApprovalLevel?: boolean } = { roles: changeRoleRoles, approvalLevel: changeRoleLevel || null };
+                                        let res = await fetch(`/api/admin/users/${u.id}/roles`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                                        if (res.status === 409) {
+                                          const conflict = await res.json() as { conflictWith: { email: string; firstName: string; lastName: string }[] };
+                                          const names = conflict.conflictWith.map(c => `${c.firstName} ${c.lastName} (${c.email})`).join(", ");
+                                          const proceed = window.confirm(`${names} already holds "${changeRoleLevel}". Assign it to ${u.first_name} ${u.last_name} as well?`);
+                                          if (!proceed) return;
+                                          res = await fetch(`/api/admin/users/${u.id}/roles`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, confirmDuplicateApprovalLevel: true }) });
+                                        }
                                         setChangeRoleId(null);
                                         const fresh = await fetch("/api/admin/users").then(r => r.json()) as { users: PublicUser[] };
                                         setDbUsers(fresh.users);
