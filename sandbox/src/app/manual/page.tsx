@@ -58,7 +58,7 @@ export default function ManualPage() {
             <div className="man-cover-meta">
               <div><strong>เวอร์ชันคู่มือ</strong>3 กรกฎาคม 2569</div>
               <div><strong>ระบบ Live</strong>memo.car-1996.com</div>
-              <div><strong>จัดทำโดย</strong>ทีม IT Ranger</div>
+              <div><strong>จัดทำโดย</strong>ปุณณวิช ภูประเสริฐ (IT Ranger)</div>
             </div>
           </div>
           <div className="man-cover-card">
@@ -90,7 +90,7 @@ export default function ManualPage() {
 
       {/* ── Footer ── */}
       <footer className="man-footer">
-        <span>คู่มือฉบับนี้จัดทำโดยทีม IT Ranger · <Link href="/login">กลับหน้าเข้าสู่ระบบ</Link></span>
+        <span>คู่มือฉบับนี้จัดทำโดย ปุณณวิช ภูประเสริฐ (ทีม IT Ranger) · <Link href="/login">กลับหน้าเข้าสู่ระบบ</Link></span>
         <span>Complete Auto Rubber Manufacturing Co., Ltd. · HR&amp;GA Workflow System</span>
       </footer>
     </div>

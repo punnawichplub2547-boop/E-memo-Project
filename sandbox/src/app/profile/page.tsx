@@ -512,7 +512,9 @@ export default function ProfilePage() {
             ออกจากระบบ
           </button>
 
-          <div style={{ marginTop: 24, textAlign: "center", fontSize: 11.5, color: "var(--ink-muted, #CBD5E1)" }}>
+          <div style={{ marginTop: 24, textAlign: "center", fontSize: 11.5, color: "var(--ink-muted, #94A3B8)", lineHeight: 1.6 }}>
+            Designed &amp; Developed by <span style={{ fontWeight: 600, color: "var(--ink-2, #475569)" }}>ปุณณวิช ภูประเสริฐ</span> (IT Ranger)
+            <br />
             Complete Auto Rubber Co., Ltd. · HR&amp;GA Workflow System
           </div>
         </div>
