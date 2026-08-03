@@ -1,0 +1,317 @@
+%% =====================================================================
+%%  HR&GA E-Memo Online System — Data Flow Diagram (Level 0 / 1 / 2 / 3)
+%%  Complete Auto Rubber Manufacturing Co., Ltd.
+%%  Generated: 2026-07-27
+%%
+%%  อิงโค้ดจริงใน sandbox/src (ไม่ใช่ฉบับร่างออกแบบ):
+%%    lib/approval.ts · lib/workflow-rules.ts · lib/workflow-actions.ts
+%%    lib/notify-memo-event.ts · lib/notification-recipients.ts
+%%    app/create/_hooks/* · app/api/**/route.ts
+%%
+%%  ไฟล์นี้เป็น "แหล่งข้อความ" ของไดอะแกรม; ฉบับวาดจริงอยู่ใน hr-ememo-dfd.drawio (7 หน้า)
+%%  Mermaid ไม่มีสัญลักษณ์ DFD มาตรฐาน จึงใช้รูปทรงแทน:
+%%    [ข้อความ]  = External Entity      ((ข้อความ)) = Process
+%%    [(ข้อความ)] = Data Store           -.->        = ระบบภายนอก / best-effort
+%% =====================================================================
+
+%% ============================================================
+%% LEVEL 0 — CONTEXT DIAGRAM
+%% ============================================================
+flowchart LR
+  A1["ผู้ยื่นคำขอ<br/>Issued Person"]
+  A2["หัวหน้า / ผู้จัดการ<br/>Supervisor / Manager"]
+  A3["ผู้รับทราบ<br/>Read Recipient"]
+  A4["ผู้บริหาร GM / MD"]
+  A5["ผู้ดูแลระบบ<br/>HR&GA Admin / IT"]
+  A6["ผู้รับหนังสือเวียน<br/>Dispatch Recipient"]
+  X1["SMTP Email Server"]
+  X2["Telegram Bot API"]
+  X3["AI Service<br/>ThaiLLM · Groq"]
+  S0(("0<br/>ระบบ HR&GA E-Memo Online"))
+
+  A1 -->|"ข้อมูลบันทึก, ไฟล์แนบ, แก้ไข/ส่งใหม่"| S0
+  S0 -->|"สถานะ, เส้นทางที่แนะนำ, แจ้งเตือน"| A1
+  A2 -->|"ตรวจสอบ / อนุมัติ / ตีกลับ"| S0
+  S0 -->|"คิวงานที่รอดำเนินการ"| A2
+  A3 -->|"กดรับทราบ / ขอข้ามการรับทราบ"| S0
+  S0 -->|"รายการที่ต้องรับทราบ"| A3
+  A4 -->|"อนุมัติ / ปฏิเสธ / ความเห็น MD"| S0
+  S0 -->|"บันทึกที่ต้องพิจารณา, MD Review"| A4
+  A5 -->|"ผู้ใช้, สิทธิ์, ข้อมูลหลัก"| S0
+  S0 -->|"รายงาน, Audit Trail, สถานะระบบ"| A5
+  A6 -->|"ตอบรับ / รับทราบหนังสือเวียน"| S0
+  S0 -->|"หนังสือเวียน"| A6
+  S0 -.->|"อีเมลแจ้งเตือน (best-effort)"| X1
+  S0 -.->|"ข้อความ + ปุ่มอนุมัติ"| X2
+  X2 -.->|"callback: approve / MD review"| S0
+  S0 -.->|"prompt ร่างบันทึก / ใบเสนอราคา PDF"| X3
+  X3 -.->|"ข้อความร่าง, รายการที่สกัดได้"| S0
+
+
+%% ============================================================
+%% LEVEL 1 — โปรเซสหลัก P1–P8
+%% ============================================================
+flowchart LR
+  E1["ผู้ยื่นคำขอ"]
+  E2["ผู้รับทราบ"]
+  E3["ผู้อนุมัติ<br/>Manager / GM / MD"]
+  E4["ผู้ใช้ทั่วไป"]
+  E5["ผู้ดูแลระบบ"]
+  E6["ผู้ตรวจสอบ / ผู้บริหาร"]
+  Y1["SMTP Email"]
+  Y2["Telegram Bot API"]
+  Y3["AI Service<br/>ThaiLLM / Groq"]
+
+  P1(("1<br/>สร้าง / แก้ไขบันทึก<br/><small>app/create · POST /api/memos</small>"))
+  P2(("2<br/>แนะนำเส้นทางอนุมัติ<br/><small>lib/approval.ts · กฎ Book1</small>"))
+  P3(("3<br/>สร้างเส้นทาง & ผู้รับทราบ<br/><small>buildApprovalFlow · read_actions</small>"))
+  P4(("4<br/>ประมวลผลการดำเนินการ<br/><small>lib/workflow-actions.ts</small>"))
+  P5(("5<br/>แจ้งเตือน & กระจายช่องทาง<br/><small>notify-memo-event.ts</small>"))
+  P6(("6<br/>ค้นหา / แดชบอร์ด / ประวัติ"))
+  P7(("7<br/>จัดการผู้ใช้ & ข้อมูลหลัก"))
+  P8(("8<br/>ร่องรอยตรวจสอบ & เวอร์ชัน"))
+
+  D1[("D1 · memos")]
+  D2[("D2 · memo_revisions")]
+  D3[("D3 · workflow_step_actions")]
+  D4[("D4 · read_actions")]
+  D5[("D5 · users / roles")]
+  D6[("D6 · notifications + deliveries")]
+  D7[("D7 · memo_templates + item_subcategories")]
+  D8[("D8 · attachments (local disk)")]
+  D9[("D9 · telegram accounts + tokens")]
+
+  E1 -->|"ข้อมูลบันทึก + ไฟล์แนบ"| P1
+  P1 -->|"เลขที่บันทึก, สถานะ"| E1
+  P1 -->|"จำนวนเงิน, งบ, แฟล็ก"| P2
+  P2 -->|"ผู้อนุมัติสุดท้ายที่แนะนำ"| P3
+  P3 -->|"บันทึกที่รอดำเนินการ"| P4
+  P4 -->|"เหตุการณ์ advanced / returned / rejected"| P5
+  P4 -->|"ตีกลับ / อนุญาตให้แก้ไข"| P1
+
+  P1 --> D7
+  P1 --> D8
+  P1 -.->|"prompt"| Y3
+  Y3 -.->|"ร่างข้อความ, ข้อมูลจาก PDF"| P1
+  P3 --> D1
+  P3 --> D4
+  E2 -->|"กดรับทราบ"| P3
+  E3 -->|"approve / return / reject"| P4
+  P4 -->|"คิวงาน + MD Review"| E3
+  P4 --> D1
+  P4 --> D3
+  P4 --> D2
+  P5 --> D6
+  P5 --> D9
+  P5 -.-> Y1
+  P5 -.-> Y2
+  E4 -->|"คำค้น / ตัวกรอง"| P6
+  P6 -->|"ผลลัพธ์ + KPI"| E4
+  P6 --> D1
+  P6 --> D3
+  P6 --> D6
+  E5 --> P7
+  P7 --> D5
+  P7 --> D7
+  E6 --> P8
+  P8 --> D2
+  P8 --> D3
+
+
+%% ============================================================
+%% LEVEL 2 — P1  สร้าง / แก้ไขบันทึก
+%% ============================================================
+flowchart LR
+  E1["ผู้ยื่นคำขอ"]
+  X3["AI Service<br/>ThaiLLM · Groq"]
+  Q1(("1.1<br/>กรอก / แก้ไขฟอร์มบันทึก<br/><small>useMemoFormFields.ts</small>"))
+  Q2(("1.2<br/>โหลด / บันทึกเทมเพลต<br/><small>useMemoTemplates.ts</small>"))
+  Q3(("1.3<br/>ช่วยร่างด้วย AI & ดึงข้อมูล PDF<br/><small>useMemoAiAssist.ts</small>"))
+  Q4(("1.4<br/>คำนวณ VAT & เปรียบเทียบผู้ขาย<br/><small>computePriceRowTotals()</small>"))
+  Q5(("1.5<br/>อัปโหลดไฟล์แนบ<br/><small>POST /api/attachments</small>"))
+  Q6(("1.6<br/>ส่งบันทึกเข้าระบบ<br/><small>useMemoSubmit → POST /api/memos</small>"))
+  Q7(("1.7<br/>แก้ไขและส่งใหม่<br/><small>/create?revise= → submit-revision</small>"))
+  D1[("D1 · memos")]
+  D2[("D2 · memo_revisions")]
+  D3[("D3 · workflow_step_actions")]
+  D4[("D4 · read_actions")]
+  D7[("D7 · memo_templates / item_subcategories")]
+  D8[("D8 · attachments")]
+
+  E1 -->|"กรอกข้อมูลบันทึก"| Q1
+  Q1 -->|"ผลตรวจสอบ + ผู้อนุมัติที่แนะนำ"| E1
+  Q1 -->|"snapshotFormData()"| Q2
+  Q2 -->|"applyBulkData()"| Q1
+  Q2 <-->|"อ่าน / เขียนเทมเพลต"| D7
+  Q1 -->|"อ่านหมวดย่อย"| D7
+  Q3 -.->|"prompt + PDF text"| X3
+  X3 -.->|"ข้อความร่าง / รายการจากใบเสนอราคา"| Q3
+  Q3 -->|"applyBulkData()"| Q1
+  Q1 -->|"รายการเปรียบเทียบราคา"| Q4
+  Q4 -->|"ราคาสุทธิรวม VAT 7%"| Q1
+  Q4 -->|"ไฟล์ใบเสนอราคา"| Q5
+  Q5 -->|"เขียนไฟล์ + metadata"| D8
+  Q5 -->|"attachments[]"| Q6
+  Q1 -->|"ข้อมูลฟอร์มทั้งหมด"| Q6
+  Q6 -->|"INSERT memo (server-set requester)"| D1
+  Q6 -->|"INSERT read_actions"| D4
+  Q6 -->|"INSERT action = submit"| D3
+  D1 -->|"อ่านบันทึกเดิม"| Q7
+  Q7 -->|"snapshot เวอร์ชันก่อนแก้"| D2
+  Q7 -->|"payload ฉบับแก้ไข"| Q6
+  Q6 -->|"เหตุการณ์ submitted → P5"| P5X["→ P5 แจ้งเตือน"]
+
+
+%% ============================================================
+%% LEVEL 2 — P4  ประมวลผลการดำเนินการ
+%% ============================================================
+flowchart LR
+  E3["ผู้อนุมัติ<br/>Supervisor / Manager / GM"]
+  E2["ผู้รับทราบ"]
+  E4["MD / ผู้บริหาร"]
+  X2["Telegram Bot API"]
+  R0(("4.0<br/>ตรวจสิทธิ์ & ล็อกข้อมูล (ประตูร่วม)<br/><small>loadMemoForUpdate FOR UPDATE · loadActor · canActOnStep</small>"))
+  R1(("4.1<br/>อนุมัติ / ผ่านขั้นตอน<br/><small>approveMemoAction()</small>"))
+  R2(("4.2<br/>ตีกลับเพื่อแก้ไข<br/><small>returnMemoAction()</small>"))
+  R3(("4.3<br/>ปฏิเสธ<br/><small>rejectMemoAction()</small>"))
+  R4(("4.4<br/>รับทราบ / ข้ามการรับทราบ<br/><small>POST read · skip-reads</small>"))
+  R5(("4.5<br/>MD Review<br/><small>reviewMemoAction()</small>"))
+  D1[("D1 · memos")]
+  D2[("D2 · memo_revisions")]
+  D3[("D3 · workflow_step_actions")]
+  D4[("D4 · read_actions")]
+  D5[("D5 · users / roles")]
+
+  E3 -->|"approve / return / reject"| R0
+  E2 -->|"กดรับทราบ / ขอข้าม"| R0
+  E4 -->|"ความเห็น MD"| R0
+  X2 -.->|"callback token (source = telegram)"| R0
+  R0 -->|"อ่านบทบาท + approval_level"| D5
+  R0 --> R1
+  R0 --> R2
+  R0 --> R3
+  R0 --> R4
+  R0 --> R5
+  R1 -->|"status, current_step, md_review_*"| D1
+  R1 -->|"action = check | approve"| D3
+  R2 -->|"status = returned + return_to_step"| D1
+  R2 -->|"action = return"| D3
+  R3 -->|"action = reject"| D3
+  R3 -->|"disposition = close | revision-allowed"| D2
+  R4 -->|"status = read | skipped + เหตุผล"| D4
+  R5 -->|"md_review_status, resume_step"| D1
+  R5 -->|"ตรวจสิทธิ์ MD"| D5
+  R1 -->|"advanced"| P5Y["→ P5 แจ้งเตือน (หลัง COMMIT)"]
+  R2 -->|"returned"| P5Y
+  R3 -->|"rejected"| P5Y
+  R5 -->|"review resolved"| P5Y
+
+
+%% ============================================================
+%% LEVEL 2 — P5  แจ้งเตือน & กระจายช่องทาง
+%% ============================================================
+flowchart LR
+  N0["เหตุการณ์จาก P1 / P4<br/>submitted · resubmitted · advanced · returned · rejected"]
+  N1(("5.1<br/>ระบุผู้รับแต่ละกลุ่ม<br/><small>resolveApprovalStepRecipients / Requester / CC / ReadLabels</small>"))
+  N2(("5.2<br/>สร้างแถวแจ้งเตือน<br/><small>createNotification() → in-app (authoritative)</small>"))
+  N3(("5.3<br/>ส่งหลายช่องทาง<br/><small>sendAndTrack / sendEmailAndTrack</small>"))
+  N4(("5.4<br/>อ่าน & ทำเครื่องหมายอ่านแล้ว<br/><small>GET /api/notifications</small>"))
+  N5(("5.5<br/>ออก & ตรวจ callback token<br/><small>telegram/tokens.ts · actions.ts</small>"))
+  D1[("D1 · memos")]
+  D5[("D5 · users / roles")]
+  D6[("D6 · notifications")]
+  D6b[("D6 · notification_deliveries")]
+  D9[("D9 · user_telegram_accounts")]
+  D9b[("D9 · telegram_action_tokens")]
+  Y1["ผู้รับแจ้งเตือนในระบบ"]
+  X1["SMTP Email Server"]
+  X2["Telegram Bot API"]
+
+  N0 -->|"memo_no + eventType + actorUserId"| N1
+  N1 -->|"อ่าน approval_level (กรองตามแผนก)"| D5
+  N1 -->|"อ่าน requester + CC + read list"| D1
+  N1 -->|"รายชื่อผู้รับ (ตัด actor / กันซ้ำ)"| N2
+  N2 -->|"INSERT notification"| D6
+  N2 --> N3
+  N2 -->|"แจ้งเตือนที่ยังไม่อ่าน"| N4
+  N3 -->|"INSERT/UPDATE delivery (UNIQUE ต่อ channel)"| D6b
+  N3 -.->|"อีเมล"| X1
+  N3 -->|"ต้องมีปุ่มอนุมัติ"| N5
+  N5 -->|"อ่าน chat id ที่ยัง active"| D9
+  N5 -->|"ออก token (one-time, มีวันหมดอายุ)"| D9b
+  N5 -.->|"ข้อความ + inline keyboard"| X2
+  X2 -.->|"callback: approve / MD review"| N5
+  N4 -->|"อ่าน / อัปเดต is_read"| D6
+  N4 -->|"bell dropdown + badge"| Y1
+  Y1 -->|"กดอ่าน / อ่านทั้งหมด"| N4
+
+
+%% ============================================================
+%% LEVEL 3 — P4.1  อนุมัติ / ผ่านขั้นตอน
+%% ============================================================
+flowchart TB
+  E3["ผู้อนุมัติ / Telegram callback"]
+  W1(("4.1.1<br/>เปิด transaction & ล็อกแถว<br/><small>SELECT … FOR UPDATE</small>"))
+  W2(("4.1.2<br/>ตรวจสิทธิ์ผู้กระทำ<br/><small>canActOnStep + guardActorAndMemo</small>"))
+  W3(("4.1.3<br/>ตรวจประตูการรับทราบ<br/><small>countPendingReads > 0 → 409</small>"))
+  W4(("4.1.4<br/>คำนวณขั้นถัดไป<br/><small>calculateNextStep(route, current)</small>"))
+  W5(("4.1.5<br/>ตรวจประตู MD Review<br/><small>park ที่ Managing Director + stash resume</small>"))
+  W6(("4.1.6<br/>อัปเดตแถว memos"))
+  W7(("4.1.7<br/>เขียน workflow_step_actions<br/><small>append-only · ไม่เคย UPDATE</small>"))
+  W8(("4.1.8<br/>COMMIT & ยิงเหตุการณ์"))
+  D1[("D1 · memos")]
+  D3[("D3 · workflow_step_actions")]
+  D4[("D4 · read_actions")]
+  D5[("D5 · users / roles")]
+
+  E3 -->|"คำขออนุมัติ + session"| W1
+  W1 -->|"อ่านแถว memo (ล็อก)"| D1
+  W1 --> W2
+  W2 -->|"อ่านบทบาท + แผนกของผู้กระทำ"| D5
+  W2 -->|"ผ่านสิทธิ์"| W3
+  W3 -->|"นับรายการที่ยังไม่รับทราบ"| D4
+  W3 -->|"ไม่มีค้าง"| W4
+  W4 -->|"nextStep / isFinal"| W5
+  W4 -->|"memoUpdate payload (กรณีปกติ)"| W6
+  W5 -->|"memoUpdate payload"| W6
+  W6 -->|"UPDATE memos"| D1
+  W6 --> W7
+  W7 -->|"INSERT action"| D3
+  W7 --> W8
+  W8 -->|"เหตุการณ์ advanced"| Z9["→ P5 (นอก transaction)"]
+  W8 -->|"200 / 403 / 409 / 422"| E3
+
+
+%% ============================================================
+%% LEVEL 3 — P5.3  ส่งหลายช่องทาง
+%% ============================================================
+flowchart LR
+  M0["แถวแจ้งเตือนที่สร้างแล้ว<br/>notification_id + title + body + action_url"]
+  C1(("5.3.1<br/>ช่องทางในระบบ (in-app)<br/><small>แถวใน notifications = ผลสำเร็จทันที</small>"))
+  C2(("5.3.2<br/>ส่งอีเมล<br/><small>createEmailDelivery → sendEmailMessage</small>"))
+  C3(("5.3.3<br/>ส่ง Telegram<br/><small>createTelegramDelivery → sendTelegramMessage</small>"))
+  C4(("5.3.4<br/>ประกอบปุ่มอนุมัติ<br/><small>buildInlineKeyboard + issueActionToken</small>"))
+  C5(("5.3.5<br/>บันทึกผลการส่ง<br/><small>markDeliveryStatus(sent | failed)</small>"))
+  D6[("D6 · notifications")]
+  D6b[("D6 · notification_deliveries")]
+  D9[("D9 · user_telegram_accounts")]
+  D9b[("D9 · telegram_action_tokens")]
+  Y1["กระดิ่งแจ้งเตือนในเว็บ"]
+  X1["SMTP Email Server"]
+  X2["Telegram Bot API"]
+
+  M0 -->|"notification_id"| C1
+  M0 -->|"+ อีเมลผู้รับ"| C2
+  M0 -->|"+ chat id ที่ active"| C3
+  C1 -->|"is_read = false"| D6
+  D6 -->|"แสดงในกระดิ่ง + badge"| Y1
+  C2 -.->|"อีเมล (text + html)"| X1
+  C3 -->|"อ่าน chat id"| D9
+  C4 -->|"inline keyboard"| C3
+  C4 -->|"ออก token one-time"| D9b
+  C3 -.->|"ข้อความ + ปุ่ม"| X2
+  X2 -.->|"callback data"| C4
+  C1 -->|"สถานะ in-app"| C5
+  C2 -->|"sent / failed + messageId"| C5
+  C3 -->|"sent / failed + message_id"| C5
+  C5 -->|"UPSERT delivery row"| D6b

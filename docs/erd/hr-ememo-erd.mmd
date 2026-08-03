@@ -1,0 +1,287 @@
+%% =====================================================================
+%%  HR&GA E-Memo Online System — Entity Relationship Diagram
+%%  Complete Auto Rubber Manufacturing Co., Ltd.
+%%  Source of truth: sandbox/db/init/001-db1-schema.sql + sandbox/db/migrations/*.sql
+%%  Generated: 2026-07-27
+%%
+%%  Domains:
+%%    [1] User & Auth        : users, memo_templates, password_reset_tokens
+%%    [2] Core Memo/Workflow  : memos, item_subcategories, memo_revisions,
+%%                              workflow_step_actions, read_actions
+%%    [3] Notification/Telegram: notifications, notification_deliveries,
+%%                              user_telegram_accounts, telegram_link_tokens,
+%%                              telegram_action_tokens, telegram_conversation_states
+%%    [4] Dispatch & Issue    : dispatches, dispatch_recipients, issue_reports
+%% =====================================================================
+erDiagram
+
+    %% ============ [1] USER & AUTH DOMAIN ============
+    users {
+        bigint   id                  PK "AUTO_INCREMENT"
+        varchar  employee_card_id    UK "รหัสบัตรพนักงาน"
+        varchar  email               UK "@car-1996.com"
+        varchar  first_name          "ชื่อ"
+        varchar  last_name           "นามสกุล"
+        varchar  password_hash       "bcrypt cost 12"
+        varchar  department          "21 แผนก"
+        varchar  roles_json          "admin|requester|manager|read-recipient"
+        varchar  approval_level      "Manager|GM|MD (nullable)"
+        enum     status              "pending|active|suspended"
+        datetime created_at
+        datetime updated_at
+    }
+
+    memo_templates {
+        bigint   id            PK
+        bigint   user_id       FK "-> users.id ON DELETE CASCADE"
+        varchar  name          "ชื่อเทมเพลต"
+        json     template_json "snapshotFormData()"
+        datetime created_at
+        datetime updated_at
+    }
+
+    password_reset_tokens {
+        bigint   id         PK
+        bigint   user_id    FK "-> users.id ON DELETE CASCADE"
+        char     token_hash UK "SHA-256"
+        datetime expires_at
+        datetime used_at    "NULL = ยังไม่ถูกใช้"
+        datetime created_at
+    }
+
+    %% ============ [2] CORE E-MEMO & WORKFLOW DOMAIN ============
+    memos {
+        bigint   id                             PK
+        varchar  memo_no                        UK "เลขที่บันทึก"
+        varchar  title
+        bigint   requester_user_id              FK "-> users.id (nullable, legacy)"
+        varchar  requester_name                 "server-set จาก session"
+        varchar  department_name
+        varchar  category                       "raw-material|fixed-asset|..."
+        bigint   item_subcategory_id            FK "-> item_subcategories.id (logical)"
+        decimal  amount                         "DECIMAL(15,2)"
+        varchar  budget_status                  "in-budget|over-budget"
+        decimal  dept_monthly_over_budget_total "โควตาเกินงบรายเดือน"
+        varchar  status                         "draft|pending|approved|rejected|returned"
+        varchar  current_step
+        json     recommended_route_json
+        json     selected_route_json            "เส้นทางอนุมัติที่ใช้จริง"
+        text     route_override_reason          "เหตุผล override (audit)"
+        boolean  notify_md
+        boolean  is_price_adjustment            "-> requires_md_review"
+        boolean  requires_md_review             "MD Review gate"
+        varchar  md_review_status               "pending|approved|returned"
+        boolean  follows_production_plan
+        boolean  is_dead_stock
+        text     return_reason
+        varchar  return_to_step
+        text     reject_reason
+        varchar  reject_disposition             "close|revision-allowed"
+        int      revision_no
+        json     price_comparisons_json         "VAT-aware vendor comparison"
+        json     request_items_json
+        json     read_recipients_json
+        json     attachments_json
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at                     "soft-delete (void)"
+    }
+
+    item_subcategories {
+        bigint   id           PK
+        varchar  category_key UK "คู่กับ label_th"
+        varchar  label_th     UK "ชื่อหมวดย่อยภาษาไทย"
+        int      sort_order
+        boolean  is_active
+        varchar  source_reference "อ้างอิง Book1.xlsx"
+        datetime created_at
+        datetime updated_at
+    }
+
+    memo_revisions {
+        bigint   id              PK
+        bigint   memo_id         FK "-> memos.id"
+        int      revision_no     UK "UNIQUE(memo_id, revision_no)"
+        varchar  source          "resubmit|submit-revision"
+        text     return_reason
+        text     reject_reason
+        text     revision_note
+        json     snapshot_json   "ภาพถ่ายฟอร์มก่อนแก้"
+        varchar  revision_impact "ยังไม่ใช้งาน (NULL)"
+        datetime submitted_at
+        datetime created_at
+    }
+
+    workflow_step_actions {
+        bigint   id            PK
+        bigint   memo_id       FK "-> memos.id"
+        int      revision_no
+        varchar  action_type   "submit|approve|return|reject|read|void|restore"
+        varchar  step_label    "Manager|GM|MD"
+        varchar  actor_name
+        varchar  result
+        text     reason
+        json     metadata_json
+        datetime acted_at
+    }
+
+    read_actions {
+        bigint   id             PK
+        bigint   memo_id        FK "-> memos.id"
+        int      revision_no    UK "UNIQUE(memo_id, revision_no, recipient_name)"
+        varchar  recipient_name UK
+        varchar  status         "pending|read|skipped"
+        datetime acted_at
+        text     skip_reason
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% ============ [3] NOTIFICATION & TELEGRAM DOMAIN ============
+    notifications {
+        bigint   id                PK
+        bigint   memo_id           FK "-> memos.id (nullable)"
+        bigint   recipient_user_id FK "-> users.id"
+        varchar  notification_type "submitted|advanced|returned|rejected"
+        varchar  title
+        text     body
+        varchar  action_url        "/queue?memo=<memo_no>"
+        boolean  is_read
+        datetime read_at
+        datetime created_at
+    }
+
+    notification_deliveries {
+        bigint   id                  PK
+        bigint   notification_id     FK "-> notifications.id"
+        varchar  channel             UK "in-app|email|telegram"
+        varchar  status              "pending|sent|failed"
+        varchar  provider_message_id
+        text     error_message
+        datetime attempted_at
+        datetime sent_at
+        datetime created_at
+    }
+
+    user_telegram_accounts {
+        bigint   id                PK
+        bigint   user_id           FK "-> users.id"
+        bigint   telegram_user_id  UK
+        bigint   telegram_chat_id
+        varchar  telegram_username
+        boolean  is_active
+        datetime linked_at
+        datetime last_seen_at
+        datetime revoked_at
+    }
+
+    telegram_link_tokens {
+        bigint   id         PK
+        bigint   user_id    FK "-> users.id"
+        char     token_hash UK "deep-link /start"
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
+    telegram_action_tokens {
+        bigint   id            PK
+        bigint   memo_id       FK "-> memos.id"
+        bigint   user_id       FK "-> users.id"
+        char     token_hash    UK "one-time callback"
+        varchar  action_type   "approve|return|reject|md-review"
+        json     metadata_json
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
+    telegram_conversation_states {
+        bigint   id               PK
+        bigint   telegram_user_id "logical -> user_telegram_accounts"
+        bigint   user_id          "logical -> users.id (no FK)"
+        bigint   memo_id          "logical -> memos.id (no FK)"
+        varchar  action_type
+        varchar  state            "await-reason|await-comment"
+        json     payload_json
+        datetime expires_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% ============ [4] DISPATCH & ISSUE DOMAIN ============
+    dispatches {
+        bigint   id               PK
+        varchar  dispatch_no      UK "เลขที่หนังสือเวียน"
+        varchar  subject
+        text     content
+        bigint   sender_user_id   FK "-> users.id"
+        bigint   memo_id          FK "-> memos.id ON DELETE SET NULL"
+        varchar  status           "active|closed"
+        json     attachments_json
+        datetime created_at
+        datetime updated_at
+    }
+
+    dispatch_recipients {
+        bigint   id              PK
+        bigint   dispatch_id     FK "-> dispatches.id ON DELETE CASCADE"
+        bigint   target_user_id  FK "-> users.id ON DELETE CASCADE"
+        enum     recipient_type  "user|department"
+        varchar  target_dept
+        enum     status          "pending|read|acknowledged"
+        datetime read_at
+        datetime acknowledged_at
+        text     feedback_notes
+        datetime created_at
+        datetime updated_at
+    }
+
+    issue_reports {
+        bigint   id                  PK
+        bigint   reporter_user_id    FK "-> users.id ON DELETE SET NULL"
+        varchar  reporter_name
+        varchar  reporter_department
+        varchar  reporter_email
+        text     description
+        enum     status              "open|resolved"
+        bigint   resolved_by_user_id FK "-> users.id ON DELETE SET NULL"
+        datetime resolved_at
+        datetime created_at
+    }
+
+    %% ================= RELATIONSHIPS =================
+
+    %% --- [1] User & Auth ---
+    users ||--o{ memo_templates          : "บันทึกเทมเพลตส่วนตัว"
+    users ||--o{ password_reset_tokens   : "ขอรีเซ็ตรหัสผ่าน"
+
+    %% --- [1] -> [2] ---
+    users ||--o{ memos                   : "เป็นผู้ยื่นคำขอ (requester)"
+
+    %% --- [2] Core Memo & Workflow ---
+    item_subcategories ||..o{ memos              : "จัดหมวดหมู่รายการ (ไม่มี FK constraint)"
+    memos ||--o{ memo_revisions                  : "เก็บประวัติการแก้ไข"
+    memos ||--o{ workflow_step_actions           : "บันทึกทุก action (audit trail)"
+    memos ||--o{ read_actions                    : "ผู้รับทราบ (acknowledge)"
+
+    %% --- [2] -> [3] ---
+    memos ||--o{ notifications                   : "สร้างการแจ้งเตือน"
+    users ||--o{ notifications                   : "เป็นผู้รับการแจ้งเตือน"
+    notifications ||--o{ notification_deliveries : "แตกเป็นช่องทางส่ง"
+
+    %% --- [3] Telegram ---
+    users ||--o{ user_telegram_accounts       : "ผูกบัญชี Telegram"
+    users ||--o{ telegram_link_tokens         : "ออก token ผูกบัญชี"
+    users ||--o{ telegram_action_tokens       : "ผู้มีสิทธิ์กดปุ่ม"
+    memos ||--o{ telegram_action_tokens       : "เป้าหมายของ callback"
+    users ||..o{ telegram_conversation_states : "สถานะสนทนา (ไม่มี FK)"
+    memos ||..o{ telegram_conversation_states : "อ้างอิงเชิงตรรกะ"
+
+    %% --- [4] Dispatch & Issue ---
+    users  ||--o{ dispatches           : "เป็นผู้ส่งหนังสือเวียน"
+    memos  |o--o{ dispatches           : "อ้างอิงบันทึกต้นเรื่อง"
+    dispatches ||--o{ dispatch_recipients : "กระจายถึงผู้รับ"
+    users  ||--o{ dispatch_recipients  : "เป็นผู้รับหนังสือเวียน"
+    users  |o--o{ issue_reports        : "แจ้งปัญหาการใช้งาน"
+    users  |o--o{ issue_reports        : "เป็นผู้ปิดเรื่อง (resolver)"

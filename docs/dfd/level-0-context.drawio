@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="L0 · Context Diagram">
+    <mxGraphModel dx="2000" dy="1400" grid="0" gridSize="10" page="1" pageWidth="2000" pageHeight="1120" background="#ffffff">
+      <root><mxCell id="0" /><mxCell id="1" parent="0" />
+        <mxCell id="_t" value="DFD Level 0  —  Context Diagram" style="text;html=1;align=center;verticalAlign=middle;fontSize=21;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="50" y="14" width="1900" height="36" as="geometry" /></mxCell>
+        <mxCell id="_t2" value="HR&amp;GA E-Memo Online System · Complete Auto Rubber Manufacturing Co., Ltd." style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#6b7280;" vertex="1" parent="1">
+          <mxGeometry x="50" y="52" width="1900" height="24" as="geometry" /></mxCell>
+        <mxCell id="S0" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="430" width="440" height="200" as="geometry" /></mxCell>
+        <mxCell id="S0_h" value="0" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="S0">
+          <mxGeometry x="0" y="0" width="440" height="26" as="geometry" /></mxCell>
+        <mxCell id="S0_b" value="ระบบ HR&amp;GA E-Memo Online&lt;br&gt;(E-Memo Workflow &amp;amp; Approval System)&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;Next.js 16 · MySQL 8 · JWT&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="S0">
+          <mxGeometry x="0" y="26" width="440" height="174" as="geometry" /></mxCell>
+        <mxCell id="A1" value="ผู้ยื่นคำขอ&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Issued Person / Requester&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="240" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="A2" value="หัวหน้า / ผู้จัดการ&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Supervisor / Manager&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="480" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="A3" value="ผู้รับทราบ&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Read Recipient&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="720" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="A4" value="ผู้บริหาร GM / MD&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GM / Managing Director&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1570" y="240" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="A5" value="ผู้ดูแลระบบ&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;HR&amp;amp;GA Admin / IT&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1570" y="480" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="A6" value="ผู้รับหนังสือเวียน&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Dispatch Recipient&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1570" y="720" width="250" height="70" as="geometry" /></mxCell>
+        <mxCell id="X1" value="SMTP Email Server" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f7f9;strokeColor=#9aa3ad;strokeWidth=2;dashed=1;dashPattern=8 5;fontSize=12;fontStyle=1;fontColor=#6b7280;align=center;verticalAlign=middle;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="560" y="900" width="250" height="60" as="geometry" /></mxCell>
+        <mxCell id="X2" value="Telegram Bot API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f7f9;strokeColor=#9aa3ad;strokeWidth=2;dashed=1;dashPattern=8 5;fontSize=12;fontStyle=1;fontColor=#6b7280;align=center;verticalAlign=middle;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="860" y="900" width="250" height="60" as="geometry" /></mxCell>
+        <mxCell id="X3" value="AI Service&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ThaiLLM · Groq&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f7f9;strokeColor=#9aa3ad;strokeWidth=2;dashed=1;dashPattern=8 5;fontSize=12;fontStyle=1;fontColor=#6b7280;align=center;verticalAlign=middle;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="900" width="250" height="60" as="geometry" /></mxCell>
+        <mxCell id="f0" value="ข้อมูลบันทึก, ไฟล์แนบ, แก้ไข/ส่งใหม่" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.12;entryDx=0;entryDy=0;" edge="1" parent="1" source="A1" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="560" y="261" />
+            <mxPoint x="560" y="454" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f1" value="สถานะ, เส้นทางที่แนะนำ, แจ้งเตือน" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.24;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="600" y="478" />
+            <mxPoint x="600" y="289" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f2" value="ตรวจสอบ / อนุมัติ / ตีกลับ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.36;entryDx=0;entryDy=0;" edge="1" parent="1" source="A2" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="640" y="501" />
+            <mxPoint x="640" y="502" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f3" value="คิวงานที่รอดำเนินการ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.48;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A2">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="680" y="526" />
+            <mxPoint x="680" y="529" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f4" value="กดรับทราบ / ขอข้ามการรับทราบ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.6;entryDx=0;entryDy=0;" edge="1" parent="1" source="A3" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="640" y="741" />
+            <mxPoint x="640" y="550" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f5" value="รายการที่ต้องรับทราบ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.72;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A3">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="600" y="574" />
+            <mxPoint x="600" y="769" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f6" value="อนุมัติ / ปฏิเสธ / ความเห็น MD" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=1;entryY=0.12;entryDx=0;entryDy=0;" edge="1" parent="1" source="A4" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1440" y="261" />
+            <mxPoint x="1440" y="454" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f7" value="บันทึกที่ต้องพิจารณา, MD Review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.24;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A4">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1400" y="478" />
+            <mxPoint x="1400" y="289" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f8" value="ผู้ใช้, สิทธิ์, ข้อมูลหลัก" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=1;entryY=0.36;entryDx=0;entryDy=0;" edge="1" parent="1" source="A5" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1360" y="501" />
+            <mxPoint x="1360" y="502" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f9" value="รายงาน, Audit Trail, สถานะระบบ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.48;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A5">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1320" y="526" />
+            <mxPoint x="1320" y="529" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f10" value="ตอบรับ / รับทราบหนังสือเวียน" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=1;entryY=0.6;entryDx=0;entryDy=0;" edge="1" parent="1" source="A6" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1360" y="741" />
+            <mxPoint x="1360" y="550" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="f11" value="หนังสือเวียน" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.72;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="A6">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1400" y="574" />
+            <mxPoint x="1400" y="769" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="x1" value="อีเมลแจ้งเตือน (best-effort)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="X1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="870" y="760" />
+            <mxPoint x="685" y="760" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="x2" value="ข้อความ + ปุ่มอนุมัติ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="X2">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="980" y="800" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="x3" value="callback: approve / MD review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.65;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="X2" target="S0">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1047" y="830" />
+            <mxPoint x="1046" y="830" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="x4" value="prompt ร่างบันทึก / ใบเสนอราคา PDF" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="S0" target="X3">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1134" y="760" />
+            <mxPoint x="1285" y="760" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="lg" value="&lt;b&gt;สัญลักษณ์ (Gane &amp;amp; Sarson)&lt;/b&gt;&amp;#160;&amp;#160;&amp;#160;&lt;font color=&quot;#2f3742&quot;&gt;▭&lt;/font&gt; External Entity (ผู้ใช้/ระบบภายนอก)&amp;#160;&amp;#160;&lt;font color=&quot;#2563eb&quot;&gt;▭&lt;/font&gt; Process (โปรเซส)&amp;#160;&amp;#160;&lt;font color=&quot;#c99400&quot;&gt;▭&lt;/font&gt; Data Store (แหล่งเก็บข้อมูล = ตารางจริงใน MySQL)&amp;#160;&amp;#160;→ Data Flow&amp;#160;&amp;#160; เส้นประ = ระบบภายนอก / best-effort" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cbd2d9;align=left;verticalAlign=middle;spacingLeft=14;spacingRight=14;fontSize=11;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1020" width="1900" height="58" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HR&amp;GA E-Memo — Interactive ER Diagram</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --line:#dde3ea; --ink:#1f2937; --muted:#6b7280;
+    --d1:#9673a6; --d1b:#f3eefa; --d2:#3f74b5; --d2b:#eef3fb;
+    --d3:#6ba05a; --d3b:#eef7ed; --d4:#c98a1a; --d4b:#fff6ec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Noto Sans Thai",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+  header{background:#fff;border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:650}
+  header .sub{font-size:12px;color:var(--muted)}
+  .wrap{display:grid;grid-template-columns:290px 1fr;gap:0;height:calc(100vh - 58px)}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr;height:auto}}
+  aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px}
+  main{position:relative;overflow:hidden;background:
+    linear-gradient(0deg,rgba(0,0,0,.03) 1px,transparent 1px) 0 0/22px 22px,
+    linear-gradient(90deg,rgba(0,0,0,.03) 1px,transparent 1px) 0 0/22px 22px, var(--bg)}
+  .sec{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;font-weight:700}
+  .chip{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);
+    background:#fff;border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  .chip.off{opacity:.42}
+  .dot{width:11px;height:11px;border-radius:3px;flex:none}
+  .chip .cnt{margin-left:auto;font-size:11px;color:var(--muted)}
+  .tbl{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-left:3px solid transparent;
+    background:transparent;padding:5px 8px;cursor:pointer;font-size:12.5px;font-family:inherit;border-radius:0 5px 5px 0}
+  .tbl:hover{background:#eef1f5}
+  .tbl.sel{background:#e7eefa;border-left-color:var(--d2);font-weight:600}
+  .tbl .n{font-family:ui-monospace,Consolas,monospace}
+  .tbl .c{margin-left:auto;font-size:10.5px;color:var(--muted)}
+  input[type=search]{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px}
+  .toolbar{position:absolute;top:12px;right:14px;z-index:5;display:flex;gap:6px;background:#fff;border:1px solid var(--line);
+    border-radius:8px;padding:5px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+  .toolbar button{border:0;background:#f2f4f7;border-radius:5px;width:30px;height:28px;cursor:pointer;font-size:14px;font-family:inherit}
+  .toolbar button:hover{background:#e2e6ec}
+  .toolbar button.w{width:auto;padding:0 10px;font-size:12px}
+  #canvas{width:100%;height:100%;overflow:hidden;cursor:grab}
+  #canvas.drag{cursor:grabbing}
+  #stage{transform-origin:0 0;padding:26px}
+  #stage svg{max-width:none!important;height:auto!important}
+  .detail{position:absolute;left:14px;bottom:14px;z-index:5;background:#fff;border:1px solid var(--line);border-radius:9px;
+    padding:12px 14px;max-width:430px;max-height:46%;overflow:auto;box-shadow:0 3px 14px rgba(0,0,0,.1);display:none}
+  .detail h3{margin:0 0 8px;font-size:13.5px;font-family:ui-monospace,Consolas,monospace}
+  .detail table{border-collapse:collapse;width:100%;font-size:11.5px}
+  .detail td{padding:3px 6px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+  .detail td.k{width:30px;font-weight:700;font-family:ui-monospace,monospace}
+  .detail td.t{color:var(--muted);font-family:ui-monospace,monospace;white-space:nowrap}
+  .detail .close{float:right;border:0;background:#f2f4f7;border-radius:5px;cursor:pointer;padding:2px 8px;font-family:inherit}
+  .k-PK{color:#b85450}.k-FK{color:#1f6fb2}.k-UK{color:#8a6d00}.k-\~{color:#8f98a3}
+  .legend{font-size:11.5px;color:var(--muted);line-height:1.8;border-top:1px solid var(--line);margin-top:14px;padding-top:10px}
+  .legend b{font-family:ui-monospace,monospace}
+  .note{font-size:11.5px;background:#fff8e6;border:1px solid #f0dfae;border-radius:7px;padding:8px 10px;color:#6b5316;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1>HR&amp;GA E-Memo Online System — ER Diagram</h1>
+  <span class="sub">Complete Auto Rubber Manufacturing Co., Ltd. · MySQL 8 / InnoDB / utf8mb4 · 17 ตาราง · 4 โดเมน</span>
+</header>
+
+<div class="wrap">
+  <aside>
+    <div class="sec">โดเมน (คลิกเพื่อซ่อน/แสดง)</div>
+    <div id="domains"></div>
+
+    <div class="sec">ค้นหาตาราง</div>
+    <input type="search" id="q" placeholder="เช่น memos, telegram, dispatch" />
+
+    <div class="sec">ตารางทั้งหมด</div>
+    <div id="tables"></div>
+
+    <div class="legend">
+      <div><b class="k-PK">PK</b> Primary Key &nbsp; <b class="k-FK">FK</b> Foreign Key &nbsp; <b class="k-UK">UK</b> Unique Key</div>
+      <div><b>~</b> อ้างอิงเชิงตรรกะ (ไม่มี FK constraint จริงใน DB)</div>
+      <div><b>||--o{</b> one-to-many (1 : 0..N) &nbsp; <b>|o--o{</b> optional parent</div>
+    </div>
+
+    <div class="sec">ข้อสังเกต</div>
+    <div class="note"><b>audit_logs ไม่มีอยู่จริงเป็นตาราง</b> — หน้า <code>/audit</code> สร้าง Audit Trail จาก
+      <code>workflow_step_actions</code> ผ่าน <code>lib/audit-query.ts</code></div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <button id="zin" title="ขยาย">+</button>
+      <button id="zout" title="ย่อ">−</button>
+      <button id="fit" class="w" title="พอดีหน้าจอ">Fit</button>
+      <button id="dl" class="w" title="ดาวน์โหลด SVG">SVG</button>
+    </div>
+    <div id="canvas"><div id="stage">กำลังเรนเดอร์…</div></div>
+    <div class="detail" id="detail"></div>
+  </main>
+</div>
+
+<script>
+const DOMAINS = [
+  {id:"d1", name:"1 · User & Auth",            color:"#9673a6"},
+  {id:"d2", name:"2 · Core E-Memo & Workflow", color:"#3f74b5"},
+  {id:"d3", name:"3 · Notification & Telegram",color:"#6ba05a"},
+  {id:"d4", name:"4 · Dispatch & Issue",       color:"#c98a1a"},
+];
+
+const T = (n,d,th,cols)=>({name:n,domain:d,th,cols});
+const TABLES = [
+ T("users","d1","ผู้ใช้งานระบบ",[
+  ["PK","id","BIGINT"],["UK","employee_card_id","VARCHAR(30)"],["UK","email","VARCHAR(255)"],
+  ["","first_name / last_name","VARCHAR(100)"],["","password_hash","VARCHAR(255) bcrypt"],
+  ["","department","VARCHAR(100)"],["","roles_json","VARCHAR(500)"],
+  ["","approval_level","VARCHAR(100) NULL"],["","status","ENUM(pending,active,suspended)"],
+  ["","created_at / updated_at","DATETIME"]]),
+ T("memo_templates","d1","เทมเพลตบันทึกส่วนตัว",[
+  ["PK","id","BIGINT"],["FK","user_id → users","BIGINT · CASCADE"],["","name","VARCHAR(255)"],
+  ["","template_json","JSON"],["","created_at / updated_at","DATETIME"]]),
+ T("password_reset_tokens","d1","โทเคนรีเซ็ตรหัสผ่าน",[
+  ["PK","id","BIGINT"],["FK","user_id → users","BIGINT · CASCADE"],["UK","token_hash","CHAR(64)"],
+  ["","expires_at","DATETIME"],["","used_at","DATETIME NULL"],["","created_at","DATETIME"]]),
+
+ T("memos","d2","บันทึกข้อความ (HUB)",[
+  ["PK","id","BIGINT"],["UK","memo_no","VARCHAR(50)"],["","title","VARCHAR(500)"],
+  ["FK","requester_user_id → users","BIGINT NULL"],["","requester_name","VARCHAR(255)"],
+  ["","department_name","VARCHAR(100)"],["","category","VARCHAR(80)"],
+  ["FK","item_subcategory_id","BIGINT NULL (logical)"],["","amount","DECIMAL(15,2)"],
+  ["","budget_status","VARCHAR(50)"],["","dept_monthly_over_budget_total","DECIMAL(15,2)"],
+  ["","status","draft|pending|approved|rejected|returned"],["","current_step","VARCHAR(100)"],
+  ["","recommended_route_json","JSON"],["","selected_route_json","JSON"],
+  ["","route_override_reason","TEXT"],["","notify_md","BOOLEAN"],
+  ["","is_price_adjustment","BOOLEAN"],["","requires_md_review","BOOLEAN"],
+  ["","md_review_status","VARCHAR(20)"],["","follows_production_plan","BOOLEAN"],
+  ["","is_dead_stock","BOOLEAN"],["","return_reason / return_to_step","TEXT / VARCHAR"],
+  ["","reject_reason / reject_disposition","TEXT / VARCHAR"],["","revision_no","INT"],
+  ["","price_comparisons_json","JSON"],["","request_items_json","JSON"],
+  ["","read_recipients_json","JSON"],["","attachments_json","JSON"],
+  ["","deleted_at","DATETIME NULL (soft-delete)"]]),
+ T("item_subcategories","d2","หมวดหมู่ย่อยของรายการ",[
+  ["PK","id","BIGINT"],["UK","category_key","VARCHAR(80)"],["UK","label_th","VARCHAR(255)"],
+  ["","sort_order","INT"],["","is_active","BOOLEAN"],["","source_reference","VARCHAR(255)"]]),
+ T("memo_revisions","d2","ประวัติการแก้ไข/ส่งใหม่",[
+  ["PK","id","BIGINT"],["FK","memo_id → memos","BIGINT"],["UK","revision_no","INT"],
+  ["","source","VARCHAR(80)"],["","return_reason / reject_reason","TEXT"],
+  ["","revision_note","TEXT"],["","snapshot_json","JSON"],
+  ["","revision_impact","VARCHAR(80) NULL"],["","submitted_at","DATETIME"]]),
+ T("workflow_step_actions","d2","บันทึกทุก action (แหล่งของ Audit Trail)",[
+  ["PK","id","BIGINT"],["FK","memo_id → memos","BIGINT"],["","revision_no","INT"],
+  ["","action_type","submit|approve|return|reject|void|restore"],
+  ["","step_label","Manager|GM|MD"],["","actor_name","VARCHAR(255)"],
+  ["","result / reason","VARCHAR / TEXT"],["","metadata_json","JSON"],["","acted_at","DATETIME"]]),
+ T("read_actions","d2","การรับทราบ (acknowledge)",[
+  ["PK","id","BIGINT"],["FK","memo_id → memos","BIGINT"],["UK","revision_no","INT"],
+  ["UK","recipient_name","VARCHAR(255)"],["","status","pending|read|skipped"],
+  ["","acted_at","DATETIME"],["","skip_reason","TEXT"]]),
+
+ T("notifications","d3","การแจ้งเตือนในระบบ (ช่องทางหลัก)",[
+  ["PK","id","BIGINT"],["FK","memo_id → memos","BIGINT NULL"],
+  ["FK","recipient_user_id → users","BIGINT"],["","notification_type","VARCHAR(100)"],
+  ["","title / body","VARCHAR(255) / TEXT"],["","action_url","/queue?memo=<memo_no>"],
+  ["","is_read / read_at","BOOLEAN / DATETIME"],["","created_at","DATETIME"]]),
+ T("notification_deliveries","d3","สถานะการส่งแต่ละช่องทาง",[
+  ["PK","id","BIGINT"],["FK","notification_id → notifications","BIGINT"],
+  ["UK","channel","in-app | email | telegram"],["","status","pending|sent|failed"],
+  ["","provider_message_id","VARCHAR(255)"],["","error_message","TEXT"],
+  ["","attempted_at / sent_at","DATETIME"]]),
+ T("user_telegram_accounts","d3","บัญชี Telegram ที่ผูกไว้",[
+  ["PK","id","BIGINT"],["FK","user_id → users","BIGINT"],["UK","telegram_user_id","BIGINT"],
+  ["","telegram_chat_id","BIGINT"],["","telegram_username","VARCHAR(255)"],
+  ["","is_active","BOOLEAN"],["","linked_at / last_seen_at / revoked_at","DATETIME"]]),
+ T("telegram_link_tokens","d3","โทเคนผูกบัญชี /start",[
+  ["PK","id","BIGINT"],["FK","user_id → users","BIGINT"],["UK","token_hash","CHAR(64)"],
+  ["","expires_at / used_at","DATETIME"],["","created_at","DATETIME"]]),
+ T("telegram_action_tokens","d3","โทเคนอนุมัติผ่านปุ่ม callback",[
+  ["PK","id","BIGINT"],["FK","memo_id → memos","BIGINT"],["FK","user_id → users","BIGINT"],
+  ["UK","token_hash","CHAR(64)"],["","action_type","approve|return|reject|md-review"],
+  ["","metadata_json","JSON"],["","expires_at / used_at","DATETIME"]]),
+ T("telegram_conversation_states","d3","สถานะสนทนา (รอพิมพ์เหตุผล)",[
+  ["PK","id","BIGINT"],["~","telegram_user_id","BIGINT · ไม่มี FK"],
+  ["~","user_id","BIGINT · ไม่มี FK"],["~","memo_id","BIGINT · ไม่มี FK"],
+  ["","action_type / state","VARCHAR(50) / VARCHAR(80)"],["","payload_json","JSON"],
+  ["","expires_at","DATETIME"]]),
+
+ T("dispatches","d4","หนังสือเวียน / แจ้งเวียน",[
+  ["PK","id","BIGINT"],["UK","dispatch_no","VARCHAR(50)"],["","subject / content","VARCHAR(500) / TEXT"],
+  ["FK","sender_user_id → users","BIGINT"],["FK","memo_id → memos","BIGINT NULL · SET NULL"],
+  ["","status","VARCHAR(50)"],["","attachments_json","JSON"]]),
+ T("dispatch_recipients","d4","ผู้รับหนังสือเวียน + สถานะตอบรับ",[
+  ["PK","id","BIGINT"],["FK","dispatch_id → dispatches","BIGINT · CASCADE"],
+  ["FK","target_user_id → users","BIGINT · CASCADE"],["","recipient_type","ENUM(user,department)"],
+  ["","target_dept","VARCHAR(100)"],["","status","ENUM(pending,read,acknowledged)"],
+  ["","read_at / acknowledged_at","DATETIME"],["","feedback_notes","TEXT"]]),
+ T("issue_reports","d4","แจ้งปัญหาการใช้งาน",[
+  ["PK","id","BIGINT"],["FK","reporter_user_id → users","BIGINT NULL · SET NULL"],
+  ["","reporter_name / department / email","VARCHAR"],["","description","TEXT"],
+  ["","status","ENUM(open,resolved)"],
+  ["FK","resolved_by_user_id → users","BIGINT NULL · SET NULL"],
+  ["","resolved_at / created_at","DATETIME"]]),
+];
+
+// [parent, child, cardinality, label, logical?]
+const RELS = [
+ ["users","memo_templates","||--o{","บันทึกเทมเพลต"],
+ ["users","password_reset_tokens","||--o{","ขอรีเซ็ตรหัสผ่าน"],
+ ["users","memos","||--o{","เป็นผู้ยื่นคำขอ"],
+ ["item_subcategories","memos","||..o{","จัดหมวดหมู่รายการ (ไม่มี FK)",1],
+ ["memos","memo_revisions","||--o{","ประวัติการแก้ไข"],
+ ["memos","workflow_step_actions","||--o{","บันทึก action"],
+ ["memos","read_actions","||--o{","ผู้รับทราบ"],
+ ["memos","notifications","||--o{","สร้างการแจ้งเตือน"],
+ ["users","notifications","||--o{","เป็นผู้รับแจ้งเตือน"],
+ ["notifications","notification_deliveries","||--o{","แตกตามช่องทาง"],
+ ["users","user_telegram_accounts","||--o{","ผูกบัญชี Telegram"],
+ ["users","telegram_link_tokens","||--o{","ออกโทเคนผูกบัญชี"],
+ ["users","telegram_action_tokens","||--o{","ผู้มีสิทธิ์กดปุ่ม"],
+ ["memos","telegram_action_tokens","||--o{","เป้าหมาย callback"],
+ ["users","telegram_conversation_states","||..o{","สถานะสนทนา (ไม่มี FK)",1],
+ ["memos","telegram_conversation_states","||..o{","อ้างอิงเชิงตรรกะ",1],
+ ["users","dispatches","||--o{","ผู้ส่งหนังสือเวียน"],
+ ["memos","dispatches","|o--o{","อ้างอิงบันทึกต้นเรื่อง"],
+ ["dispatches","dispatch_recipients","||--o{","กระจายถึงผู้รับ"],
+ ["users","dispatch_recipients","||--o{","เป็นผู้รับ"],
+ ["users","issue_reports","|o--o{","แจ้งปัญหา / ปิดเรื่อง"],
+];
+
+const state = { on:new Set(DOMAINS.map(d=>d.id)), sel:null, scale:1, tx:0, ty:0 };
+const byName = Object.fromEntries(TABLES.map(t=>[t.name,t]));
+const esc = s => String(s).replace(/[<>"]/g,c=>({'<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const safe = s => String(s).replace(/[^\wก-๙\/|<>().,&+\- ]/g,"").replace(/"/g,"");
+
+mermaid.initialize({startOnLoad:false, theme:"base", securityLevel:"loose",
+  themeVariables:{fontFamily:'"Segoe UI","Noto Sans Thai",sans-serif', fontSize:"13px",
+    primaryColor:"#eef3fb", primaryBorderColor:"#6c8ebf", lineColor:"#5a6b7f"},
+  er:{layoutDirection:"TB", entityPadding:12, minEntityWidth:150, useMaxWidth:false}});
+
+function buildSrc(){
+  const vis = TABLES.filter(t=>state.on.has(t.domain));
+  const names = new Set(vis.map(t=>t.name));
+  let s = "erDiagram\n";
+  for(const t of vis){
+    s += `  ${t.name} {\n`;
+    for(const [k,n,ty] of t.cols){
+      const key = k==="PK"||k==="FK"||k==="UK" ? " "+k : "";
+      const type = ((String(ty).match(/[A-Za-z]+/)||["col"])[0]).toLowerCase();
+      const attr = (String(n).replace(/[^\w]+/g,"_").replace(/^_|_$/g,"")) || "col";
+      s += `    ${type} ${attr}${key} "${safe(ty)}"\n`;
+    }
+    s += "  }\n";
+  }
+  for(const [a,b,card,lbl] of RELS){
+    if(names.has(a) && names.has(b)) s += `  ${a} ${card} ${b} : "${safe(lbl)}"\n`;
+  }
+  return s;
+}
+
+async function render(){
+  const stage = document.getElementById("stage");
+  try{
+    const {svg} = await mermaid.render("erd_"+Date.now(), buildSrc());
+    stage.innerHTML = svg;
+    highlight();
+    fit();
+  }catch(e){ stage.innerHTML = '<pre style="color:#b85450">'+esc(e.message||e)+'</pre>'; }
+}
+
+function highlight(){
+  document.querySelectorAll("#stage g.node, #stage .er.entityBox").forEach(el=>{ el.style.filter=""; });
+  if(!state.sel) return;
+  document.querySelectorAll("#stage text").forEach(tx=>{
+    if(tx.textContent.trim()===state.sel){
+      const box = tx.parentNode.querySelector("rect") || tx.previousElementSibling;
+      if(box && box.tagName==="rect"){ box.style.stroke="#e0932f"; box.style.strokeWidth="3px"; }
+    }
+  });
+}
+
+/* ---------- sidebar ---------- */
+function drawSidebar(){
+  const dc = document.getElementById("domains"); dc.innerHTML="";
+  DOMAINS.forEach(d=>{
+    const n = TABLES.filter(t=>t.domain===d.id).length;
+    const b = document.createElement("button");
+    b.className = "chip"+(state.on.has(d.id)?"":" off");
+    b.innerHTML = `<span class="dot" style="background:${d.color}"></span><span>${d.name}</span><span class="cnt">${n}</span>`;
+    b.onclick = ()=>{ state.on.has(d.id)?state.on.delete(d.id):state.on.add(d.id); drawSidebar(); render(); };
+    dc.appendChild(b);
+  });
+  drawTables();
+}
+function drawTables(){
+  const q = (document.getElementById("q").value||"").toLowerCase();
+  const c = document.getElementById("tables"); c.innerHTML="";
+  DOMAINS.forEach(d=>{
+    TABLES.filter(t=>t.domain===d.id && (t.name.toLowerCase().includes(q)||t.th.includes(q)))
+      .forEach(t=>{
+        const b=document.createElement("button");
+        b.className="tbl"+(state.sel===t.name?" sel":"");
+        b.style.borderLeftColor = state.sel===t.name ? d.color : "transparent";
+        b.innerHTML=`<span class="dot" style="background:${d.color}"></span><span class="n">${t.name}</span><span class="c">${t.cols.length}</span>`;
+        b.onclick=()=>{ state.sel = state.sel===t.name?null:t.name; drawTables(); detail(); highlight(); };
+        c.appendChild(b);
+      });
+  });
+}
+function detail(){
+  const el = document.getElementById("detail");
+  if(!state.sel){ el.style.display="none"; return; }
+  const t = byName[state.sel];
+  const d = DOMAINS.find(x=>x.id===t.domain);
+  el.innerHTML = `<button class="close" onclick="state.sel=null;detail();drawTables();">×</button>`
+    + `<h3><span class="dot" style="display:inline-block;background:${d.color}"></span> ${t.name}</h3>`
+    + `<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${esc(t.th)} · ${d.name}</div>`
+    + `<table>${t.cols.map(([k,n,ty])=>
+        `<tr><td class="k k-${k||'x'}">${esc(k)}</td><td>${esc(n)}</td><td class="t">${esc(ty)}</td></tr>`).join("")}</table>`;
+  el.style.display="block";
+}
+
+/* ---------- pan / zoom ---------- */
+const canvas=document.getElementById("canvas"), stage=document.getElementById("stage");
+function apply(){ stage.style.transform=`translate(${state.tx}px,${state.ty}px) scale(${state.scale})`; }
+function fit(){
+  const svg = stage.querySelector("svg"); if(!svg) return;
+  const bb = svg.getBoundingClientRect();
+  const w = svg.viewBox.baseVal.width || bb.width, h = svg.viewBox.baseVal.height || bb.height;
+  state.scale = Math.min(canvas.clientWidth/(w+70), canvas.clientHeight/(h+70), 1.6);
+  state.tx = 20; state.ty = 20; apply();
+}
+document.getElementById("zin").onclick =()=>{state.scale=Math.min(state.scale*1.25,4);apply();};
+document.getElementById("zout").onclick=()=>{state.scale=Math.max(state.scale/1.25,.08);apply();};
+document.getElementById("fit").onclick = fit;
+document.getElementById("dl").onclick=()=>{
+  const svg=stage.querySelector("svg"); if(!svg) return;
+  const blob=new Blob([svg.outerHTML],{type:"image/svg+xml"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="hr-ememo-erd.svg"; a.click();
+};
+let drag=null;
+canvas.addEventListener("mousedown",e=>{drag={x:e.clientX-state.tx,y:e.clientY-state.ty};canvas.classList.add("drag");});
+window.addEventListener("mousemove",e=>{if(!drag)return;state.tx=e.clientX-drag.x;state.ty=e.clientY-drag.y;apply();});
+window.addEventListener("mouseup",()=>{drag=null;canvas.classList.remove("drag");});
+canvas.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const f = e.deltaY<0?1.12:1/1.12, r=canvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  state.tx = mx-(mx-state.tx)*f; state.ty = my-(my-state.ty)*f;
+  state.scale = Math.max(.08, Math.min(4, state.scale*f)); apply();
+},{passive:false});
+
+document.getElementById("q").oninput = drawTables;
+drawSidebar(); render();
+</script>
+</body>
+</html>

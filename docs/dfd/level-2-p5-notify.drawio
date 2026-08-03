@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="L2 · P5 Notify &amp; Deliver">
+    <mxGraphModel dx="2000" dy="1400" grid="0" gridSize="10" page="1" pageWidth="2320" pageHeight="1200" background="#ffffff">
+      <root><mxCell id="0" /><mxCell id="1" parent="0" />
+        <mxCell id="_t" value="DFD Level 2  —  แตกโปรเซส P5  แจ้งเตือน &amp;amp; กระจายช่องทาง" style="text;html=1;align=center;verticalAlign=middle;fontSize=21;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="50" y="14" width="2220" height="36" as="geometry" /></mxCell>
+        <mxCell id="_t2" value="notify-memo-event.ts · notification-recipients.ts · in-app คือช่องทางหลัก (authoritative) ส่วน email/Telegram เป็น best-effort" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#6b7280;" vertex="1" parent="1">
+          <mxGeometry x="50" y="52" width="2220" height="24" as="geometry" /></mxCell>
+        <mxCell id="N0" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="520" width="270" height="120" as="geometry" /></mxCell>
+        <mxCell id="N0_h" value="← 4" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N0">
+          <mxGeometry x="0" y="0" width="270" height="26" as="geometry" /></mxCell>
+        <mxCell id="N0_b" value="เหตุการณ์จาก P1 / P4&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;submitted · resubmitted · advanced · returned · rejected&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N0">
+          <mxGeometry x="0" y="26" width="270" height="94" as="geometry" /></mxCell>
+        <mxCell id="N1" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="150" width="300" height="110" as="geometry" /></mxCell>
+        <mxCell id="N1_h" value="5.1" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N1">
+          <mxGeometry x="0" y="0" width="300" height="26" as="geometry" /></mxCell>
+        <mxCell id="N1_b" value="ระบุผู้รับแต่ละกลุ่ม&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;resolveApprovalStepRecipients / Requester / CC / ReadLabels&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N1">
+          <mxGeometry x="0" y="26" width="300" height="84" as="geometry" /></mxCell>
+        <mxCell id="N2" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="420" width="300" height="110" as="geometry" /></mxCell>
+        <mxCell id="N2_h" value="5.2" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N2">
+          <mxGeometry x="0" y="0" width="300" height="26" as="geometry" /></mxCell>
+        <mxCell id="N2_b" value="สร้างแถวแจ้งเตือน&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;createNotification() → in-app (authoritative)&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N2">
+          <mxGeometry x="0" y="26" width="300" height="84" as="geometry" /></mxCell>
+        <mxCell id="N3" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="700" width="300" height="110" as="geometry" /></mxCell>
+        <mxCell id="N3_h" value="5.3" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N3">
+          <mxGeometry x="0" y="0" width="300" height="26" as="geometry" /></mxCell>
+        <mxCell id="N3_b" value="ส่งหลายช่องทาง&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;sendAndTrack / sendEmailAndTrack&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N3">
+          <mxGeometry x="0" y="26" width="300" height="84" as="geometry" /></mxCell>
+        <mxCell id="N4" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="960" width="300" height="110" as="geometry" /></mxCell>
+        <mxCell id="N4_h" value="5.4" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N4">
+          <mxGeometry x="0" y="0" width="300" height="26" as="geometry" /></mxCell>
+        <mxCell id="N4_b" value="อ่าน &amp;amp; ทำเครื่องหมายอ่านแล้ว&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;GET /api/notifications · /[id]/read&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N4">
+          <mxGeometry x="0" y="26" width="300" height="84" as="geometry" /></mxCell>
+        <mxCell id="N5" value="" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="700" width="300" height="110" as="geometry" /></mxCell>
+        <mxCell id="N5_h" value="5.5" style="text;html=1;fillColor=#2563eb;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="N5">
+          <mxGeometry x="0" y="0" width="300" height="26" as="geometry" /></mxCell>
+        <mxCell id="N5_b" value="ออก &amp;amp; ตรวจ callback token&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#5b7bb0&quot;&gt;telegram/tokens.ts · actions.ts&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#12305e;spacingLeft=8;spacingRight=8;" vertex="1" parent="N5">
+          <mxGeometry x="0" y="26" width="300" height="84" as="geometry" /></mxCell>
+        <mxCell id="V5" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="150" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V5_c" value="D5" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V5">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V5_r" value="" style="text;html=1;fillColor=#c99400;strokeColor=none;" vertex="1" parent="V5">
+          <mxGeometry x="58" y="0" width="4" height="50" as="geometry" /></mxCell>
+        <mxCell id="V5_b" value="users / roles" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V5">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="V1" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="240" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V1_c" value="D1" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V1">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V1_r" value="" style="text;html=1;fillColor=#c99400;strokeColor=none;" vertex="1" parent="V1">
+          <mxGeometry x="58" y="0" width="4" height="50" as="geometry" /></mxCell>
+        <mxCell id="V1_b" value="memos" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V1">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="420" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6_c" value="D6" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V6">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6_r" value="" style="text;html=1;fillColor=#c99400;strokeColor=none;" vertex="1" parent="V6">
+          <mxGeometry x="58" y="0" width="4" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6_b" value="notifications" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V6">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6b" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="500" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6b_c" value="D6" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V6b">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V6b_b" value="notification_deliveries" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V6b">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="960" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9_c" value="D9" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V9">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9_r" value="" style="text;html=1;fillColor=#c99400;strokeColor=none;" vertex="1" parent="V9">
+          <mxGeometry x="58" y="0" width="4" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9_b" value="user_telegram_accounts" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V9">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9b" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e5;strokeColor=#c99400;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="960" width="310" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9b_c" value="D9" style="text;html=1;fillColor=#f3e3b0;strokeColor=#c99400;strokeWidth=2;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#6b4d00;" vertex="1" parent="V9b">
+          <mxGeometry x="0" y="0" width="58" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9b_r" value="" style="text;html=1;fillColor=#c99400;strokeColor=none;" vertex="1" parent="V9b">
+          <mxGeometry x="58" y="0" width="4" height="50" as="geometry" /></mxCell>
+        <mxCell id="V9b_b" value="telegram_action_tokens" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;fontColor=#6b4d00;" vertex="1" parent="V9b">
+          <mxGeometry x="64" y="0" width="246" height="50" as="geometry" /></mxCell>
+        <mxCell id="Y1" value="ผู้รับแจ้งเตือน (ในระบบ)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e9ecf2;strokeColor=#5b6472;strokeWidth=2;dashed=0;fontSize=12;fontStyle=1;fontColor=#2f3742;align=center;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="960" width="300" height="70" as="geometry" /></mxCell>
+        <mxCell id="X1" value="SMTP Email Server" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f7f9;strokeColor=#9aa3ad;strokeWidth=2;dashed=1;dashPattern=8 5;fontSize=12;fontStyle=1;fontColor=#6b7280;align=center;verticalAlign=middle;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="660" width="300" height="60" as="geometry" /></mxCell>
+        <mxCell id="X2" value="Telegram Bot API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f6f7f9;strokeColor=#9aa3ad;strokeWidth=2;dashed=1;dashPattern=8 5;fontSize=12;fontStyle=1;fontColor=#6b7280;align=center;verticalAlign=middle;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="780" width="300" height="60" as="geometry" /></mxCell>
+        <mxCell id="m0" value="memo_no + eventType + actorUserId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N0" target="N1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="440" y="556" />
+            <mxPoint x="440" y="205" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m1" value="อ่าน approval_level (กรองตามแผนก)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N1" target="V5">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m2" value="อ่าน requester + CC + read list" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N1" target="V1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1000" y="232" />
+            <mxPoint x="1000" y="265" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m3" value="รายชื่อผู้รับ (ตัด actor / กันซ้ำ)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="N1" target="N2">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m4" value="INSERT notification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N2" target="V6">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m5" value="notification_id + เนื้อหา" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="N2" target="N3">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m6" value="INSERT/UPDATE delivery (UNIQUE ต่อ channel)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="N3" target="V6b">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="970" y="722" />
+            <mxPoint x="970" y="542" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m7" value="อีเมล" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N3" target="X1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1440" y="745" />
+            <mxPoint x="1440" y="690" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m8" value="ต้องมีปุ่มอนุมัติ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.6;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N3" target="N5">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m9" value="อ่าน chat id ที่ยัง active" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=1;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="N5" target="V9">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1460" y="794" />
+            <mxPoint x="1460" y="978" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m10" value="ออก token (one-time, มีวันหมดอายุ)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="N5" target="V9b">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m11" value="ข้อความ + inline keyboard" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N5" target="X2">
+          <mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="m12" value="callback: approve / MD review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;dashPattern=8 5;strokeColor=#9aa3ad;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=1;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="X2" target="N5">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1880" y="831" />
+            <mxPoint x="1880" y="794" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m13" value="แจ้งเตือนที่ยังไม่อ่าน" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.9;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="N2" target="N4">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="480" y="519" />
+            <mxPoint x="480" y="988" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m14" value="อ่าน / อัปเดต is_read" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="N4" target="V6">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="980" y="982" />
+            <mxPoint x="980" y="460" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m15" value="bell dropdown + badge" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="N4" target="Y1">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1880" y="1015" />
+            <mxPoint x="1880" y="995" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="m16" value="กดอ่าน / อ่านทั้งหมด" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;strokeColor=#3f4a57;strokeWidth=1.7;endArrow=blockThin;endFill=1;startArrow=none;fontSize=10;fontColor=#3d4852;labelBackgroundColor=#ffffff;exitX=0;exitY=0.85;exitDx=0;exitDy=0;entryX=1;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="Y1" target="N4">
+          <mxGeometry relative="1" as="geometry"><Array as="points">
+            <mxPoint x="1900" y="1020" />
+            <mxPoint x="1900" y="1054" />
+          </Array></mxGeometry></mxCell>
+        <mxCell id="nt" value="&lt;b&gt;ไม่บล็อกเวิร์กโฟลว์&lt;/b&gt; — &lt;code&gt;notifyMemoEvent()&lt;/code&gt; เป็น fire-and-forget เรียกหลัง COMMIT และ จับ error ไว้ทั้งหมด การส่งอีเมล/Telegram ล้มเหลวจึงไม่ทำให้การอนุมัติล้มตาม" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cbd2d9;align=left;verticalAlign=middle;spacingLeft=14;spacingRight=14;fontSize=11;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="90" y="700" width="360" height="120" as="geometry" /></mxCell>
+        <mxCell id="lg" value="&lt;b&gt;สัญลักษณ์ (Gane &amp;amp; Sarson)&lt;/b&gt;&amp;#160;&amp;#160;&amp;#160;&lt;font color=&quot;#2f3742&quot;&gt;▭&lt;/font&gt; External Entity (ผู้ใช้/ระบบภายนอก)&amp;#160;&amp;#160;&lt;font color=&quot;#2563eb&quot;&gt;▭&lt;/font&gt; Process (โปรเซส)&amp;#160;&amp;#160;&lt;font color=&quot;#c99400&quot;&gt;▭&lt;/font&gt; Data Store (แหล่งเก็บข้อมูล = ตารางจริงใน MySQL)&amp;#160;&amp;#160;→ Data Flow&amp;#160;&amp;#160; เส้นประ = ระบบภายนอก / best-effort" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cbd2d9;align=left;verticalAlign=middle;spacingLeft=14;spacingRight=14;fontSize=11;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1080" width="2220" height="58" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
