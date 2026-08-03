@@ -186,6 +186,9 @@ export function buildAdvanceStepPayload(body: AdvanceStepBody): AdvanceStepPaylo
 export type ReturnMemoBody = {
   stepLabel: string;
   returnReason: string;
+  // Optional selectable return destination; the /return route re-validates it
+  // server-side (evaluateReturnAction). Omitted = restart from the first step.
+  returnToStep?: string;
   revisionNo: number;
   updatedAt: string;
   actorName: string | null;
@@ -421,6 +424,7 @@ export type ResubmitMemoPayload = {
     revision_submitted_at: string;
     updated_at: string;
     return_reason: null;
+    return_to_step: null;
     reject_reason: null;
     reject_disposition: null;
     md_review_status: null;
@@ -467,6 +471,7 @@ export function buildResubmitMemoPayload(body: ResubmitMemoBody): ResubmitMemoPa
       revision_submitted_at: updatedAtUtc,
       updated_at: updatedAtUtc,
       return_reason: null,
+      return_to_step: null,
       reject_reason: null,
       reject_disposition: null,
       md_review_status: null,

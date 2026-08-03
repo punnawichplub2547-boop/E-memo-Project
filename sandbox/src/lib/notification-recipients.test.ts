@@ -65,6 +65,31 @@ describe("resolveApprovalStepRecipients", () => {
     expect(calls[0].params).toEqual(["Manager / Top Section", "HR&GA"]);
   });
 
+  it("scopes the query to the memo's department when approval level is Supervisor", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        return [[{ id: 3 }], undefined];
+      },
+    } as unknown as Pool;
+    const result = await resolveApprovalStepRecipients("Supervisor", "HR&GA", pool);
+    expect(result).toEqual([3]);
+    expect(calls[0].sql).toContain("department = ?");
+    expect(calls[0].params).toEqual(["Supervisor", "HR&GA"]);
+  });
+
+  // Q4: a department may have more than one active Supervisor — every one of them
+  // must be notified, exactly like the multi-Manager case.
+  it("returns every active Supervisor in the department (Q4 — multiple supervisors)", async () => {
+    const result = await resolveApprovalStepRecipients(
+      "Supervisor",
+      "HR&GA",
+      pool1([{ id: 3 }, { id: 4 }, { id: 5 }]),
+    );
+    expect(result).toEqual([3, 4, 5]);
+  });
+
   it("does NOT scope by department for company-wide levels (General Manager / Managing Director)", async () => {
     const calls: Array<{ sql: string; params: unknown[] }> = [];
     const pool = {

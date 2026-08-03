@@ -21,6 +21,7 @@ import {
 } from "@/components/icons";
 
 const APPROVAL_LEVELS: ApprovalLevel[] = [
+  "Supervisor",
   "Manager / Top Section",
   "General Manager",
   "Managing Director",
@@ -330,7 +331,7 @@ export default function AdminPage() {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 260 }}>
                                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Assign roles:</div>
                                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                    {(["requester","manager","general-manager","managing-director","read-recipient","admin"] as const).map(r => (
+                                    {(["requester","supervisor","manager","general-manager","managing-director","read-recipient","admin"] as const).map(r => (
                                       <label key={r} style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                                         <input type="checkbox" checked={approveRoles.includes(r)}
                                           onChange={e => setApproveRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))} />
@@ -338,7 +339,7 @@ export default function AdminPage() {
                                       </label>
                                     ))}
                                   </div>
-                                  {(approveRoles.includes("manager") || approveRoles.includes("general-manager") || approveRoles.includes("managing-director")) && (
+                                  {(approveRoles.includes("supervisor") || approveRoles.includes("manager") || approveRoles.includes("general-manager") || approveRoles.includes("managing-director")) && (
                                     <select value={approveLevel} onChange={e => setApproveLevel(e.target.value)}
                                       style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink)", outline: "none" }}>
                                       <option value="">— Approval Level —</option>
@@ -427,7 +428,7 @@ export default function AdminPage() {
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 300 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>Assign roles:</div>
                                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                      {(["requester","manager","general-manager","senior-general-manager","managing-director","read-recipient","admin"] as const).map(r => (
+                                      {(["requester","supervisor","manager","general-manager","managing-director","read-recipient","admin"] as const).map(r => (
                                         <label key={r} style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                                           <input type="checkbox" checked={changeRoleRoles.includes(r)}
                                             onChange={e => setChangeRoleRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))} />
@@ -435,7 +436,7 @@ export default function AdminPage() {
                                         </label>
                                       ))}
                                     </div>
-                                    {(changeRoleRoles.includes("manager") || changeRoleRoles.includes("general-manager") || changeRoleRoles.includes("senior-general-manager") || changeRoleRoles.includes("managing-director")) && (
+                                    {(changeRoleRoles.includes("supervisor") || changeRoleRoles.includes("manager") || changeRoleRoles.includes("general-manager") || changeRoleRoles.includes("managing-director")) && (
                                       <select value={changeRoleLevel} onChange={e => setChangeRoleLevel(e.target.value)}
                                         style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink)", outline: "none" }}>
                                         <option value="">— Approval Level —</option>

@@ -6,6 +6,7 @@ import type { MemoRecord } from "@/lib/approval";
 import { IconCheck, IconPen, IconReturn, IconX } from "@/components/icons";
 import {
   canApproveMemo,
+  canRejectMemo,
   canResubmitMemo,
   canReturnOrRejectMemo,
   canReviewMdMemo,
@@ -26,7 +27,7 @@ export function DrawerFooter({
   currentUser: PrototypeUser;
   onAction: (id: string, action: "approve") => void;
   onReject: (id: string, disposition: "close" | "revision-allowed", reason: string) => void;
-  onReturn: (id: string, reason: string) => void;
+  onReturn: (id: string, reason: string, returnToStep?: string) => void;
   onResubmit: (id: string, revisionNote?: string) => void;
   onSkipAllReads: (id: string, reason: string) => void;
   onReview: (
@@ -45,6 +46,9 @@ export function DrawerFooter({
   const [localRejectDisposition, setLocalRejectDisposition] = useState<"close" | "revision-allowed">("close");
   const [returnMode, setReturnMode] = useState(false);
   const [localReturnReason, setLocalReturnReason] = useState("");
+  // Selectable return destination. Empty = restart from the first step (default,
+  // backward-compatible). Options are computed below and capped by Q1/Q2 rules.
+  const [localReturnToStep, setLocalReturnToStep] = useState("");
   const [resubmitMode, setResubmitMode] = useState(false);
   const [revisionNote, setRevisionNote] = useState("");
   const [skipReadsMode, setSkipReadsMode] = useState(false);
@@ -58,7 +62,23 @@ export function DrawerFooter({
   const hasPendingReads = memo.readActions?.some(ra => ra.status === "pending") ?? false;
   const canApprove = canApproveMemo(currentUser, memo);
   const canWorkflowDecision = canReturnOrRejectMemo(currentUser, memo);
+  // Reject is Manager-and-above only (Supervisor can return but not reject, Q3).
+  const canReject = canRejectMemo(currentUser, memo);
   const canResubmit = canResubmitMemo(currentUser, memo);
+  // Approve button label follows the step: a Supervisor "passes/checks", not "approves" (Q3).
+  const approveVerb = memo.currentStep === "Supervisor" ? "ตรวจแล้ว/ผ่าน" : "Approve";
+
+  // Selectable return-destination options: steps in the route from the first up to
+  // (and including) the current step — Q2 forbids picking a step ahead of the actor.
+  // Q1 caps an md-review memo so it cannot resume past Manager (gate-bypass guard).
+  const route = memo.selectedRoute ?? [];
+  const currentStepIndex = route.indexOf(memo.currentStep);
+  let maxReturnIndex = currentStepIndex >= 0 ? currentStepIndex : route.length - 1;
+  if (memo.requiresMdReview) {
+    const managerIndex = route.indexOf("Manager / Top Section");
+    if (managerIndex >= 0) maxReturnIndex = Math.min(maxReturnIndex, managerIndex);
+  }
+  const returnStepOptions = route.slice(0, maxReturnIndex + 1);
   const noWorkflowPermissionText = "ไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้";
   const noResubmitPermissionText = "เฉพาะผู้สร้าง memo หรือ Admin เท่านั้นที่ส่งแก้ไขได้";
 
@@ -323,6 +343,28 @@ export function DrawerFooter({
               onChange={e => setLocalReturnReason(e.target.value)}
               autoFocus
             />
+            {returnStepOptions.length > 1 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ fontSize: 12, color: "var(--ink-2)", fontWeight: 600 }}>
+                  ส่งกลับไปที่ขั้น
+                  {memo.requiresMdReview && (
+                    <span style={{ fontWeight: 400, color: "var(--muted)" }}> (จำกัดไม่เกิน Manager เพราะต้องผ่าน MD)</span>
+                  )}
+                </div>
+                <select
+                  className="em-input"
+                  style={{ fontSize: 12.5, padding: "6px 8px" }}
+                  value={localReturnToStep}
+                  onChange={e => setLocalReturnToStep(e.target.value)}
+                >
+                  {returnStepOptions.map((step, i) => (
+                    <option key={step} value={step}>
+                      {step}{i === 0 ? " (เริ่มต้นใหม่ / default)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
@@ -338,7 +380,7 @@ export function DrawerFooter({
                 style={{ flex: 2, background: "var(--amber-soft)", color: "var(--amber)", border: "1px solid rgba(180,83,9,0.30)" }}
                 disabled={!localReturnReason.trim() || !canWorkflowDecision}
                 title={canWorkflowDecision ? "Confirm return" : noWorkflowPermissionText}
-                onClick={() => onReturn(memo.id, localReturnReason.trim())}
+                onClick={() => onReturn(memo.id, localReturnReason.trim(), localReturnToStep || undefined)}
               >
                 <IconReturn size={13} /> Confirm Return
               </button>
@@ -415,21 +457,22 @@ export function DrawerFooter({
               </div>
             )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                className="em-btn danger"
-                style={{ flex: 1 }}
-                disabled={!canWorkflowDecision}
-                title={canWorkflowDecision ? "Reject memo" : noWorkflowPermissionText}
-                onClick={() => { setRejectMode(true); setLocalRejectReason(""); setLocalRejectDisposition("close"); }}
-              >
-                <IconX size={14} /> Reject
-              </button>
+              {canReject && (
+                <button
+                  className="em-btn danger"
+                  style={{ flex: 1 }}
+                  title="Reject memo"
+                  onClick={() => { setRejectMode(true); setLocalRejectReason(""); setLocalRejectDisposition("close"); }}
+                >
+                  <IconX size={14} /> Reject
+                </button>
+              )}
               <button
                 className="em-btn"
                 style={{ flex: 1 }}
                 disabled={!canWorkflowDecision}
                 title={canWorkflowDecision ? "Return memo" : noWorkflowPermissionText}
-                onClick={() => { setReturnMode(true); setLocalReturnReason(""); }}
+                onClick={() => { setReturnMode(true); setLocalReturnReason(""); setLocalReturnToStep(route[0] ?? ""); }}
               >
                 <IconReturn size={14} /> Return
               </button>
@@ -440,7 +483,7 @@ export function DrawerFooter({
                 title={canApprove ? "Approve memo" : noWorkflowPermissionText}
                 onClick={() => onAction(memo.id, "approve")}
               >
-                <IconCheck size={14} /> {hasPendingReads ? "Approve (รอรับทราบ)" : canApprove ? "Approve" : "Approve (ไม่มีสิทธิ์)"}
+                <IconCheck size={14} /> {hasPendingReads ? `${approveVerb} (รอรับทราบ)` : canApprove ? approveVerb : `${approveVerb} (ไม่มีสิทธิ์)`}
               </button>
             </div>
           </div>

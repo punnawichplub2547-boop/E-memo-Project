@@ -16,10 +16,11 @@ export async function POST(
     const session = await getActiveSessionUserFromToken(token);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = (await request.json().catch(() => ({}))) as { returnReason?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { returnReason?: unknown; returnToStep?: unknown };
     const returnReason = typeof body.returnReason === "string" ? body.returnReason : "";
+    const returnToStep = typeof body.returnToStep === "string" ? body.returnToStep : undefined;
 
-    await returnMemoAction({ memoNo, actorUserId: session.userId, reason: returnReason, source: "web" });
+    await returnMemoAction({ memoNo, actorUserId: session.userId, reason: returnReason, returnToStep, source: "web" });
     void notifyMemoEvent(memoNo, "returned", session.userId).catch((err) =>
       console.error("[notifyMemoEvent] returned failed:", err));
     return NextResponse.json({ ok: true });

@@ -3,9 +3,9 @@ import type { SessionUser } from "./auth-jwt";
 
 export type PrototypeRole =
   | "requester"
+  | "supervisor"
   | "manager"
   | "general-manager"
-  | "senior-general-manager"
   | "managing-director"
   | "read-recipient"
   | "admin";
@@ -43,6 +43,14 @@ export const PROTOTYPE_USERS: PrototypeUser[] = [
     department: "PD",
     roleLabel: "Requester",
     roles: ["requester"],
+  },
+  {
+    id: "supervisor",
+    name: "อรุณ ตั้งใจงาน",
+    department: "HR&GA",
+    roleLabel: "Supervisor",
+    roles: ["supervisor"],
+    approvalLevel: "Supervisor",
   },
   {
     id: "manager",
@@ -108,11 +116,11 @@ export function sessionUserToPrototypeUser(user: SessionUser): PrototypeUser {
 }
 
 function isPrototypeRole(role: string): role is PrototypeRole {
-  return ["requester", "manager", "general-manager", "senior-general-manager", "managing-director", "read-recipient", "admin"].includes(role);
+  return ["requester", "supervisor", "manager", "general-manager", "managing-director", "read-recipient", "admin"].includes(role);
 }
 
 function toApprovalLevel(level: string | null): ApprovalLevel | undefined {
-  if (level === "Manager / Top Section" || level === "General Manager" || level === "Managing Director") {
+  if (level === "Supervisor" || level === "Manager / Top Section" || level === "General Manager" || level === "Managing Director") {
     return level;
   }
   return undefined;
@@ -147,6 +155,14 @@ export function canApproveMemo(user: PrototypeUser, memo: MemoRecord): boolean {
 
 export function canReturnOrRejectMemo(user: PrototypeUser, memo: MemoRecord): boolean {
   return canApproveMemo(user, memo);
+}
+
+// Reject is a Manager-and-above power. A Supervisor is a check-only step: they can
+// pass the memo forward or return it for revision, but they cannot reject it (Q3).
+// Admin keeps full power (approvalLevel is undefined, never "Supervisor").
+export function canRejectMemo(user: PrototypeUser, memo: MemoRecord): boolean {
+  if (!canApproveMemo(user, memo)) return false;
+  return user.approvalLevel !== "Supervisor";
 }
 
 export function canResubmitMemo(user: PrototypeUser, memo: MemoRecord): boolean {

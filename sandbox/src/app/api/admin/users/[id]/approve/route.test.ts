@@ -82,3 +82,19 @@ describe("POST approve — Managing Director duplicate guard", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("POST approve — Supervisor role/level and SGM removal", () => {
+  it("approves the supervisor role with the Supervisor approval level", async () => {
+    const res = await POST(req({ roles: ["supervisor"], approvalLevel: "Supervisor" }), ctx("5"));
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(approveUser)).toHaveBeenCalledWith(5, ["supervisor"], "Supervisor");
+  });
+
+  it("rejects the removed senior-general-manager role with 400", async () => {
+    const res = await POST(req({ roles: ["senior-general-manager"] }), ctx("5"));
+
+    expect(res.status).toBe(400);
+    expect(vi.mocked(approveUser)).not.toHaveBeenCalled();
+  });
+});

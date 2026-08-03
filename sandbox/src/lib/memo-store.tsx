@@ -28,7 +28,7 @@ type Action =
   | { type: "ADVANCE_STEP"; id: string; updatedAt?: string }
   | { type: "MARK_READ"; id: string; recipient: string; actedAt?: string }
   | { type: "SKIP_ALL_READS"; id: string; skipReason: string; actedAt?: string }
-  | { type: "RETURN_MEMO"; id: string; returnReason: string; updatedAt?: string }
+  | { type: "RETURN_MEMO"; id: string; returnReason: string; returnToStep?: string; updatedAt?: string }
   | {
       type: "REVIEW_MEMO";
       id: string;
@@ -407,7 +407,7 @@ export function MemoProvider({ children }: { children: React.ReactNode }) {
       const prevMemo = prevState.find((m) => m.id === action.id);
       const nextMemo = nextState.find((m) => m.id === action.id);
       if (prevMemo && nextMemo && prevMemo !== nextMemo) {
-        void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, actorName, action.updatedAt);
+        void persistReturnMemo(action.id, prevMemo, nextMemo, action.returnReason, actorName, action.updatedAt, action.returnToStep);
       }
     } else if (action.type === "REVIEW_MEMO") {
       const prevState = memos;
@@ -573,10 +573,12 @@ async function persistReturnMemo(
   returnReason: string,
   actorName: string,
   updatedAt?: string,
+  returnToStep?: string,
 ) {
   const body: ReturnMemoBody = {
     stepLabel: prev.currentStep,
     returnReason,
+    returnToStep,
     revisionNo: next.revisionNo ?? 0,
     updatedAt: updatedAt ?? next.updatedAt,
     actorName,

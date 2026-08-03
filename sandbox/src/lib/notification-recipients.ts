@@ -5,19 +5,19 @@ import type { RowDataPacket } from "mysql2";
 
 type IdRow = RowDataPacket & { id: number };
 
-// "Manager / Top Section" is department-scoped — mirrors canActOnStep in
-// workflow-rules.ts, where a Manager may only act on their own department's
-// memo (each department has its own Manager, all sharing this exact label).
-// Without this filter, every department's Manager would be notified for
-// every OTHER department's memo too. GM and MD are global, no department filter.
-const DEPARTMENT_SCOPED_APPROVAL_LEVEL = "Manager / Top Section";
+// "Manager / Top Section" and "Supervisor" are department-scoped — mirrors
+// canActOnStep in workflow-rules.ts, where they may only act on their own
+// department's memo (each department has its own, all sharing the exact label).
+// Without this filter, every department's Supervisor/Manager would be notified
+// for every OTHER department's memo too. GM and MD are global, no department filter.
+const DEPARTMENT_SCOPED_APPROVAL_LEVELS = new Set(["Manager / Top Section", "Supervisor"]);
 
 export async function resolveApprovalStepRecipients(
   approvalLevel: string,
   departmentName: string,
   pool: Pool,
 ): Promise<number[]> {
-  const isDepartmentScoped = approvalLevel === DEPARTMENT_SCOPED_APPROVAL_LEVEL;
+  const isDepartmentScoped = DEPARTMENT_SCOPED_APPROVAL_LEVELS.has(approvalLevel);
   const [rows] = await pool.query<IdRow[]>(
     isDepartmentScoped
       ? "SELECT id FROM users WHERE approval_level = ? AND department = ? AND status = 'active'"

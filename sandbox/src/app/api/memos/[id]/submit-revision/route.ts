@@ -4,10 +4,13 @@ import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { buildSubmitRevisionPayload, type SubmitRevisionBody } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
+import type { ApprovalLevel } from "@/lib/approval";
 import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
 import { isMemoOwner } from "@/lib/memo-ownership";
+import { departmentHasActiveSupervisor } from "@/lib/db-users";
+import { applySupervisorRouting } from "@/lib/supervisor-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +21,7 @@ type MemoIdRow = RowDataPacket & {
   status: string;
   reject_disposition: string | null;
   revision_no: number;
+  return_to_step: string | null;
 };
 
 export async function POST(
@@ -37,7 +41,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
+      "SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, return_to_step FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -79,10 +83,25 @@ export async function POST(
     const memoDbId = memo.id;
     const { memoRevision, memoUpdate, newReadActions, workflowAction } = buildSubmitRevisionPayload(body);
 
-    // Server-derive current_step from the first step of the submitted route so the
-    // client cannot redirect approval notifications to an arbitrary approval level.
-    const submittedRoute = JSON.parse(memoUpdate.selected_route_json || "[]") as string[];
-    memoUpdate.current_step = submittedRoute[0] ?? "Manager / Top Section";
+    // Server-authoritative Supervisor step: strip any client "Supervisor" and, only
+    // when the (possibly re-picked) department has an active Supervisor, prepend it.
+    const hasSupervisor = await departmentHasActiveSupervisor(pool, memoUpdate.department_name);
+    const supervised = applySupervisorRouting(
+      JSON.parse(memoUpdate.selected_route_json || "[]") as ApprovalLevel[],
+      JSON.parse(memoUpdate.recommended_route_json || "[]") as ApprovalLevel[],
+      hasSupervisor,
+    );
+    memoUpdate.selected_route_json = supervised.selectedRoute.length ? JSON.stringify(supervised.selectedRoute) : null;
+    memoUpdate.recommended_route_json = supervised.recommendedRoute.length ? JSON.stringify(supervised.recommendedRoute) : null;
+
+    // Server-derive current_step. Honor the approver's chosen return destination
+    // (return_to_step) when it is still a member of the route; otherwise restart from
+    // the first step. Never trust the client to redirect approval notifications.
+    const returnToStep = memo.return_to_step;
+    memoUpdate.current_step =
+      returnToStep && supervised.selectedRoute.includes(returnToStep as ApprovalLevel)
+        ? returnToStep
+        : supervised.selectedRoute[0] ?? "Manager / Top Section";
 
     await connection.execute(
       `INSERT INTO memo_revisions (
@@ -151,6 +170,7 @@ export async function POST(
          md_review_comment = ?,
          md_review_acted_by = ?,
          md_review_acted_at = ?,
+         return_to_step = NULL,
          updated_at = ?
        WHERE id = ?`,
       memoUpdateParams(memoUpdate, memoDbId)

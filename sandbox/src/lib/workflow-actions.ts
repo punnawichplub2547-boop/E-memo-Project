@@ -190,6 +190,7 @@ export async function returnMemoAction(input: {
   memoNo: string;
   actorUserId: number;
   reason: string;
+  returnToStep?: string;
   source: WorkflowActionSource;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: true }> {
@@ -203,6 +204,7 @@ export async function returnMemoAction(input: {
         memo,
         actor,
         reason: input.reason,
+        returnToStep: input.returnToStep,
         source: input.source,
         metadata: input.metadata,
         now,
@@ -213,9 +215,10 @@ export async function returnMemoAction(input: {
       `UPDATE memos SET
          status = ?,
          return_reason = ?,
+         return_to_step = ?,
          updated_at = ?
        WHERE id = ?`,
-      [memoUpdate.status, memoUpdate.return_reason, memoUpdate.updated_at, memo.id],
+      [memoUpdate.status, memoUpdate.return_reason, memoUpdate.return_to_step, memoUpdate.updated_at, memo.id],
     );
     await insertWorkflowAction(connection, memo.id, workflowAction);
     return { ok: true as const };

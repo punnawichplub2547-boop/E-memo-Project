@@ -68,6 +68,7 @@ $ColumnMigrations = [ordered]@{
     'memos.closing_remark'     = '2026-06-10-add-closing-remark.sql'
     'memos.requester_user_id'  = '2026-06-19-add-memo-requester-user-id.sql'
     'memos.requires_md_review' = '2026-07-01-add-md-review-columns.sql'
+    'memos.return_to_step'     = '2026-07-22-add-memo-return-to-step.sql'
 }
 
 # --- Helpers --------------------------------------------------------------

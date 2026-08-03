@@ -1,4 +1,5 @@
 import { getDbPool } from "./db";
+import type { Pool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 
 export type UserRow = {
@@ -116,6 +117,21 @@ export async function updateUserPassword(id: number, passwordHash: string): Prom
     "UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?",
     [passwordHash, id]
   );
+}
+
+// True when the department has at least one active user carrying the "Supervisor"
+// approval level. The POST /api/memos + submit-revision routes call this to decide,
+// server-side, whether to prepend an optional "Supervisor" check step to the route.
+// Takes the pool explicitly so it can share the request's transaction/connection.
+export async function departmentHasActiveSupervisor(
+  pool: Pool,
+  department: string,
+): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT 1 FROM users WHERE approval_level = 'Supervisor' AND department = ? AND status = 'active' LIMIT 1",
+    [department],
+  );
+  return rows.length > 0;
 }
 
 export function parseRoles(rolesJson: string): string[] {

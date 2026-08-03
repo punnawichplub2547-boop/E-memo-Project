@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS memos (
   dept_monthly_over_budget_total  DECIMAL(15,2) NULL,
 
   return_reason                   TEXT          NULL,
+  return_to_step                  VARCHAR(100)  NULL,
   reject_reason                   TEXT          NULL,
   reject_disposition              VARCHAR(50)   NULL,
 

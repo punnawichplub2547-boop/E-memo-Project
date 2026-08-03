@@ -716,6 +716,12 @@ describe("buildResubmitMemoPayload", () => {
     expect(payload.memoUpdate.reject_disposition).toBeNull();
   });
 
+  it("memoUpdate clears return_to_step (the return destination is consumed on resubmit)", () => {
+    const payload = buildResubmitMemoPayload(baseBody);
+
+    expect(payload.memoUpdate.return_to_step).toBeNull();
+  });
+
   it("memoUpdate.current_step matches body.nextCurrentStep", () => {
     const payload = buildResubmitMemoPayload({ ...baseBody, nextCurrentStep: "General Manager" });
 

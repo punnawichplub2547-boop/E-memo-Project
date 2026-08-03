@@ -190,6 +190,20 @@ describe("approver roles", () => {
     )).toBe(true);
   });
 
+  it("supervisor sees a memo in its route from their own department", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["Supervisor", "Manager / Top Section"], department: "IT" }),
+      makeSession({ roles: ["supervisor"], approvalLevel: "Supervisor", department: "IT" }),
+    )).toBe(true);
+  });
+
+  it("supervisor does NOT see a routed memo from a different department (dept-scoped like Manager)", () => {
+    expect(isMemoVisibleTo(
+      makeMemo({ selectedRoute: ["Supervisor", "Manager / Top Section"], department: "IT" }),
+      makeSession({ roles: ["supervisor"], approvalLevel: "Supervisor", department: "HR&GA" }),
+    )).toBe(false);
+  });
+
   it("GM sees memo in route from a different department (no dept restriction)", () => {
     expect(isMemoVisibleTo(
       makeMemo({ selectedRoute: ["General Manager"], department: "PC" }),

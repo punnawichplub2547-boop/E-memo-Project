@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { updateUserRoles, updateUserStatus, findActiveUsersByApprovalLevel } from "@/lib/db-users";
 
-const ALLOWED_ROLES = new Set(["requester", "manager", "general-manager", "senior-general-manager", "managing-director", "read-recipient", "admin"]);
-const ALLOWED_APPROVAL_LEVELS = new Set(["Manager / Top Section", "General Manager", "Managing Director"]);
+const ALLOWED_ROLES = new Set(["requester", "supervisor", "manager", "general-manager", "managing-director", "read-recipient", "admin"]);
+const ALLOWED_APPROVAL_LEVELS = new Set(["Supervisor", "Manager / Top Section", "General Manager", "Managing Director"]);
 const ALLOWED_STATUSES = new Set(["active", "suspended"]);
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

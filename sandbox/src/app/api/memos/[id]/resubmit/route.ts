@@ -19,6 +19,7 @@ type MemoIdRow = RowDataPacket & {
   revision_no: number;
   selected_route_json: string;
   requires_md_review: number | boolean;
+  return_to_step: string | null;
 };
 
 export async function POST(
@@ -39,7 +40,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      `SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, selected_route_json, requires_md_review
+      `SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, selected_route_json, requires_md_review, return_to_step
        FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE`,
       [memoNo]
     );
@@ -75,8 +76,16 @@ export async function POST(
     }
 
     // Server derives these — never trust client for workflow-critical fields.
+    // Quick resubmit reuses the frozen route as-is (no re-pick), so any prepended
+    // Supervisor step is already in selected_route_json. Honor the approver's chosen
+    // return destination (return_to_step) when it is still a member of the route;
+    // otherwise restart from the first step.
     const selectedRoute = JSON.parse(memo.selected_route_json || "[]") as string[];
-    body.nextCurrentStep = selectedRoute[0] ?? "Manager / Top Section";
+    const returnToStep = memo.return_to_step;
+    body.nextCurrentStep =
+      returnToStep && selectedRoute.includes(returnToStep)
+        ? returnToStep
+        : selectedRoute[0] ?? "Manager / Top Section";
     body.oldRevisionNo = memo.revision_no;
     body.requiresMdReview = Boolean(memo.requires_md_review);
 
@@ -112,6 +121,7 @@ export async function POST(
          revision_submitted_at = ?,
          updated_at = ?,
          return_reason = ?,
+         return_to_step = ?,
          reject_reason = ?,
          reject_disposition = ?,
          md_review_status = ?,
@@ -129,6 +139,7 @@ export async function POST(
         memoUpdate.revision_submitted_at,
         memoUpdate.updated_at,
         memoUpdate.return_reason,
+        memoUpdate.return_to_step,
         memoUpdate.reject_reason,
         memoUpdate.reject_disposition,
         memoUpdate.md_review_status,

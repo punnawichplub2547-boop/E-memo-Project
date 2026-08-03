@@ -137,10 +137,10 @@ function QueuePageContent() {
     setSelected(null);
   };
 
-  const handleReturn = (id: string, reason: string) => {
+  const handleReturn = (id: string, reason: string, returnToStep?: string) => {
     const memo = memos.find((m) => m.id === id);
     if (!memo || !canReturnOrRejectMemo(user, memo)) return;
-    dispatch({ type: "RETURN_MEMO", id, returnReason: reason, updatedAt: stampNow() });
+    dispatch({ type: "RETURN_MEMO", id, returnReason: reason, returnToStep, updatedAt: stampNow() });
     setSelected(null);
   };
 

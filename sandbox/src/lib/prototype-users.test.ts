@@ -3,6 +3,7 @@ import type { MemoRecord } from "./approval";
 import {
   canApproveMemo,
   canMarkReadRecipient,
+  canRejectMemo,
   canResubmitMemo,
   canReturnOrRejectMemo,
   canReviewMdMemo,
@@ -96,6 +97,31 @@ describe("prototype user permissions", () => {
 
     expect(canResubmitMemo(user("requester"), closedRejectedMemo)).toBe(false);
     expect(canResubmitMemo(user("admin"), closedRejectedMemo)).toBe(false);
+  });
+
+  it("provides an active Supervisor prototype user with the Supervisor approval level", () => {
+    const supervisor = user("supervisor");
+    expect(supervisor.approvalLevel).toBe("Supervisor");
+    expect(supervisor.roles).toContain("supervisor");
+  });
+
+  it("lets a Supervisor return but NOT reject a memo at their step", () => {
+    const supervisorMemo = { ...baseMemo, currentStep: "Supervisor" as const };
+
+    // Supervisor is a check-only step: they can pass/return, but rejecting is a
+    // Manager-and-above power (Q3). canReturnOrRejectMemo still allows return/skip.
+    expect(canReturnOrRejectMemo(user("supervisor"), supervisorMemo)).toBe(true);
+    expect(canRejectMemo(user("supervisor"), supervisorMemo)).toBe(false);
+    expect(canApproveMemo(user("supervisor"), supervisorMemo)).toBe(true);
+  });
+
+  it("lets Manager and admin reject, matching canRejectMemo to their step", () => {
+    const managerMemo = { ...baseMemo, currentStep: "Manager / Top Section" as const };
+    const mdMemo = { ...baseMemo, currentStep: "Managing Director" as const };
+
+    expect(canRejectMemo(user("manager"), managerMemo)).toBe(true);
+    expect(canRejectMemo(user("manager"), mdMemo)).toBe(false);
+    expect(canRejectMemo(user("admin"), mdMemo)).toBe(true);
   });
 
   it("allows read recipients to mark only matching recipient labels", () => {

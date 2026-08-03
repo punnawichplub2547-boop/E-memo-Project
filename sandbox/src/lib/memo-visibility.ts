@@ -52,7 +52,9 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
     ]);
     const inRoute = routeSteps.has(approvalLevel) || memo.currentStep === approvalLevel;
     if (inRoute) {
-      if (approvalLevel === "Manager / Top Section") {
+      // Supervisor and Manager / Top Section are department-scoped — each department
+      // has its own, so they only see their own department's memos. GM and MD global.
+      if (approvalLevel === "Manager / Top Section" || approvalLevel === "Supervisor") {
         if (session.department && memo.department === session.department) return true;
       } else {
         return true;
@@ -81,6 +83,7 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
 
 function toApprovalLevel(level: string | null | undefined): ApprovalLevel | null {
   if (
+    level === "Supervisor" ||
     level === "Manager / Top Section" ||
     level === "General Manager" ||
     level === "Managing Director"

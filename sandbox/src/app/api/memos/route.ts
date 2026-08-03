@@ -14,6 +14,8 @@ import { serializeMemoRecord, type MemoDbRow, type MemoRevisionDbRow, type ReadA
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { isMemoVisibleTo } from "@/lib/memo-visibility";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
+import { departmentHasActiveSupervisor } from "@/lib/db-users";
+import { applySupervisorRouting } from "@/lib/supervisor-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +99,21 @@ export async function POST(request: NextRequest) {
     clientMemo.requester = `${session.firstName} ${session.lastName}`;
     clientMemo.requesterUserId = session.userId;
 
+    const pool = getDbPool();
+
+    // Server-authoritative Supervisor step: strip any client-supplied "Supervisor"
+    // and, only when the requesting department actually has an active Supervisor,
+    // prepend it to the route. sanitizeNewMemoInput then derives current_step from
+    // selectedRoute[0], so the memo starts at the Supervisor step when applicable.
+    const hasSupervisor = await departmentHasActiveSupervisor(pool, clientMemo.department);
+    const supervised = applySupervisorRouting(
+      clientMemo.selectedRoute,
+      clientMemo.recommendedRoute,
+      hasSupervisor,
+    );
+    clientMemo.selectedRoute = supervised.selectedRoute;
+    clientMemo.recommendedRoute = supervised.recommendedRoute;
+
     // Never trust the client for workflow/lifecycle state either — sanitizeNewMemoInput
     // is the trust boundary that forces status/current_step/workflow_state/revision_no/
     // timestamps server-side so a memo cannot be created already "approved".
@@ -106,7 +123,6 @@ export async function POST(request: NextRequest) {
     }
     const memo = sanitized.memo;
 
-    const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 

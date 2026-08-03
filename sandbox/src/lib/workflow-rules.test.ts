@@ -145,6 +145,35 @@ describe("canActOnStep", () => {
   });
 });
 
+describe("canActOnStep — Supervisor (department-scoped, like Manager)", () => {
+  it("supervisor can act at Supervisor step for their own department's memo", () => {
+    expect(
+      canActOnStep(
+        { id: 1, roles: ["supervisor"], approval_level: "Supervisor", department: "HR&GA" },
+        { current_step: "Supervisor", department_name: "HR&GA", requester_user_id: 99 },
+      ),
+    ).toBe(true);
+  });
+
+  it("supervisor CANNOT act on another department's memo at the Supervisor step", () => {
+    expect(
+      canActOnStep(
+        { id: 1, roles: ["supervisor"], approval_level: "Supervisor", department: "HR&GA" },
+        { current_step: "Supervisor", department_name: "QA", requester_user_id: 99 },
+      ),
+    ).toBe(false);
+  });
+
+  it("supervisor cannot act at the Manager / Top Section step", () => {
+    expect(
+      canActOnStep(
+        { id: 1, roles: ["supervisor"], approval_level: "Supervisor", department: "HR&GA" },
+        { current_step: "Manager / Top Section", department_name: "HR&GA", requester_user_id: 99 },
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("parseRouteJson", () => {
   it("parses a JSON string route", () => {
     expect(parseRouteJson(JSON.stringify(FULL_ROUTE))).toEqual(FULL_ROUTE);
@@ -580,6 +609,7 @@ describe("evaluateReturnAction", () => {
     expect(result.payload.memoUpdate).toEqual({
       status: "returned",
       return_reason: "ข้อมูลงบประมาณไม่ครบ",
+      return_to_step: null,
       updated_at: NOW_SQL,
     });
     expect(result.payload.workflowAction).toEqual({
@@ -638,6 +668,109 @@ describe("evaluateReturnAction", () => {
       now: NOW,
     });
     expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" });
+  });
+});
+
+describe("evaluateReturnAction — selectable return destination (return_to_step)", () => {
+  const ROUTE = ["Manager / Top Section", "General Manager", "Managing Director"];
+  // GM acts on a memo currently at the GM step.
+  const gmActor = makeActor({ approval_level: "General Manager", roles: ["general-manager"] });
+
+  function returnAt(returnToStep: string | undefined, memoOverrides = {}) {
+    return evaluateReturnAction({
+      memo: makeMemo({
+        current_step: "General Manager",
+        selected_route_json: JSON.stringify(ROUTE),
+        ...memoOverrides,
+      }),
+      actor: gmActor,
+      reason: "ขอให้ทบทวน",
+      returnToStep,
+      source: "web",
+      now: NOW,
+    });
+  }
+
+  it("keeps a valid earlier step (index ≤ current step)", () => {
+    const result = returnAt("Manager / Top Section");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBe("Manager / Top Section");
+  });
+
+  it("allows returning to the current step itself", () => {
+    const result = returnAt("General Manager");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBe("General Manager");
+  });
+
+  it("coerces a non-member step to null", () => {
+    const result = returnAt("Supervisor");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  it("coerces a forward step (ahead of current) to null (Q2 — no forward selection)", () => {
+    const result = returnAt("Managing Director");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  it("defaults to null when returnToStep is not supplied", () => {
+    const result = returnAt(undefined);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  // Admin actor so the guard passes on an MD-step memo — isolates the Q1 md cap
+  // from the actor-permission check.
+  const adminReturnAt = (returnToStep: string) =>
+    evaluateReturnAction({
+      memo: makeMemo({
+        current_step: "Managing Director",
+        selected_route_json: JSON.stringify(ROUTE),
+        requires_md_review: true,
+      }),
+      actor: makeActor({ roles: ["admin"], approval_level: null }),
+      reason: "ทบทวน",
+      returnToStep,
+      source: "web",
+      now: NOW,
+    });
+
+  it("Q1: caps an md-review memo to Manager — a GM destination is coerced to null", () => {
+    const result = adminReturnAt("General Manager");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  it("Q1: an md-review memo still allows returning to Manager / Top Section", () => {
+    const result = adminReturnAt("Manager / Top Section");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBe("Manager / Top Section");
+  });
+
+  it("honors a Supervisor destination on a supervised route", () => {
+    const result = evaluateReturnAction({
+      memo: makeMemo({
+        current_step: "General Manager",
+        selected_route_json: JSON.stringify(["Supervisor", "Manager / Top Section", "General Manager"]),
+      }),
+      actor: gmActor,
+      reason: "ส่งกลับให้ Supervisor ตรวจ",
+      returnToStep: "Supervisor",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.memoUpdate.return_to_step).toBe("Supervisor");
   });
 });
 
@@ -712,6 +845,43 @@ describe("evaluateRejectAction", () => {
       now: NOW,
     });
     expect(result).toEqual({ ok: false, status: 409, message: "เมโมนี้ไม่ได้อยู่ในสถานะรอดำเนินการ" });
+  });
+
+  it("blocks a Supervisor from rejecting (check-only step), even at their own valid step", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo({ current_step: "Supervisor", department_name: "HR&GA" }),
+      actor: makeActor({ roles: ["supervisor"], approval_level: "Supervisor", department: "HR&GA" }),
+      disposition: "close",
+      reason: "ราคาสูงเกินไป",
+      source: "web",
+      now: NOW,
+    });
+    expect(result).toEqual({ ok: false, status: 403, message: "Supervisor ไม่มีสิทธิ์ปฏิเสธเมโม" });
+  });
+
+  it("still lets an admin who happens to carry a Supervisor approval_level reject", () => {
+    const result = evaluateRejectAction({
+      memo: makeMemo({ current_step: "Supervisor", department_name: "HR&GA" }),
+      actor: makeActor({ roles: ["admin"], approval_level: "Supervisor", department: "HR&GA" }),
+      disposition: "close",
+      reason: "ปิดคำขอ",
+      source: "web",
+      now: NOW,
+    });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("calculateNextStep — Supervisor prefix", () => {
+  it("advances from Supervisor to Manager / Top Section", () => {
+    const result = calculateNextStep(
+      JSON.stringify(["Supervisor", "Manager / Top Section", "General Manager"]),
+      "Supervisor",
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.isFinal).toBe(false);
+    expect(result.nextCurrentStep).toBe("Manager / Top Section");
   });
 });
 

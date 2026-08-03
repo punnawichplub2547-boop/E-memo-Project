@@ -8,6 +8,7 @@ export type ApprovalCategory =
 export type BudgetStatus = "in-budget" | "over-budget" | "no-budget";
 
 export type ApprovalLevel =
+  | "Supervisor"
   | "Manager / Top Section"
   | "General Manager"
   | "Managing Director";
@@ -378,19 +379,30 @@ export function getRouteFinalApprover(route: ApprovalLevel[]): ApprovalLevel {
   return route[route.length - 1] ?? "Manager / Top Section";
 }
 
+// Supervisor is an optional dept-scoped check step prepended before the mandatory
+// Manager step. It is deliberately NOT on the rank ladder (approvalLevels), so the
+// Book1 amount/budget matrix never produces it. Route-mode analysis must ignore it
+// on BOTH sides — otherwise a route that only added a legitimate Supervisor prefix
+// would compare unequal to the recommendation and be flagged a false "exception",
+// and getRouteFinalApprover/rank logic could misread it.
+function stripSupervisor(route: ApprovalLevel[]): ApprovalLevel[] {
+  return route.filter((step) => step !== "Supervisor");
+}
+
 export function analyzeApprovalRoute(
   recommendedFinalApprover: ApprovalLevel,
   selectedRoute: ApprovalLevel[]
 ): ApprovalRouteReview {
-  const recommendedRoute = buildApprovalFlow(recommendedFinalApprover);
-  const selectedFinalApprover = getRouteFinalApprover(selectedRoute);
+  const recommendedRoute = stripSupervisor(buildApprovalFlow(recommendedFinalApprover));
+  const comparableSelectedRoute = stripSupervisor(selectedRoute);
+  const selectedFinalApprover = getRouteFinalApprover(comparableSelectedRoute);
   const recommendedFinalRank = getApprovalLevelRank(recommendedFinalApprover);
   const selectedFinalRank = getApprovalLevelRank(selectedFinalApprover);
   const isSameRoute =
-    recommendedRoute.length === selectedRoute.length &&
-    recommendedRoute.every((step, index) => step === selectedRoute[index]);
+    recommendedRoute.length === comparableSelectedRoute.length &&
+    recommendedRoute.every((step, index) => step === comparableSelectedRoute[index]);
   const skipsRecommendedStep = recommendedRoute.some(
-    (step) => !selectedRoute.includes(step)
+    (step) => !comparableSelectedRoute.includes(step)
   );
 
   if (isSameRoute) {

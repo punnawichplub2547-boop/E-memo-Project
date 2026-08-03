@@ -56,7 +56,11 @@ export function canActOnStep(
   if (actor.roles.includes("admin")) return true;
   if (isSelfRequester(actor, memo)) return false;
   if (actor.approval_level === null || actor.approval_level !== memo.current_step) return false;
-  if (actor.approval_level === "Manager / Top Section") {
+  // Supervisor and Manager / Top Section are both department-scoped: every
+  // department has its own Supervisor/Manager sharing the same label, so action
+  // permission must be pinned to the actor's own department (memo-visibility.ts
+  // applies the identical scope to what they can SEE). GM and MD stay global.
+  if (actor.approval_level === "Manager / Top Section" || actor.approval_level === "Supervisor") {
     return actor.department === memo.department_name;
   }
   return true;
@@ -273,15 +277,42 @@ export type ReturnActionPayload = {
   memoUpdate: {
     status: "returned";
     return_reason: string;
+    // The step the memo re-enters on resubmit (null = restart from the first step,
+    // the original behaviour). Server-validated in resolveReturnToStep below.
+    return_to_step: string | null;
     updated_at: string;
   };
   workflowAction: WorkflowActionRow;
 };
 
+// Validate the approver's chosen return destination against the memo's own route.
+// Returns null (safe default: resubmit restarts at route[0]) unless the destination
+// is a genuine, non-forward step the approver is allowed to pick:
+//   - must be a member of selected_route_json                    (real step)
+//   - index ≤ index of current_step                             (Q2: no forward pick)
+//   - if requires_md_review: index ≤ index of Manager           (Q1: cannot bypass the
+//     MD-review gate by resuming past the Manager step)
+// Never throws / never blocks the return — an invalid value simply degrades to null.
+function resolveReturnToStep(memo: WorkflowMemoRow, returnToStep: string | undefined): string | null {
+  if (!returnToStep) return null;
+  const route = parseRouteJson(memo.selected_route_json);
+  if (!route) return null;
+  const targetIndex = route.indexOf(returnToStep);
+  const currentIndex = route.indexOf(memo.current_step);
+  if (targetIndex === -1 || currentIndex === -1) return null;
+  if (targetIndex > currentIndex) return null;
+  if (memo.requires_md_review) {
+    const managerIndex = route.indexOf("Manager / Top Section");
+    if (managerIndex !== -1 && targetIndex > managerIndex) return null;
+  }
+  return returnToStep;
+}
+
 export function evaluateReturnAction(input: {
   memo: WorkflowMemoRow;
   actor: WorkflowActorRow;
   reason: string;
+  returnToStep?: string;
   source: WorkflowActionSource;
   metadata?: Record<string, unknown>;
   now?: Date;
@@ -293,6 +324,7 @@ export function evaluateReturnAction(input: {
     return { ok: false, status: 400, message: "ต้องระบุเหตุผลในการส่งคืน" };
   }
 
+  const returnToStep = resolveReturnToStep(input.memo, input.returnToStep);
   const actedAt = nowMysqlUtcDateTime(input.now);
   return {
     ok: true,
@@ -300,6 +332,7 @@ export function evaluateReturnAction(input: {
       memoUpdate: {
         status: "returned",
         return_reason: reason,
+        return_to_step: returnToStep,
         updated_at: actedAt,
       },
       workflowAction: {
@@ -337,6 +370,11 @@ export function evaluateRejectAction(input: {
 }): WorkflowEvaluation<RejectActionPayload> {
   const guard = guardActorAndMemo(input.memo, input.actor);
   if (guard) return guard;
+  // Reject is a Manager-and-above power. A Supervisor is a check-only step: they
+  // may pass forward or return for revision, but never reject (Q3). Admin bypasses.
+  if (!input.actor.roles.includes("admin") && input.actor.approval_level === "Supervisor") {
+    return { ok: false, status: 403, message: "Supervisor ไม่มีสิทธิ์ปฏิเสธเมโม" };
+  }
   const reason = input.reason.trim();
   if (!reason) {
     return { ok: false, status: 400, message: "ต้องระบุเหตุผลในการปฏิเสธ" };

@@ -3,6 +3,7 @@ import {
   analyzeApprovalRoute,
   buildApprovalFlow,
   getApprovalLevel,
+  getApprovalLevelRank,
   getApprovalRecommendation,
   getDashboardMetrics,
   seedMemos
@@ -270,6 +271,53 @@ describe("analyzeApprovalRoute", () => {
         "Managing Director"
       ])
     ).toMatchObject({ mode: "escalated", requiresReason: false });
+  });
+});
+
+describe("Supervisor pre-Manager check step", () => {
+  // Supervisor is an optional dept-scoped check step prepended before the mandatory
+  // Manager step. It is NOT part of the rank ladder (approvalLevels array) — the
+  // Book1 amount/budget matrix knows nothing about it. analyzeApprovalRoute must
+  // strip it from BOTH sides before comparing, or a route that only added a
+  // legitimate Supervisor prefix would look like a false "exception".
+  it("getApprovalLevelRank returns -1 for Supervisor (not on the rank ladder)", () => {
+    expect(getApprovalLevelRank("Supervisor")).toBe(-1);
+  });
+
+  it("buildApprovalFlow never emits a Supervisor step", () => {
+    expect(buildApprovalFlow("Managing Director")).not.toContain("Supervisor");
+    expect(buildApprovalFlow("Manager / Top Section")).not.toContain("Supervisor");
+    expect(buildApprovalFlow("Managing Director", { respectChosenOnly: true })).not.toContain("Supervisor");
+  });
+
+  it("treats a route with only a Supervisor prefix added as recommended (not exception)", () => {
+    const review = analyzeApprovalRoute("Manager / Top Section", [
+      "Supervisor",
+      "Manager / Top Section",
+    ]);
+    expect(review.mode).toBe("recommended");
+    expect(review.requiresReason).toBe(false);
+  });
+
+  it("strips Supervisor from a GM-recommended route and still reads as recommended", () => {
+    const review = analyzeApprovalRoute("General Manager", [
+      "Supervisor",
+      "Manager / Top Section",
+      "General Manager",
+    ]);
+    expect(review.mode).toBe("recommended");
+    expect(review.requiresReason).toBe(false);
+  });
+
+  it("still flags a genuine exception even when a Supervisor prefix is present", () => {
+    // Supervisor stripped → selected ["Manager / Top Section"] ends below the
+    // GM recommendation → exception, requires reason.
+    const review = analyzeApprovalRoute("General Manager", [
+      "Supervisor",
+      "Manager / Top Section",
+    ]);
+    expect(review.mode).toBe("exception");
+    expect(review.requiresReason).toBe(true);
   });
 });
 
