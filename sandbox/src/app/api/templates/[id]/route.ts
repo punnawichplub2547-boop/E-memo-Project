@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
-import { deleteTemplate, updateTemplate } from "@/lib/db-templates";
+import { deleteTemplate, updateTemplate, getTemplateById } from "@/lib/db-templates";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
+
+export async function GET(req: NextRequest, { params }: Params) {
+  try {
+    const token = req.cookies.get(COOKIE_NAME)?.value;
+    const session = await getActiveSessionUserFromToken(token);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = Number((await params).id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
+    const template = await getTemplateById(id);
+    // 404 (not 403) when it belongs to someone else, so the response does not
+    // confirm that the id exists. Matches PUT/DELETE below.
+    if (!template || template.userId !== session.userId) {
+      return NextResponse.json({ error: "Template not found or not owned by user" }, { status: 404 });
+    }
+
+    return NextResponse.json({ template });
+  } catch (error) {
+    console.error("GET /api/templates/[id] error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {

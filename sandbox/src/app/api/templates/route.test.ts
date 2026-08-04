@@ -8,15 +8,16 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/db-templates", () => ({
   createTemplate: vi.fn(),
   getTemplatesByUserId: vi.fn(),
+  getTemplateById: vi.fn(),
   deleteTemplate: vi.fn(),
   updateTemplate: vi.fn(),
 }));
 
 import { GET, POST } from "./route";
-import { DELETE, PUT } from "./[id]/route";
+import { DELETE, PUT, GET as GET_ONE } from "./[id]/route";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
-import { createTemplate, getTemplatesByUserId, deleteTemplate, updateTemplate } from "@/lib/db-templates";
-import type { MemoTemplateSummary } from "@/lib/db-templates";
+import { createTemplate, getTemplatesByUserId, getTemplateById, deleteTemplate, updateTemplate } from "@/lib/db-templates";
+import type { MemoTemplate, MemoTemplateSummary } from "@/lib/db-templates";
 
 const USER = { userId: 1, firstName: "Test", lastName: "User", roles: ["requester"] };
 
@@ -195,6 +196,57 @@ describe("Templates API Routes", () => {
       });
       const res = await PUT(req, ctx);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("GET /api/templates/[id]", () => {
+    const ctx = { params: Promise.resolve({ id: "202" }) };
+    const OWNED: MemoTemplate = {
+      id: 202,
+      userId: 1,
+      name: "ซื้อยาง EPDM ก.ค.",
+      templateJson: '{"category":"วัตถุดิบ","subject":"ขอซื้อยาง"}',
+      createdAt: "2026-07-01T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+    };
+
+    it("returns 401 when no session", async () => {
+      vi.mocked(getActiveSessionUserFromToken).mockResolvedValue(null);
+      const req = new NextRequest("http://localhost/api/templates/202");
+      const res = await GET_ONE(req, ctx);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 400 when ID is invalid", async () => {
+      const req = new NextRequest("http://localhost/api/templates/abc");
+      const res = await GET_ONE(req, { params: Promise.resolve({ id: "abc" }) });
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 404 when the template does not exist", async () => {
+      vi.mocked(getTemplateById).mockResolvedValue(null);
+      const req = new NextRequest("http://localhost/api/templates/202");
+      const res = await GET_ONE(req, ctx);
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 - not 403 - when the template belongs to another user", async () => {
+      vi.mocked(getTemplateById).mockResolvedValue({ ...OWNED, userId: 99 });
+      const req = new NextRequest("http://localhost/api/templates/202");
+      const res = await GET_ONE(req, ctx);
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.template).toBeUndefined();
+    });
+
+    it("returns the full template for its owner", async () => {
+      vi.mocked(getTemplateById).mockResolvedValue(OWNED);
+      const req = new NextRequest("http://localhost/api/templates/202");
+      const res = await GET_ONE(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.template).toEqual(OWNED);
+      expect(getTemplateById).toHaveBeenCalledWith(202);
     });
   });
 });
