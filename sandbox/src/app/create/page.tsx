@@ -92,7 +92,7 @@ function CreatePageContent() {
 
   const {
     templates, templatesLoading, saveModalOpen, setSaveModalOpen, isSavingTemplate,
-    loadedTemplateId, loadedTemplateName, clearLoadedTemplate,
+    loadedTemplateId, loadedTemplateName, clearLoadedTemplate, loadingTemplateId,
     handleLoadTemplate, handleSaveTemplate, handleDeleteTemplate,
   } = useMemoTemplates({ isRevisionMode, applyBulkData, snapshotFormData });
 
@@ -218,6 +218,7 @@ function CreatePageContent() {
                   onSelectTemplate={handleLoadTemplate}
                   onDeleteTemplate={handleDeleteTemplate}
                   isLoading={templatesLoading}
+                  loadingTemplateId={loadingTemplateId}
                 />
               )}
               <MemoDetailsCard
