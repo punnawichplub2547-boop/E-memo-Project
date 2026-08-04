@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import type { MemoTemplate } from "@/lib/db-templates";
+import type { MemoTemplateSummary } from "@/lib/db-templates";
 
 export interface UseMemoTemplatesInput {
   isRevisionMode: boolean;
@@ -11,8 +11,9 @@ export interface UseMemoTemplatesInput {
 }
 
 export function useMemoTemplates({ isRevisionMode, applyBulkData, snapshotFormData }: UseMemoTemplatesInput) {
-  const [templates, setTemplates] = useState<MemoTemplate[]>([]);
+  const [templates, setTemplates] = useState<MemoTemplateSummary[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [loadingTemplateId, setLoadingTemplateId] = useState<number | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [loadedTemplateId, setLoadedTemplateId] = useState<number | null>(null);
@@ -46,12 +47,43 @@ export function useMemoTemplates({ isRevisionMode, applyBulkData, snapshotFormDa
     }
   }, [isRevisionMode]);
 
-  const handleLoadTemplate = (id: number, name: string, data: Record<string, unknown>) => {
-    if (!data) return;
-    setLoadedTemplateId(id);
-    setLoadedTemplateName(name);
-    applyBulkData(data);
-    showSuccessToast("โหลดแม่แบบเรียบร้อยแล้ว");
+  const handleLoadTemplate = async (id: number, name: string) => {
+    setLoadingTemplateId(id);
+    try {
+      const res = await fetch(`/api/templates/${id}`);
+
+      if (res.status === 404) {
+        // Another tab deleted it. Refresh the list but never touch the form.
+        showErrorToast("แม่แบบนี้ถูกลบไปแล้ว");
+        setTemplatesLoading(true);
+        await fetchTemplates();
+        return;
+      }
+      if (!res.ok) {
+        showErrorToast("โหลดแม่แบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        return;
+      }
+
+      const body = await res.json();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(body.template.templateJson) as Record<string, unknown>;
+      } catch (e) {
+        console.error("Failed to parse template json", e);
+        showErrorToast("ข้อมูลแม่แบบเสียหาย ไม่สามารถโหลดได้");
+        return;
+      }
+
+      setLoadedTemplateId(id);
+      setLoadedTemplateName(name);
+      applyBulkData(data);
+      showSuccessToast("โหลดแม่แบบเรียบร้อยแล้ว");
+    } catch (e) {
+      console.error("Failed to load template", e);
+      showErrorToast("ระบบเกิดข้อผิดพลาดในการโหลดแม่แบบ");
+    } finally {
+      setLoadingTemplateId(null);
+    }
   };
 
   const handleSaveTemplate = async (name: string, overwriteId?: number | null) => {
@@ -119,7 +151,7 @@ export function useMemoTemplates({ isRevisionMode, applyBulkData, snapshotFormDa
 
   return {
     templates, templatesLoading, saveModalOpen, setSaveModalOpen, isSavingTemplate,
-    loadedTemplateId, loadedTemplateName, clearLoadedTemplate,
+    loadedTemplateId, loadedTemplateName, clearLoadedTemplate, loadingTemplateId,
     handleLoadTemplate, handleSaveTemplate, handleDeleteTemplate,
   };
 }

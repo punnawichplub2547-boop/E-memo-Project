@@ -28,7 +28,7 @@ describe("useMemoTemplates", () => {
   it("fetches templates on mount when not in revision mode", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ templates: [{ id: 1, userId: 1, name: "แม่แบบ A", templateJson: "{}", createdAt: "", updatedAt: "" }] }),
+      json: async () => ({ templates: [{ id: 1, name: "แม่แบบ A", category: "วัตถุดิบ", updatedAt: "2026-07-28T00:00:00.000Z" }] }),
     });
     vi.stubGlobal("fetch", fetchMock);
     const { result } = renderHook(() =>
@@ -39,21 +39,94 @@ describe("useMemoTemplates", () => {
     expect(result.current.templates).toHaveLength(1);
   });
 
-  it("handleLoadTemplate forwards parsed data to applyBulkData and tracks the loaded template", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ templates: [] }) }));
+  it("handleLoadTemplate fetches the full template and applies it", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) }) // initial GET list
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ template: { id: 1, userId: 1, name: "แม่แบบ A", templateJson: '{"subject":"หัวข้อ","amount":999}', createdAt: "", updatedAt: "" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
     const applyBulkData = vi.fn();
     const { result } = renderHook(() =>
       useMemoTemplates({ isRevisionMode: false, applyBulkData, snapshotFormData: vi.fn() })
     );
-    // Wait for the initial effect to settle
+    await waitFor(() => expect(result.current.templatesLoading).toBe(false));
+
     await act(async () => {
-      await Promise.resolve();
+      await result.current.handleLoadTemplate(1, "แม่แบบ A");
     });
-    const data = { title: "หัวข้อ", amount: 999 };
-    act(() => result.current.handleLoadTemplate(1, "แม่แบบ A", data));
-    expect(applyBulkData).toHaveBeenCalledWith(data);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/templates/1");
+    expect(applyBulkData).toHaveBeenCalledWith({ subject: "หัวข้อ", amount: 999 });
     expect(result.current.loadedTemplateId).toBe(1);
     expect(result.current.loadedTemplateName).toBe("แม่แบบ A");
+    expect(result.current.loadingTemplateId).toBe(null);
+  });
+
+  it("handleLoadTemplate leaves the form untouched and refreshes the list when the template is already deleted", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) }) // initial GET list
+      .mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({ error: "Template not found or not owned by user" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) }); // refetch
+    vi.stubGlobal("fetch", fetchMock);
+    const applyBulkData = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoTemplates({ isRevisionMode: false, applyBulkData, snapshotFormData: vi.fn() })
+    );
+    await waitFor(() => expect(result.current.templatesLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleLoadTemplate(1, "แม่แบบ A");
+    });
+
+    expect(applyBulkData).not.toHaveBeenCalled();
+    expect(result.current.loadedTemplateId).toBe(null);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // list, failed load, refetch
+  });
+
+  it("handleLoadTemplate does not apply anything when the request fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) })
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: "Internal Server Error" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const applyBulkData = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoTemplates({ isRevisionMode: false, applyBulkData, snapshotFormData: vi.fn() })
+    );
+    await waitFor(() => expect(result.current.templatesLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleLoadTemplate(1, "แม่แบบ A");
+    });
+
+    expect(applyBulkData).not.toHaveBeenCalled();
+    expect(result.current.loadedTemplateId).toBe(null);
+    expect(result.current.loadingTemplateId).toBe(null);
+  });
+
+  it("handleLoadTemplate does not apply anything when the stored JSON is corrupt", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ template: { id: 1, userId: 1, name: "พัง", templateJson: "{not json", createdAt: "", updatedAt: "" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    const applyBulkData = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoTemplates({ isRevisionMode: false, applyBulkData, snapshotFormData: vi.fn() })
+    );
+    await waitFor(() => expect(result.current.templatesLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleLoadTemplate(1, "พัง");
+    });
+
+    expect(applyBulkData).not.toHaveBeenCalled();
+    expect(result.current.loadedTemplateId).toBe(null);
   });
 
   it("handleSaveTemplate posts the snapshot and closes the modal on success", async () => {
@@ -100,6 +173,11 @@ describe("useMemoTemplates", () => {
   it("handleDeleteTemplate clears the loaded template when the deleted id matches", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) }) // initial GET
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ template: { id: 5, userId: 1, name: "แม่แบบ B", templateJson: '{"subject":"x"}', createdAt: "", updatedAt: "" } }),
+      }) // load
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // DELETE
       .mockResolvedValueOnce({ ok: true, json: async () => ({ templates: [] }) }); // refetch GET
     vi.stubGlobal("fetch", fetchMock);
@@ -108,7 +186,9 @@ describe("useMemoTemplates", () => {
     );
     await waitFor(() => expect(result.current.templatesLoading).toBe(false));
 
-    act(() => result.current.handleLoadTemplate(5, "แม่แบบ B", { title: "x" }));
+    await act(async () => {
+      await result.current.handleLoadTemplate(5, "แม่แบบ B");
+    });
     expect(result.current.loadedTemplateId).toBe(5);
 
     await act(async () => {
