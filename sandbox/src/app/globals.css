@@ -2307,6 +2307,42 @@ a:focus-visible, .em-nav-item:focus-visible, .em-tab:focus-visible, .em-chip:foc
   cursor: pointer;
 }
 
+.em-template-overwrite-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--amber-soft, var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.em-template-overwrite-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-md);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.em-template-overwrite-btn:hover:not(:disabled) {
+  background: var(--ice-50);
+}
+
+.em-template-overwrite-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 @keyframes em-fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

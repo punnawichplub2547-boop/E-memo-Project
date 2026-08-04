@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { IconX, IconCheck } from "@/components/icons";
+import type { MemoTemplateSummary } from "@/lib/db-templates";
+import { findExactNameMatch } from "@/lib/template-filters";
 
 interface SaveTemplateModalProps {
   isOpen: boolean;
@@ -8,6 +10,7 @@ interface SaveTemplateModalProps {
   isSaving: boolean;
   loadedTemplateId?: number | null;
   loadedTemplateName?: string;
+  templates: MemoTemplateSummary[];
 }
 
 export function SaveTemplateModal({
@@ -17,9 +20,13 @@ export function SaveTemplateModal({
   isSaving,
   loadedTemplateId,
   loadedTemplateName,
+  templates,
 }: SaveTemplateModalProps) {
   const [name, setName] = useState("");
   const [saveMode, setSaveMode] = useState<"overwrite" | "new">("new");
+  // Which template "overwrite" would replace: the one loaded into the form, or
+  // one the user picked from the exact-name offer below.
+  const [overwriteTarget, setOverwriteTarget] = useState<{ id: number; name: string } | null>(null);
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
   if (isOpen !== prevIsOpen) {
@@ -27,15 +34,22 @@ export function SaveTemplateModal({
     if (isOpen) {
       setName(loadedTemplateName || "");
       setSaveMode(loadedTemplateId ? "overwrite" : "new");
+      setOverwriteTarget(loadedTemplateId ? { id: loadedTemplateId, name: loadedTemplateName || "" } : null);
     }
   }
 
   if (!isOpen) return null;
 
+  // Derived in render (React 19 rule): no effect resets this when name changes.
+  // Users name templates by month on purpose, so a near-identical name is fine
+  // and silent - only an exact match offers to overwrite, and never blocks.
+  const exactMatch = findExactNameMatch(templates, name);
+  const showOverwriteOffer = saveMode === "new" && exactMatch !== null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave(name.trim(), saveMode === "overwrite" ? loadedTemplateId : null);
+    onSave(name.trim(), saveMode === "overwrite" ? overwriteTarget?.id ?? null : null);
   };
 
   return (
@@ -50,7 +64,7 @@ export function SaveTemplateModal({
         <form onSubmit={handleSubmit}>
           <div className="em-modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             
-            {loadedTemplateId && (
+            {overwriteTarget && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>โหมดการบันทึก (Save Mode)</span>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "var(--ink)" }}>
@@ -61,11 +75,11 @@ export function SaveTemplateModal({
                     checked={saveMode === "overwrite"}
                     onChange={() => {
                       setSaveMode("overwrite");
-                      setName(loadedTemplateName || "");
+                      setName(overwriteTarget.name);
                     }}
                     disabled={isSaving}
                   />
-                  <span>บันทึกทับแม่แบบเดิม (&quot;{loadedTemplateName}&quot;)</span>
+                  <span>บันทึกทับแม่แบบเดิม (&quot;{overwriteTarget.name}&quot;)</span>
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", color: "var(--ink)" }}>
                   <input
@@ -75,7 +89,7 @@ export function SaveTemplateModal({
                     checked={saveMode === "new"}
                     onChange={() => {
                       setSaveMode("new");
-                      if (name === loadedTemplateName) setName("");
+                      if (name === overwriteTarget.name) setName("");
                     }}
                     disabled={isSaving}
                   />
@@ -101,9 +115,27 @@ export function SaveTemplateModal({
               />
             </div>
             
+            {showOverwriteOffer && exactMatch && (
+              <div className="em-template-overwrite-offer">
+                <span>มีแม่แบบชื่อ &quot;{exactMatch.name}&quot; อยู่แล้ว — จะบันทึกทับอันเดิมหรือเก็บเป็นอันใหม่ก็ได้</span>
+                <button
+                  type="button"
+                  className="em-template-overwrite-btn"
+                  disabled={isSaving}
+                  onClick={() => {
+                    setOverwriteTarget({ id: exactMatch.id, name: exactMatch.name });
+                    setSaveMode("overwrite");
+                    setName(exactMatch.name);
+                  }}
+                >
+                  ทับอันเดิม
+                </button>
+              </div>
+            )}
+
             <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", lineHeight: "1.4" }}>
-              {saveMode === "overwrite"
-                ? `แม่แบบ "${loadedTemplateName}" จะถูกปรับปรุงด้วยข้อมูลแบบฟอร์มปัจจุบันที่คุณแก้ไข (ยกเว้นเอกสารแนบและวันที่)`
+              {saveMode === "overwrite" && overwriteTarget
+                ? `แม่แบบ "${overwriteTarget.name}" จะถูกปรับปรุงด้วยข้อมูลแบบฟอร์มปัจจุบันที่คุณแก้ไข (ยกเว้นเอกสารแนบและวันที่)`
                 : "ข้อมูลฟอร์มปัจจุบันทั้งหมด (เช่น รายการสินค้า หมวดหมู่ แผนก และราคาเปรียบเทียบ) จะถูกบันทึกเพื่อนำมาสร้างเป็นแม่แบบใหม่ในรอบหน้า (ยกเว้นเอกสารแนบและวันที่)"}
             </p>
           </div>

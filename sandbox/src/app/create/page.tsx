@@ -548,6 +548,7 @@ function CreatePageContent() {
         isSaving={isSavingTemplate}
         loadedTemplateId={loadedTemplateId}
         loadedTemplateName={loadedTemplateName}
+        templates={templates}
       />
     </div>
   );
