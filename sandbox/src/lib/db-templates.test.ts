@@ -25,20 +25,43 @@ describe("db-templates helpers", () => {
   });
 
   describe("getTemplatesByUserId", () => {
-    it("queries templates and returns mapped list", async () => {
+    it("returns a light summary without templateJson", async () => {
       const mockRows = [
-        { id: 10, userId: 1, name: "T1", templateJson: '{"title":"T1"}', createdAt: "2026-07-13", updatedAt: "2026-07-13" },
+        { id: 10, name: "ซื้อยาง EPDM ก.ค.", category: "วัตถุดิบ", updatedAt: "2026-07-28 10:00:00" },
       ];
       query.mockResolvedValue([mockRows]);
       const result = await getTemplatesByUserId(1);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(10);
-      expect(result[0].name).toBe("T1");
-      expect(result[0].templateJson).toBe('{"title":"T1"}');
-      expect(query).toHaveBeenCalledTimes(1);
+      expect(result[0]).toEqual({
+        id: 10,
+        name: "ซื้อยาง EPDM ก.ค.",
+        category: "วัตถุดิบ",
+        updatedAt: "2026-07-28 10:00:00",
+      });
+      // Guard: nobody may put the heavy JSON back into the list payload
+      expect(Object.keys(result[0])).not.toContain("templateJson");
+    });
+
+    it("pulls category out of template_json and sorts by updated_at DESC", async () => {
+      query.mockResolvedValue([[]]);
+      await getTemplatesByUserId(7);
       const [sql, params] = query.mock.calls[0];
-      expect(sql).toMatch(/SELECT .* FROM memo_templates WHERE user_id/i);
-      expect(params).toEqual([1]);
+      expect(sql).not.toMatch(/template_json as templateJson/i);
+      expect(sql).toMatch(/JSON_UNQUOTE\(JSON_EXTRACT\(template_json, '\$\.category'\)\)/i);
+      expect(sql).toMatch(/WHERE user_id = \?/i);
+      expect(sql).toMatch(/ORDER BY updated_at DESC/i);
+      expect(params).toEqual([7]);
+    });
+
+    it("normalises missing, JSON-null and blank categories to null", async () => {
+      const mockRows = [
+        { id: 1, name: "เก่าไม่มีหมวด", category: null, updatedAt: "2026-01-01 00:00:00" },
+        { id: 2, name: "หมวดเป็น json null", category: "null", updatedAt: "2026-01-02 00:00:00" },
+        { id: 3, name: "หมวดว่าง", category: "   ", updatedAt: "2026-01-03 00:00:00" },
+      ];
+      query.mockResolvedValue([mockRows]);
+      const result = await getTemplatesByUserId(1);
+      expect(result.map((r) => r.category)).toEqual([null, null, null]);
     });
   });
 

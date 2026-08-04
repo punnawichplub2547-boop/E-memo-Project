@@ -16,7 +16,7 @@ import { GET, POST } from "./route";
 import { DELETE, PUT } from "./[id]/route";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { createTemplate, getTemplatesByUserId, deleteTemplate, updateTemplate } from "@/lib/db-templates";
-import type { MemoTemplate } from "@/lib/db-templates";
+import type { MemoTemplateSummary } from "@/lib/db-templates";
 
 const USER = { userId: 1, firstName: "Test", lastName: "User", roles: ["requester"] };
 
@@ -34,13 +34,11 @@ describe("Templates API Routes", () => {
       expect(res.status).toBe(401);
     });
 
-    it("returns templates list for valid session", async () => {
-      const mockTemplates: MemoTemplate[] = [{
+    it("returns the light template summary list for a valid session", async () => {
+      const mockTemplates: MemoTemplateSummary[] = [{
         id: 10,
-        userId: 1,
         name: "Test Tpl",
-        templateJson: "{}",
-        createdAt: "2026-07-13T00:00:00.000Z",
+        category: "วัตถุดิบ",
         updatedAt: "2026-07-13T00:00:00.000Z",
       }];
       vi.mocked(getTemplatesByUserId).mockResolvedValue(mockTemplates);
