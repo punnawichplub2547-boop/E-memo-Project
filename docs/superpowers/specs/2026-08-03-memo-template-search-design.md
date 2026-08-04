@@ -1,7 +1,7 @@
 # Memo Template Search & Scale — Design
 
 **วันที่:** 2026-08-03
-**สถานะ:** อนุมัติแล้ว รอเขียน implementation plan
+**สถานะ:** ทำเสร็จแล้ว (2026-08-04) — ดู `docs/superpowers/plans/2026-08-04-memo-template-search.md`
 **โปรเจกต์:** HR&GA E-Memo Sandbox (`D:\Hrproject\sandbox`)
 
 ## โจทย์
