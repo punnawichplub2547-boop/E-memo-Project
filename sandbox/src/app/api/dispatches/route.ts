@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
 import { createDispatch, getSentDispatches, getReceivedDispatches } from "@/lib/db-dispatches";
+import { dispatchDisabledResponse } from "@/lib/dispatch-feature-flag";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const disabled = dispatchDisabledResponse();
+    if (disabled) return disabled;
+
     const token = req.cookies.get(COOKIE_NAME)?.value;
     const session = await getActiveSessionUserFromToken(token);
     if (!session) {
@@ -47,6 +51,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const disabled = dispatchDisabledResponse();
+    if (disabled) return disabled;
+
     const token = req.cookies.get(COOKIE_NAME)?.value;
     const session = await getActiveSessionUserFromToken(token);
     if (!session) {

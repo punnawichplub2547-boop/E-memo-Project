@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({
@@ -31,9 +31,20 @@ import {
 
 const USER = { userId: 1, firstName: "Test", lastName: "User", roles: ["requester"] };
 
+const originalFlag = process.env.DISPATCH_ENABLED;
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getActiveSessionUserFromToken).mockResolvedValue(USER as never);
+  process.env.DISPATCH_ENABLED = "true";
+});
+
+afterEach(() => {
+  if (originalFlag === undefined) {
+    delete process.env.DISPATCH_ENABLED;
+  } else {
+    process.env.DISPATCH_ENABLED = originalFlag;
+  }
 });
 
 describe("Dispatches API Routes", () => {
@@ -158,5 +169,66 @@ describe("Dispatches API Routes", () => {
       expect(res.status).toBe(200);
       expect(acknowledgeDispatch).toHaveBeenCalledWith(45, 1, "Understood");
     });
+  });
+});
+
+describe("Dispatches API Routes with the feature flag off", () => {
+  const ctx = { params: Promise.resolve({ id: "45" }) };
+
+  beforeEach(() => {
+    delete process.env.DISPATCH_ENABLED;
+  });
+
+  it("hides POST /api/dispatches behind a 404 and never creates anything", async () => {
+    const req = new NextRequest("http://localhost/api/dispatches", {
+      method: "POST",
+      body: JSON.stringify({
+        subject: "Test Circular",
+        content: "Please acknowledge.",
+        recipients: [{ type: "user", targetId: 10 }],
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(404);
+    expect(createDispatch).not.toHaveBeenCalled();
+  });
+
+  it("hides GET /api/dispatches behind a 404 and never queries", async () => {
+    const req = new NextRequest("http://localhost/api/dispatches");
+    const res = await GET(req);
+    expect(res.status).toBe(404);
+    expect(getReceivedDispatches).not.toHaveBeenCalled();
+    expect(getSentDispatches).not.toHaveBeenCalled();
+  });
+
+  it("hides GET /api/dispatches/[id] behind a 404 and never queries", async () => {
+    const req = new NextRequest("http://localhost/api/dispatches/45");
+    const res = await GET_DETAILS(req, ctx);
+    expect(res.status).toBe(404);
+    expect(getDispatchDetails).not.toHaveBeenCalled();
+  });
+
+  it("hides PUT /api/dispatches/[id]/read behind a 404 and never writes", async () => {
+    const req = new NextRequest("http://localhost/api/dispatches/45/read", { method: "PUT" });
+    const res = await PUT_READ(req, ctx);
+    expect(res.status).toBe(404);
+    expect(markDispatchAsRead).not.toHaveBeenCalled();
+  });
+
+  it("hides PUT /api/dispatches/[id]/acknowledge behind a 404 and never writes", async () => {
+    const req = new NextRequest("http://localhost/api/dispatches/45/acknowledge", {
+      method: "PUT",
+      body: JSON.stringify({ notes: "Understood" }),
+    });
+    const res = await PUT_ACK(req, ctx);
+    expect(res.status).toBe(404);
+    expect(acknowledgeDispatch).not.toHaveBeenCalled();
+  });
+
+  it("returns the same 404 for an unauthenticated caller, leaking nothing", async () => {
+    vi.mocked(getActiveSessionUserFromToken).mockResolvedValue(null);
+    const req = new NextRequest("http://localhost/api/dispatches");
+    const res = await GET(req);
+    expect(res.status).toBe(404);
   });
 });

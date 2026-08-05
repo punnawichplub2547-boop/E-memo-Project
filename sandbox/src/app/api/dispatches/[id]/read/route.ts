@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, getActiveSessionUserFromToken } from "@/lib/auth";
 import { markDispatchAsRead } from "@/lib/db-dispatches";
+import { dispatchDisabledResponse } from "@/lib/dispatch-feature-flag";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,9 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const disabled = dispatchDisabledResponse();
+    if (disabled) return disabled;
+
     const token = req.cookies.get(COOKIE_NAME)?.value;
     const session = await getActiveSessionUserFromToken(token);
     if (!session) {
