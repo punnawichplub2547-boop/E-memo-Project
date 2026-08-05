@@ -6,6 +6,12 @@ import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import { approvalLabels } from "@/lib/approval";
 import {
+  sortSearchResults,
+  SEARCH_PAGE_SIZE,
+  SEARCH_SORT_TABS,
+  type SearchSortKey,
+} from "@/lib/search-sort";
+import {
   IconPlus, IconHistory, IconSparkles, IconSearch,
   IconArrowRight, IconCrown, IconUsers, IconCalendar,
   IconCheckCircle, IconChevDown,
@@ -20,6 +26,13 @@ const CATEGORIES = [
   { label: "สินทรัพย์ถาวร", key: "fixed-asset" },
   { label: "แม่พิมพ์", key: "mold" },
 ];
+
+// Thai wording for the "เรียงตาม …" line above the results.
+const SORT_LABELS: Record<SearchSortKey, string> = {
+  relevance: "ความเกี่ยวข้อง",
+  newest: "วันที่ล่าสุด",
+  amount: "มูลค่า",
+};
 
 const EXAMPLE_QUERIES = [
   "memo ที่ใช้เวลานานที่สุดเดือนนี้",
@@ -44,9 +57,23 @@ export default function SearchPage() {
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SearchSortKey>("relevance");
+  const [visibleCount, setVisibleCount] = useState(SEARCH_PAGE_SIZE);
+
+  // Any change that reshuffles the result list starts the reader back at page 1 —
+  // otherwise a narrower search would keep an expanded list open on stale paging.
+  function resetPaging() {
+    setVisibleCount(SEARCH_PAGE_SIZE);
+  }
+
+  function handleSortChange(key: SearchSortKey) {
+    setSortKey(key);
+    resetPaging();
+  }
 
   async function handleAiSearch() {
     if (!query.trim()) return;
+    resetPaging();
     setIsAiSearching(true);
     setAiError(null);
     setAiIds(null);
@@ -89,10 +116,12 @@ export default function SearchPage() {
     setAiIds(null);
     setAiSummary("");
     setAiError(null);
+    resetPaging();
   }
 
   function handleQueryChange(val: string) {
     setQuery(val);
+    resetPaging();
     // Clear AI results when query changes so user knows they need to re-search
     if (aiIds !== null) {
       setAiIds(null);
@@ -128,6 +157,12 @@ export default function SearchPage() {
       ].filter(Boolean).join(" ").toLowerCase().includes(q)
     );
   }, [memos, query, catFilter, approvedOnly, aiIds]);
+
+  // Sorting is applied after filtering; the summary stats below stay on the full
+  // result set because they describe the whole search, not the visible page.
+  const sortedResults = useMemo(() => sortSearchResults(results, sortKey), [results, sortKey]);
+  const visibleResults = sortedResults.slice(0, visibleCount);
+  const hasMore = sortedResults.length > visibleResults.length;
 
   const avgAmount = results.length ? Math.round(results.reduce((s, m) => s + m.amount, 0) / results.length) : 0;
   const approvalRate = results.length ? Math.round(results.filter(m => m.status === "approved").length / results.length * 100) : 0;
@@ -195,12 +230,12 @@ export default function SearchPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="em-eyebrow" style={{ marginRight: 4 }}>Filter</span>
             {CATEGORIES.map(c => (
-              <div key={c.key} className={`em-chip${catFilter === c.key ? " active" : ""}`} onClick={() => setCatFilter(c.key)}>
+              <div key={c.key} className={`em-chip${catFilter === c.key ? " active" : ""}`} onClick={() => { setCatFilter(c.key); resetPaging(); }}>
                 {c.label}
               </div>
             ))}
             <div style={{ width: 1, height: 20, background: "var(--line)" }} />
-            <div className={`em-chip${approvedOnly ? " active" : ""}`} onClick={() => setApprovedOnly(v => !v)}>
+            <div className={`em-chip${approvedOnly ? " active" : ""}`} onClick={() => { setApprovedOnly(v => !v); resetPaging(); }}>
               <IconCheckCircle size={12} /> Approved only
             </div>
           </div>
@@ -211,14 +246,21 @@ export default function SearchPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>
                   {isAiMode
-                    ? <>AI พบ <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · เรียงตาม <strong style={{ color: "var(--ink)" }}>ความเกี่ยวข้อง</strong></>
-                    : <>Found <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · sorted by <strong style={{ color: "var(--ink)" }}>keyword</strong></>
+                    ? <>AI พบ <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · เรียงตาม <strong style={{ color: "var(--ink)" }}>{SORT_LABELS[sortKey]}</strong></>
+                    : <>Found <strong style={{ color: "var(--ink)" }}>{results.length} results</strong> · เรียงตาม <strong style={{ color: "var(--ink)" }}>{SORT_LABELS[sortKey]}</strong></>
                   }
                 </div>
                 <div className="em-tabs" style={{ padding: 3 }}>
-                  <div className="em-tab active" style={{ padding: "5px 10px", fontSize: 11.5 }}>Relevance</div>
-                  <div className="em-tab" style={{ padding: "5px 10px", fontSize: 11.5 }}>Newest</div>
-                  <div className="em-tab" style={{ padding: "5px 10px", fontSize: 11.5 }}>Amount</div>
+                  {SEARCH_SORT_TABS.map(t => (
+                    <div
+                      key={t.key}
+                      className={`em-tab${sortKey === t.key ? " active" : ""}`}
+                      style={{ padding: "5px 10px", fontSize: 11.5 }}
+                      onClick={() => handleSortChange(t.key)}
+                    >
+                      {t.label}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -229,8 +271,11 @@ export default function SearchPage() {
                   <div style={{ fontSize: 13 }}>ลองเปลี่ยน keyword หรือล้าง filter</div>
                 </div>
               ) : (
-                results.map((m, idx) => {
+                visibleResults.map((m) => {
                   const isMd = m.currentStep === "Managing Director";
+                  // The badge shows the AI's relevance rank, so it has to come from
+                  // the unsorted order — not the row's position after re-sorting.
+                  const aiRank = results.indexOf(m) + 1;
                   const initials = m.requester.split(" ").map((p: string) => p[0]).slice(0, 2).join("");
                   return (
                     <article key={m.id} className="em-card" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -247,7 +292,7 @@ export default function SearchPage() {
                         )}
                         {isAiMode && (
                           <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "rgba(37,99,235,0.12)", color: "var(--primary)", border: "1px solid rgba(37,99,235,0.2)" }}>
-                            #{idx + 1}
+                            #{aiRank}
                           </span>
                         )}
                         <div style={{ flex: 1 }} />
@@ -265,15 +310,21 @@ export default function SearchPage() {
                         </div>
                         <div style={{ flex: 1 }} />
                         <span className="em-amt">฿{m.amount.toLocaleString()}</span>
-                        <button className="em-btn sm ghost">Open <IconArrowRight size={12} /></button>
+                        <Link href={`/queue?memo=${encodeURIComponent(m.id)}`} className="em-btn sm ghost">Open <IconArrowRight size={12} /></Link>
                       </div>
                     </article>
                   );
                 })
               )}
 
-              {results.length > 0 && (
-                <button className="em-btn ghost" style={{ alignSelf: "center", marginTop: 4 }}>Load more <IconChevDown size={13} /></button>
+              {hasMore && (
+                <button
+                  className="em-btn ghost"
+                  style={{ alignSelf: "center", marginTop: 4 }}
+                  onClick={() => setVisibleCount(c => c + SEARCH_PAGE_SIZE)}
+                >
+                  Load more <IconChevDown size={13} /> <span style={{ color: "var(--muted)", fontWeight: 500 }}>({sortedResults.length - visibleResults.length})</span>
+                </button>
               )}
             </div>
 
