@@ -583,6 +583,23 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   padding: 18px 22px 24px;
   gap: 14px;
 }
+
+/* Action bar at the foot of the /create form. Every value here was an inline
+   style on the element and is reproduced unchanged — the move exists so the
+   phone override further down can reach it at all.
+   Two classes on purpose: .em-card is declared later in this file and paints a
+   gradient background, which this bar deliberately replaces with a flat one. */
+.em-card.em-create-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.em-card.em-create-footer-actions > .em-btn { min-width: 120px; }
+.em-card.em-create-footer-actions > .em-btn.primary { min-width: 160px; }
 .em-create-content .em-card-head { padding: 14px 18px; }
 .em-create-content .em-card-body { padding: 16px 18px; }
 .em-create-content .em-form-grid { gap: 12px; }
@@ -1600,6 +1617,28 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   /* Crumbs are hidden and padding drops below, so anything sticking under the
      topbar has to offset by less. Only consumed by --em-sticky-top today. */
   :root { --em-topbar-h: 48px; }
+
+  /* /create action bar. The two buttons need 292px at their min-widths
+     (120 + 160 + 12 gap) but the card offers 298px at a 320px viewport, and the
+     row is `justify-content: flex-end` with no wrap — so the overflow spilled
+     off the LEFT edge, where `scrollWidth` cannot see it and Save Draft was
+     clipped by the card. Wrap instead: primary on its own row, the secondaries
+     sharing the next one. `flex-grow: 1` means a lone secondary (revision mode
+     hides Save Draft) still fills its row instead of sitting at half width. */
+  .em-card.em-create-footer-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+  }
+  /* .em-btn has no justify-content, which is invisible while a button is only as
+     wide as its label but leaves the icon+text hugging the left edge once the
+     button stretches across the row. */
+  .em-card.em-create-footer-actions > .em-btn,
+  .em-card.em-create-footer-actions > .em-btn.primary { min-width: 0; justify-content: center; }
+  /* Primary first: it is the action people came for, and putting it above the
+     secondaries keeps it clear of the thumb path along the bottom edge. */
+  .em-card.em-create-footer-actions > .em-btn.primary { flex: 1 1 100%; order: -1; }
+  .em-card.em-create-footer-actions > .em-btn:not(.primary) { flex: 1 1 calc(50% - 5px); }
   .em-top-search { display: none; }
   .em-crumbs { display: none; }
   .em-page-title { font-size: 15px; }

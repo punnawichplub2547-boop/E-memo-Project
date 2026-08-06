@@ -505,22 +505,13 @@ function CreatePageContent() {
             />
 
             {/* Form Actions Footer */}
-            <div className="em-card em-create-footer-actions" style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 12,
-              padding: "16px 24px",
-              background: "var(--surface)",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--r-lg)",
-            }}>
+            <div className="em-card em-create-footer-actions">
               {!isRevisionMode && (
                 <button
                   type="button"
                   className="em-btn"
                   disabled={isSubmitting}
                   onClick={() => handleSubmit("draft")}
-                  style={{ minWidth: 120 }}
                 >
                   <IconFileText size={15} /> Save Draft
                 </button>
@@ -530,7 +521,6 @@ function CreatePageContent() {
                 className="em-btn primary"
                 disabled={!canSubmitPending || isSubmitting}
                 onClick={() => handleSubmit("pending")}
-                style={{ minWidth: 160 }}
               >
                 <IconMail size={15} />
                 {isRevisionMode
