@@ -86,7 +86,7 @@ export function DrawerFooter({
   const resubmitForm = (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.55, padding: "7px 10px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-        This prototype resubmits the existing memo content with an optional correction note. Full edit/resubmit form is deferred.
+        ทางลัดนี้ส่งเนื้อหาเดิมกลับเข้าสู่ขั้นตอนอนุมัติพร้อมหมายเหตุ โดยไม่แก้ไขรายละเอียดเมโม · ถ้าต้องแก้เนื้อหา ให้กด “แก้ไขและส่งใหม่”
       </div>
       <div style={{ fontSize: 12.5, color: "var(--ink-2)", fontWeight: 600 }}>
         หมายเหตุการแก้ไข{" "}
