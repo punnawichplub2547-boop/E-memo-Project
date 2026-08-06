@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import {
-  IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles, IconBookmark
+  IconChevRight, IconFileText, IconMail, IconRoute, IconSparkles, IconBookmark, IconDownload
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
@@ -106,8 +106,8 @@ function CreatePageContent() {
   });
 
   const {
-    attachmentFiles, attachmentError, isSubmitting,
-    addAttachmentFiles, removeAttachmentFile, handleSubmit,
+    attachmentFiles, attachmentError, isSubmitting, isPreviewingExcel,
+    addAttachmentFiles, removeAttachmentFile, handleSubmit, handlePreviewExcel,
   } = useMemoSubmit(formFields, { user, dispatch, router });
 
   // ── Assistant panel state — extracted to hook for localStorage persistence ──
@@ -506,6 +506,18 @@ function CreatePageContent() {
 
             {/* Form Actions Footer */}
             <div className="em-card em-create-footer-actions">
+              {/* Deliberately not disabled by canSubmitPending — the point is to
+                  check the printed form while the memo is still being written. */}
+              <button
+                type="button"
+                className="em-btn"
+                disabled={isPreviewingExcel}
+                onClick={handlePreviewExcel}
+                title="เปิดฟอร์ม Excel ของเมโมฉบับนี้ โดยยังไม่บันทึกและยังไม่ส่ง"
+              >
+                <IconDownload size={15} />
+                {isPreviewingExcel ? "กำลังสร้างไฟล์..." : "ดูตัวอย่างฟอร์ม Excel"}
+              </button>
               {!isRevisionMode && (
                 <button
                   type="button"

@@ -67,8 +67,12 @@ two silently drift apart (see ERR-0030).
 
 Lifts the 37-field record assembly out of `useMemoSubmit.handleSubmit`. Both the
 real submit path and the preview call it, so the preview can never show fields the
-submit does not send, or vice versa. This removes duplication that already exists
-between the `ADD_MEMO` and `SUBMIT_REVISION` payloads.
+submit does not send, or vice versa.
+
+`SUBMIT_REVISION` is **not** routed through it: that action dispatches an edit
+applied to an existing memo, not a whole `MemoRecord`, so folding the two together
+would mean reshaping the reducer's contract for no gain here. Preview in revision
+mode still uses this function — it just passes the existing memo's id.
 
 ### 2. `src/app/api/memos/preview-excel/route.ts` (new)
 
@@ -126,14 +130,21 @@ inside the existing `@media (max-width: 768px)` block.
 ```
 desktop (unchanged)              phone <=768px (new)
 +---------------------------+    +----------------------+
-| [Excel] [Draft] [Send >]  |    | [ Send to Approval ] |  primary, full width
-+---------------------------+    | [Draft]    [ Excel ] |  secondaries, half each
-      right-aligned, one row     +----------------------+
+| [Excel] [Draft] [Send >]  |    | [ Send to Approval ] |  primary first
++---------------------------+    | [ Excel form      ] |
+      right-aligned, one row     | [ Save Draft      ] |  one per row
+                                 +----------------------+
 ```
 
-- `flex-wrap: wrap`; primary `flex: 1 1 100%`; secondaries `flex: 1 1 calc(50% - 6px)`;
-  `min-width` dropped on phones.
-- At 320px each secondary gets ~143px — fits, and the existing clipping is fixed.
+- `flex-wrap: wrap`; every button `flex: 1 1 100%`; primary `order: -1`;
+  `min-width` dropped; labels centred; icons `flex-shrink: 0`.
+- **Half-width secondaries were tried first and rejected on measurement.** The
+  longest label ("ดูตัวอย่างฟอร์ม Excel") needs ~177px with its icon and padding,
+  and a 390px viewport leaves 175px per half — at which point the flex row does not
+  wrap or clip the text, it silently shrinks the **icon** to zero width. Nothing in
+  the numbers showed it (`scrollWidth === clientWidth`, no overflow, no clipped
+  label); it was only visible in a screenshot. One button per row is the only
+  arrangement where every label and icon survives at 320px.
 - Desktop >=769px is byte-identical to today: the same values, moved from `style=`
   to a class.
 

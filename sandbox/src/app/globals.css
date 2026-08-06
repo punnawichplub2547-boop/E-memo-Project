@@ -1635,10 +1635,18 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
      button stretches across the row. */
   .em-card.em-create-footer-actions > .em-btn,
   .em-card.em-create-footer-actions > .em-btn.primary { min-width: 0; justify-content: center; }
+  /* One button per row. Half-width secondaries fit only above ~430px: the
+     longest label ("ดูตัวอย่างฟอร์ม Excel") needs ~177px with its icon and
+     padding, and a 390px viewport leaves 175px — at which point the flex row
+     silently shrinks the icon to nothing instead of wrapping. Full width is the
+     only arrangement where every label and icon survives at every phone size. */
+  .em-card.em-create-footer-actions > .em-btn { flex: 1 1 100%; }
   /* Primary first: it is the action people came for, and putting it above the
      secondaries keeps it clear of the thumb path along the bottom edge. */
-  .em-card.em-create-footer-actions > .em-btn.primary { flex: 1 1 100%; order: -1; }
-  .em-card.em-create-footer-actions > .em-btn:not(.primary) { flex: 1 1 calc(50% - 5px); }
+  .em-card.em-create-footer-actions > .em-btn.primary { order: -1; }
+  /* An icon squeezed to zero width is never the intent — it just reads as a
+     missing icon next to a label that looks fine. */
+  .em-card.em-create-footer-actions > .em-btn > svg { flex-shrink: 0; }
   .em-top-search { display: none; }
   .em-crumbs { display: none; }
   .em-page-title { font-size: 15px; }

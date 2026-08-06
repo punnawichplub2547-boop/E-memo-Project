@@ -6,6 +6,7 @@ import { MemoAttachment, ReadAction } from "@/lib/approval";
 import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
+import { buildMemoDraftRecord } from "@/lib/build-memo-draft-record";
 import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
 import { showErrorToast } from "@/lib/toast";
 import type { useMemos } from "@/lib/memo-store";
@@ -26,12 +27,67 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     requestItems, priceComparisons, selectedVendor, selectedNotLowest, cleanVendorReason,
     effectiveIsPriceAdjustment, priceAdjustmentReason, effectiveFollowsProductionPlan,
     effectiveIsDeadStock, showDeptMonthly, deptMonthlyOverBudgetTotal, orderedReadRecipients,
-    recommendation, routeReview, selectedRoute, cleanOverrideReason, firstCheckingStep, canSubmitPending,
+    recommendation, routeReview, selectedRoute, cleanOverrideReason, canSubmitPending,
   } = fields;
 
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewingExcel, setIsPreviewingExcel] = useState(false);
+
+  /**
+   * Downloads the F-DC-006 Excel form for whatever is in the form right now,
+   * without saving anything. The server renders it with the same generator the
+   * queue's download uses, so what you check here is what you will get.
+   *
+   * Deliberately not gated on validateMemoFormForApproval: a preview that
+   * refuses to open while the form is incomplete cannot help you see what is
+   * still missing, and the file goes to nobody.
+   */
+  const handlePreviewExcel = async () => {
+    if (isPreviewingExcel) return;
+    setIsPreviewingExcel(true);
+    try {
+      // A new memo has no number yet, so Ref.No stays blank on the sheet — the
+      // real id is timestamp-derived and would not match the one issued at
+      // submit. A revision already has one and can print it.
+      const memo = buildMemoDraftRecord(fields, {
+        id: isRevisionMode ? reviseMemo!.id : "",
+        requester: user.name,
+        status: isRevisionMode ? reviseMemo!.status : "draft",
+        timestamp: formatTimestamp(new Date()),
+      });
+
+      const response = await fetch("/api/memos/preview-excel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ memo }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ error: "ไม่สามารถสร้างไฟล์ตัวอย่างได้" }));
+        showErrorToast(String(body.error ?? "ไม่สามารถสร้างไฟล์ตัวอย่างได้"), 5000);
+        return;
+      }
+
+      // Take the name from the response rather than rebuilding it here, so the
+      // two cannot disagree.
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "memo-draft.xlsx";
+
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "ไม่สามารถสร้างไฟล์ตัวอย่างได้", 5000);
+    } finally {
+      setIsPreviewingExcel(false);
+    }
+  };
 
   const addAttachmentFiles = (files: File[]) => {
     setAttachmentError(null);
@@ -151,47 +207,19 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     }
     dispatch({
       type: "ADD_MEMO",
-      memo: {
-        id, title: subject, requester: user.name, department, category, amount, status,
-        itemSubcategoryId,
-        itemSubcategoryLabel,
-        currentStep: firstCheckingStep,
-        workflowState: "Issued",
-        recommendedFinalApprover: recommendation.recommendedFinalApprover,
-        recommendedRoute: routeReview.recommendedRoute,
-        selectedRoute,
-        routeMode: routeReview.mode,
-        routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
-        readRecipients: orderedReadRecipients,
-        readActions: status === "pending" && orderedReadRecipients.length > 0
-          ? orderedReadRecipients.map((r): ReadAction => ({ recipient: r, status: "pending" }))
-          : undefined,
-        description: description.trim() || undefined,
-        closingRemark: closingRemark.trim() || undefined,
-        budgetStatus,
-        accountCode: accountCode.trim() || undefined,
-        budgetPlan,
-        budgetUsed,
-        notifyMD: recommendation.notifyMD,
-        requiresMdReview: recommendation.requiresMdReview,
-        priceComparisons,
-        selectedVendorId: selectedVendor?.id,
-        selectedVendorReason: selectedNotLowest ? cleanVendorReason : undefined,
-        requestItems: requestItems.filter(r => r.name.trim() || r.unitPrice > 0),
+      memo: buildMemoDraftRecord(fields, {
+        id,
+        requester: user.name,
+        status,
+        timestamp: createdTimestamp,
         attachments,
-        priceAdjustmentReason: effectiveIsPriceAdjustment && priceAdjustmentReason.trim() ? priceAdjustmentReason.trim() : undefined,
-        isPriceAdjustment: effectiveIsPriceAdjustment || undefined,
-        followsProductionPlan: effectiveFollowsProductionPlan || undefined,
-        isDeadStockOrSlowMovement: effectiveIsDeadStock || undefined,
-        departmentMonthlyOverBudgetTotal: showDeptMonthly && deptMonthlyOverBudgetTotal > 0 ? deptMonthlyOverBudgetTotal : undefined,
-        cycleHours: 0, createdAt: createdTimestamp, updatedAt: createdTimestamp,
-      },
+      }),
     });
     router.push(status === "pending" ? "/queue" : "/");
   };
 
   return {
-    attachmentFiles, attachmentError, isSubmitting,
-    addAttachmentFiles, removeAttachmentFile, handleSubmit,
+    attachmentFiles, attachmentError, isSubmitting, isPreviewingExcel,
+    addAttachmentFiles, removeAttachmentFile, handleSubmit, handlePreviewExcel,
   };
 }
