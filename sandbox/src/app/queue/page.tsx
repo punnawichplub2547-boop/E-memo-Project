@@ -60,20 +60,29 @@ function QueuePageContent() {
   const [selected, setSelected] = useState<string | null>(memoParam);
   const [isDesktopSplit, setIsDesktopSplit] = useState(false);
   const [isCompactTable, setIsCompactTable] = useState(false);
+  // Phone width. A three-column table cannot give Subject a usable share here:
+  // at 320px the id and status columns alone eat 216 of it. Below this the id
+  // moves under the subject instead of holding its own column. 768px is the
+  // same breakpoint globals.css already uses for the phone layout.
+  const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 1280px)");
     const compactMedia = window.matchMedia("(max-width: 1100px)");
+    const narrowMedia = window.matchMedia("(max-width: 768px)");
     const sync = () => {
       setIsDesktopSplit(desktopMedia.matches);
       setIsCompactTable(compactMedia.matches);
+      setIsNarrow(narrowMedia.matches);
     };
     sync();
     desktopMedia.addEventListener("change", sync);
     compactMedia.addEventListener("change", sync);
+    narrowMedia.addEventListener("change", sync);
     return () => {
       desktopMedia.removeEventListener("change", sync);
       compactMedia.removeEventListener("change", sync);
+      narrowMedia.removeEventListener("change", sync);
     };
   }, []);
 
@@ -293,8 +302,12 @@ function QueuePageContent() {
                     <colgroup>
                       {/* Wide enough for a shortened id ("…154525-D43" needs
                           82px at 12px mono) plus the cell's 28px padding, so
-                          the ellipsis rule never fires on a real memo id. */}
-                      <col style={{ width: useCompactColumns ? 112 : 116 }} />
+                          the ellipsis rule never fires on a real memo id.
+                          On a phone the column is gone entirely — the id is
+                          rendered under the subject instead. */}
+                      {!isNarrow && (
+                        <col style={{ width: useCompactColumns ? 112 : 116 }} />
+                      )}
                       <col />
                       {!useCompactColumns && <col style={{ width: 200 }} />}
                       {!useCompactColumns && <col style={{ width: 136 }} />}
@@ -303,7 +316,7 @@ function QueuePageContent() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>Memo ID</th>
+                        {!isNarrow && <th>Memo ID</th>}
                         <th>
                           Subject{" "}
                           <IconSort
@@ -337,7 +350,7 @@ function QueuePageContent() {
                       {filtered.length === 0 && (
                         <tr>
                           <td
-                            colSpan={useCompactColumns ? 3 : 6}
+                            colSpan={isNarrow ? 2 : useCompactColumns ? 3 : 6}
                             style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}
                           >
                             {tier
@@ -362,11 +375,13 @@ function QueuePageContent() {
                               setSelected(selected === memo.id ? null : memo.id)
                             }
                           >
-                            <td>
-                              {/* Shortened to keep the row one line tall; the
-                                  full id stays on hover and on the panel. */}
-                              <span className="em-id" title={memo.id}>{shortMemoId(memo.id)}</span>
-                            </td>
+                            {!isNarrow && (
+                              <td>
+                                {/* Shortened to keep the row one line tall; the
+                                    full id stays on hover and on the panel. */}
+                                <span className="em-id" title={memo.id}>{shortMemoId(memo.id)}</span>
+                              </td>
+                            )}
                             <td style={{ fontWeight: 500 }}>
                               <div
                                 style={{
@@ -394,6 +409,11 @@ function QueuePageContent() {
                                   {memo.title}
                                 </span>
                               </div>
+                              {isNarrow && (
+                                <span className="em-id em-id-sub" title={memo.id}>
+                                  {shortMemoId(memo.id)}
+                                </span>
+                              )}
                               {!useCompactColumns && isMd && (
                                 <div
                                   style={{

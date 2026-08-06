@@ -1023,6 +1023,16 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
+/* Phone only (rendered by page.tsx below 768px): the id drops out of its own
+   column and sits under the subject, so the full table width goes to the title.
+   Dimmer and smaller than the title because on a phone the title is what you
+   scan for — the id is confirmation, and the full one is in the drawer. */
+.em-queue-table .em-id-sub {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
 .em-queue-table tbody td { padding: 10px 14px; }
 .em-queue-table thead th { padding: 9px 14px; }
 .em-id { font-family: var(--font-mono); font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.02em; }
