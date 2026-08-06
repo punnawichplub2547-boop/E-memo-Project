@@ -44,12 +44,28 @@ $AppUrl       = 'http://localhost:3000/login'
 
 # Ordered map: table marker -> migration file. A migration runs ONLY if its table
 # is absent. Add future CREATE TABLE migrations here (keep chronological order).
+#
+# Chronological order is also DEPENDENCY order: db/init/001-db1-schema.sql only
+# creates memos, item_subcategories, memo_revisions, read_actions and
+# workflow_step_actions - every table below has a FOREIGN KEY to users(id), so
+# users must exist first or the very first migration dies with errno 150.
+#
+# 'telegram_conversation_states' is the LAST table its file creates, so its
+# presence proves the whole file ran, not just the first statement.
+#
+# Deliberately NOT listed: 2026-06-19-admin-account-separation.sql. It is a data
+# migration (INSERT INTO users ... ON DUPLICATE KEY UPDATE password_hash), so it
+# has no table/column marker to gate on AND running it on an existing prod DB
+# would reset the admin account's password back to the hash baked into the file
+# on every single deploy. Apply that one by hand, once, on a fresh database.
 $Migrations = [ordered]@{
-    'issue_reports'         = '2026-06-24-issue-reports-table.sql'
-    'item_subcategories'    = '2026-06-25-item-subcategories.sql'
-    'password_reset_tokens' = '2026-06-29-password-reset-tokens.sql'
-    'memo_templates'        = '2026-07-13-add-memo-templates-table.sql'
-    'dispatches'            = '2026-07-17-add-dispatch-tables.sql'
+    'users'                        = '2026-06-09-add-users-table.sql'
+    'telegram_conversation_states' = '2026-06-12-telegram-tables.sql'
+    'issue_reports'                = '2026-06-24-issue-reports-table.sql'
+    'item_subcategories'           = '2026-06-25-item-subcategories.sql'
+    'password_reset_tokens'        = '2026-06-29-password-reset-tokens.sql'
+    'memo_templates'               = '2026-07-13-add-memo-templates-table.sql'
+    'dispatches'                   = '2026-07-17-add-dispatch-tables.sql'
 }
 
 # Ordered map: "table.column" marker -> migration file. For ALTER TABLE ADD COLUMN
