@@ -58,22 +58,14 @@ export function DrawerPanel({
       .join("|") ?? "",
   ].join("::");
 
-  const wrapperStyle = inline
-    ? {
-        position: "sticky" as const,
-        top: 84,
-        alignSelf: "start" as const,
-        minWidth: 0,
-        maxHeight: "calc(100vh - 108px)",
-        display: "flex",
-        flexDirection: "column" as const,
-      }
-    : undefined;
-
+  // Sticky positioning, max-height and the flex column now live in
+  // .em-queue-detail-panel (globals.css, inside the >=1280px block). It was an
+  // inline style here, which meant it also applied to the <1280px overlay
+  // drawer and could not be limited by a media query.
   return (
     <div
       className={inline ? "em-card em-queue-detail-panel" : "em-drawer"}
-      style={wrapperStyle}
+      style={inline ? { minWidth: 0 } : undefined}
     >
       <div className="em-drawer-head">
         <div style={{ minWidth: 0, flex: 1 }}>

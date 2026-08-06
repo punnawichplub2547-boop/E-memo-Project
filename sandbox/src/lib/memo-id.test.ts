@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateMemoId } from "./memo-id";
+import { generateMemoId, shortMemoId } from "./memo-id";
 
 // UTC instant that is still the PREVIOUS calendar day in Bangkok.
 // 2026-05-31T17:30:00Z → Bangkok (UTC+7) = 2026-06-01 00:30:00
@@ -64,5 +64,45 @@ describe("generateMemoId", () => {
     const a = generateMemoId(KNOWN_DATE_UTC, ALWAYS_ZERO);
     const b = generateMemoId(KNOWN_DATE_UTC, ALWAYS_MAX);
     expect(a).not.toBe(b);
+  });
+});
+
+describe("shortMemoId", () => {
+  it("drops the prefix every row shares", () => {
+    // "EM-20260805" repeats down the whole column, so it carries no
+    // information while scanning — the tail is what tells rows apart.
+    expect(shortMemoId("EM-20260805-103912-34E")).toBe("…103912-34E");
+  });
+
+  it("keeps a legacy sequential id whole — its middle segment is the year", () => {
+    expect(shortMemoId("EM-2026-001")).toBe("EM-2026-001");
+  });
+
+  it("does not collapse two legacy ids from different years onto each other", () => {
+    expect(shortMemoId("EM-2026-002")).not.toBe(shortMemoId("EM-2027-002"));
+  });
+
+  it("leaves an id with nothing to drop alone", () => {
+    expect(shortMemoId("EM-001")).toBe("EM-001");
+    expect(shortMemoId("EM")).toBe("EM");
+  });
+
+  it("leaves an id with no separator alone", () => {
+    expect(shortMemoId("EM2026001")).toBe("EM2026001");
+  });
+
+  it("returns an empty id untouched rather than a bare ellipsis", () => {
+    expect(shortMemoId("")).toBe("");
+  });
+
+  it("stays distinct for ids differing only in the last character", () => {
+    expect(shortMemoId("EM-20260805-103912-34E")).not.toBe(
+      shortMemoId("EM-20260805-103912-34F"),
+    );
+  });
+
+  it("shortens whatever generateMemoId produces", () => {
+    const id = generateMemoId(KNOWN_DATE_UTC, ALWAYS_HALF); // EM-20260601-073004-800
+    expect(shortMemoId(id)).toBe("…073004-800");
   });
 });

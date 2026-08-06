@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { useMemos } from "@/lib/memo-store";
 import { formatTimestamp } from "@/lib/format-timestamp";
+import { shortMemoId } from "@/lib/memo-id";
 import { ApprovalLevel, approvalLabels } from "@/lib/approval";
 import {
   IconPlus, IconSearch, IconSort,
@@ -194,7 +195,10 @@ function QueuePageContent() {
             </>
           }
         />
-        <div className="em-content">
+        {/* em-content-queue drops the shared `overflow: auto`, which would
+            otherwise trap the sticky detail panel in a scrollport that never
+            scrolls. See globals.css. */}
+        <div className="em-content em-content-queue">
           <div className="em-card em-filter-card" style={{ padding: 14 }}>
             <div
               className="em-filter-row"
@@ -285,9 +289,12 @@ function QueuePageContent() {
             <div style={{ minWidth: 0 }}>
               <div className="em-card" style={{ padding: 0, overflow: "hidden" }}>
                 <div style={{ width: "100%", overflowX: "hidden" }}>
-                  <table className="em-table" style={{ tableLayout: "fixed" }}>
+                  <table className="em-table em-queue-table" style={{ tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width: useCompactColumns ? 112 : 120 }} />
+                      {/* Wide enough for a shortened id ("…154525-D43" needs
+                          82px at 12px mono) plus the cell's 28px padding, so
+                          the ellipsis rule never fires on a real memo id. */}
+                      <col style={{ width: useCompactColumns ? 112 : 116 }} />
                       <col />
                       {!useCompactColumns && <col style={{ width: 200 }} />}
                       {!useCompactColumns && <col style={{ width: 136 }} />}
@@ -349,18 +356,16 @@ function QueuePageContent() {
                         return (
                           <tr
                             key={memo.id}
-                            className={isMd ? "md-row" : ""}
-                            style={
-                              selected === memo.id
-                                ? { background: "var(--primary-soft)" }
-                                : undefined
-                            }
+                            className={`${isMd ? "md-row " : ""}${selected === memo.id ? "is-selected" : ""}`.trim()}
+                            aria-selected={selected === memo.id}
                             onClick={() =>
                               setSelected(selected === memo.id ? null : memo.id)
                             }
                           >
                             <td>
-                              <span className="em-id">{memo.id}</span>
+                              {/* Shortened to keep the row one line tall; the
+                                  full id stays on hover and on the panel. */}
+                              <span className="em-id" title={memo.id}>{shortMemoId(memo.id)}</span>
                             </td>
                             <td style={{ fontWeight: 500 }}>
                               <div

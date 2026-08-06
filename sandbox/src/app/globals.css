@@ -2,6 +2,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 :root {
+  /* Height of .em-topbar, which is position:sticky at top 0. Anything else that
+     sticks below it offsets by this instead of hard-coding a number, because the
+     topbar loses its crumbs/search and shrinks on narrow screens. */
+  --em-topbar-h: 79px;
+  --em-sticky-top: calc(var(--em-topbar-h) + 12px);
+
   --bg: #F0F4FF;
   --surface: #FFFFFF;
   --surface-2: #F7F9FF;
@@ -563,6 +569,16 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
 /* ===== Content ===== */
 .em-content { padding: 22px 26px 26px; display: flex; flex-direction: column; gap: 18px; overflow: auto; flex: 1; }
+/* The queue's detail panel is position:sticky. `overflow: auto` above makes
+   .em-content that panel's nearest scroll container, and because the .em-work
+   chain is sized with min-height rather than height, .em-content never scrolls
+   itself — so the panel sticks to a scrollport frozen at scrollTop 0 and never
+   moves. `clip` still contains horizontal overflow but creates no scroll
+   container, which hands the panel back to the document scroll. Paired with
+   `visible` this is legal and stays unadjusted (CSS Overflow 3); `hidden` would
+   force the other axis to `auto` and reintroduce the bug.
+   Scoped to /queue on purpose — .em-content is shared by every page. */
+.em-content-queue { overflow-x: clip; overflow-y: visible; }
 .em-create-content {
   padding: 18px 22px 24px;
   gap: 14px;
@@ -981,6 +997,34 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-table tbody tr.md-row td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 .em-table tbody tr.md-row td { background: linear-gradient(90deg,rgba(201,168,76,0.06),rgba(255,255,255,0) 60%); }
 .em-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Selected row, queue table only.
+   The background has to be set on the td: the zebra and md-row rules above also
+   paint the td, and a td background always covers the tr's. Setting it on the tr
+   (as this used to) left every even row and every MD row with no visible
+   selection at all — half the list. The three-class selector also clears
+   :nth-child and .md-row on specificity without needing !important. */
+.em-queue-table tbody tr.is-selected td {
+  background: linear-gradient(90deg, rgba(219,234,254,0.85), rgba(240,247,255,0.55));
+}
+.em-queue-table tbody tr.is-selected td:first-child {
+  box-shadow: inset 4px 0 0 var(--primary);
+}
+.em-queue-table tbody tr.is-selected.md-row td:first-child {
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
+/* One line, ellipsised. shortMemoId() already trims the shared prefix; this
+   stops anything left over from wrapping and inflating the row height. */
+.em-queue-table .em-id {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.em-queue-table tbody td { padding: 10px 14px; }
+.em-queue-table thead th { padding: 9px 14px; }
 .em-id { font-family: var(--font-mono); font-size: 12px; color: var(--primary); font-weight: 600; letter-spacing: 0.02em; }
 .em-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); text-align: right; white-space: nowrap; }
 .em-dept {
@@ -1010,7 +1054,14 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
   .em-queue-detail-shell {
     min-width: 0;
-    overflow-x: hidden;
+    /* `clip` not `hidden`: hidden on one axis forces the other to `auto`, which
+       would make this shell a scroll container and kill the panel's sticky. */
+    overflow-x: clip;
+    /* The grid sets align-items:start, which would shrink this shell to the
+       panel's own height and leave sticky with zero travel. Stretching only this
+       column gives the panel the full row to travel down, without stretching the
+       list card next to it. */
+    align-self: stretch;
     opacity: 0;
     transform: translateX(18px);
     transition: opacity 180ms ease, transform 220ms ease;
@@ -1025,7 +1076,37 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
   .em-queue-detail-panel {
     border-radius: var(--r-xl);
-    box-shadow: var(--shadow-md);
+    /* Sticks below the topbar so the panel stays in view no matter how far down
+       the list the reader has scrolled. Kept in CSS rather than an inline style
+       so it can be limited to this breakpoint — the <1280px overlay drawer must
+       not inherit it. dvh, not vh: vh is wrong while a mobile URL bar is shown. */
+    position: sticky;
+    top: var(--em-sticky-top);
+    max-height: calc(100dvh - var(--em-sticky-top) - 18px);
+    display: flex;
+    flex-direction: column;
+    /* Two-layer elevation so the panel reads as a plane above the list at all
+       times. Deliberately constant — a shadow that pops on scroll would be
+       motion without meaning in a tool people stare at all day. */
+    box-shadow:
+      0 0 0 1px rgba(37,99,235,0.10),
+      0 1px 2px rgba(15,27,60,0.05),
+      0 18px 44px -26px rgba(30,58,138,0.32);
+    border-color: rgba(37,99,235,0.14);
+  }
+
+  /* Head and foot hold their size; only the body scrolls. min-height:0 is what
+     actually allows the body to shrink — without it the flex item refuses to go
+     below its content height and pushes the Approve/Return/Reject footer off
+     the bottom of the screen. */
+  .em-queue-detail-panel .em-drawer-head { flex: 0 0 auto; }
+  .em-queue-detail-panel .em-drawer-foot { flex: 0 0 auto; margin-top: 0; }
+  .em-queue-detail-panel .em-drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .em-queue-detail-panel .em-drawer-head {
@@ -1506,6 +1587,9 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
     gap: 8px;
     flex-wrap: nowrap;
   }
+  /* Crumbs are hidden and padding drops below, so anything sticking under the
+     topbar has to offset by less. Only consumed by --em-sticky-top today. */
+  :root { --em-topbar-h: 48px; }
   .em-top-search { display: none; }
   .em-crumbs { display: none; }
   .em-page-title { font-size: 15px; }
