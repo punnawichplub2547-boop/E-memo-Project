@@ -8,7 +8,7 @@ import {
   IconDownload, IconPlus, IconFileText, IconCheckCircle, IconClock,
   IconReturn, IconCrown, IconCheck, IconSlash, IconPen,
   IconArrowRight, IconArrowUp, IconArrowDown, IconCalendar,
-  IconUsers, IconChevDown, IconX,
+  IconUsers, IconX,
 } from "@/components/icons";
 import { MemoRecord, approvalLabels } from "@/lib/approval";
 import { groupMemosByDate } from "@/lib/group-memos";
@@ -229,10 +229,6 @@ export default function HistoryPage() {
                   </div>
                 </div>
               ))}
-
-              <button className="em-btn ghost" style={{ alignSelf: "center", marginTop: 4 }} disabled title="Pagination — coming soon">
-                Load earlier history <IconChevDown size={13} />
-              </button>
             </div>
 
             {/* Right rail */}
