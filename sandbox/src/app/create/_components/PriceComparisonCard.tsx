@@ -1,4 +1,4 @@
-import { type PriceComparison, computePriceRowTotals } from "@/lib/approval";
+import { type PriceComparison, computePriceRowTotals, needsNonNegotiableRemark } from "@/lib/approval";
 import {
   clampNonNegativeInputElement,
   coerceNonNegativeNumber,
@@ -24,6 +24,9 @@ interface PriceComparisonCardProps {
   addVendorRow: () => void;
   removeVendorRow: (id: string) => void;
   updateVendorRow: (id: string, updates: Partial<PriceComparison>) => void;
+  updateVendorDiscountPercent: (id: string, percent: number) => void;
+  markVendorNonNegotiable: (id: string) => void;
+  rowsMissingNonNegotiableRemark: PriceComparison[];
   onSelectVendor: (id: string) => void;
   onPdfButtonClick: () => void;
   onClearPdfError: () => void;
@@ -46,6 +49,9 @@ export function PriceComparisonCard({
   addVendorRow,
   removeVendorRow,
   updateVendorRow,
+  updateVendorDiscountPercent,
+  markVendorNonNegotiable,
+  rowsMissingNonNegotiableRemark,
   onSelectVendor,
   onPdfButtonClick,
   onClearPdfError,
@@ -92,12 +98,12 @@ export function PriceComparisonCard({
       )}
       <div className="em-card-body" style={{ padding: "6px 18px 18px" }}>
         <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)" }}>
-          <table className="em-table" style={{ minWidth: 780, width: "100%" }}>
+          <table className="em-table" style={{ minWidth: 880, width: "100%" }}>
             <colgroup>
               <col style={{ width: 48 }} />
               <col />
               <col style={{ width: 130 }} />
-              <col style={{ width: 110 }} />
+              <col style={{ width: 158 }} />
               <col style={{ width: 118 }} />
               <col style={{ width: 168 }} />
               <col style={{ width: 150 }} />
@@ -108,7 +114,7 @@ export function PriceComparisonCard({
                 <th style={{ padding: "10px 8px", textAlign: "center" }}></th>
                 <th style={{ padding: "10px 14px" }}>ผู้ให้บริการ</th>
                 <th style={{ padding: "10px 12px", textAlign: "right" }}>ราคาเสนอ (฿)</th>
-                <th style={{ padding: "10px 12px", textAlign: "right" }}>ส่วนลด (฿)</th>
+                <th style={{ padding: "10px 12px", textAlign: "right" }}>ส่วนลด (฿ / %)</th>
                 <th style={{ padding: "10px 12px", textAlign: "center" }}>VAT 7%</th>
                 <th style={{ padding: "10px 14px", textAlign: "right" }}>ราคาสุทธิ</th>
                 <th style={{ padding: "10px 12px" }}>หมายเหตุ</th>
@@ -117,8 +123,9 @@ export function PriceComparisonCard({
             </thead>
             <tbody>
               {priceComparisons.map((row) => {
-                const { basePrice, vatAmount, netPrice } = computePriceRowTotals(row);
+                const { basePrice, vatAmount, netPrice, discountPercent } = computePriceRowTotals(row);
                 const isLowest = lowestNetPrice > 0 && row.offeredPrice > 0 && netPrice === lowestNetPrice && priceComparisons.length > 1;
+                const needsRemark = needsNonNegotiableRemark(row) && (row.remark ?? "").trim().length === 0;
                 return (
                   <tr key={row.id} style={{ background: row.isSelected ? "var(--surface-soft)" : undefined }}>
                     <td style={{ padding: "10px 8px", textAlign: "center" }}>
@@ -154,19 +161,42 @@ export function PriceComparisonCard({
                       />
                     </td>
                     <td style={{ padding: "10px 12px" }}>
-                      <input
-                        className="em-table-input num"
-                        type="number"
-                        min={0}
-                        value={row.discount || ""}
-                        placeholder="0"
-                        onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
-                        onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
-                        onKeyDown={(e) => {
-                          if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
-                        }}
-                        onChange={e => updateVendorRow(row.id, { discount: coerceNonNegativeNumber(e.target.value) })}
-                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <input
+                          className="em-table-input num"
+                          type="number"
+                          min={0}
+                          value={row.discount || ""}
+                          placeholder="0"
+                          title="ส่วนลดเป็นบาท"
+                          style={{ flex: "1 1 60px", minWidth: 0 }}
+                          onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                          onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                          onKeyDown={(e) => {
+                            if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => updateVendorRow(row.id, { discount: coerceNonNegativeNumber(e.target.value) })}
+                        />
+                        <span style={{ fontSize: 10.5, color: "var(--muted)", flex: "0 0 auto" }}>฿</span>
+                        <input
+                          className="em-table-input num"
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={discountPercent || ""}
+                          placeholder="0"
+                          title="ส่วนลดเป็นเปอร์เซ็นต์ — ระบบจะคำนวณกลับเป็นบาทให้"
+                          disabled={row.offeredPrice <= 0}
+                          style={{ flex: "1 1 52px", minWidth: 0 }}
+                          onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                          onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
+                          onKeyDown={(e) => {
+                            if (shouldBlockNonNegativeNumberKey(e.key)) e.preventDefault();
+                          }}
+                          onChange={e => updateVendorDiscountPercent(row.id, coerceNonNegativeNumber(e.target.value))}
+                        />
+                        <span style={{ fontSize: 10.5, color: "var(--muted)", flex: "0 0 auto" }}>%</span>
+                      </div>
                     </td>
                     <td style={{ padding: "10px 12px", textAlign: "center" }}>
                       <VatPill
@@ -198,9 +228,25 @@ export function PriceComparisonCard({
                       <input
                         className="em-table-input"
                         value={row.remark ?? ""}
-                        placeholder="—"
+                        placeholder={needsRemark ? "ต้องระบุเหตุผล" : "—"}
+                        style={needsRemark ? { borderColor: "var(--amber)", background: "var(--amber-soft)" } : undefined}
                         onChange={e => updateVendorRow(row.id, { remark: e.target.value })}
                       />
+                      {needsRemark && (
+                        <button
+                          type="button"
+                          onClick={() => markVendorNonNegotiable(row.id)}
+                          style={{
+                            marginTop: 5, width: "100%", cursor: "pointer",
+                            fontSize: 10.5, fontWeight: 700, lineHeight: 1.3,
+                            padding: "4px 6px", borderRadius: 6,
+                            color: "var(--amber)", background: "var(--amber-soft)",
+                            border: "1px solid rgba(180,83,9,0.28)",
+                          }}
+                        >
+                          + ไม่สามารถต่อรองราคาได้
+                        </button>
+                      )}
                     </td>
                     <td style={{ padding: "10px 6px", textAlign: "center" }}>
                       <button
@@ -284,6 +330,17 @@ export function PriceComparisonCard({
             Lowest offer {lowestOfferSummary} · Selected vendor {selectedVendorSummary}
             {selectedVendorVat && ` (รวม VAT 7% +฿${selectedVendorVatAmount.toLocaleString()})`}
             {" · "}Difference from lowest {selectedNotLowest ? `+฿${((selectedVendor?.netPrice ?? 0) - lowestNetPrice).toLocaleString()}` : "฿0"}
+          </div>
+        )}
+
+        {rowsMissingNonNegotiableRemark.length > 0 && (
+          <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 8, background: "var(--amber-soft)", border: "1px solid rgba(180,83,9,0.22)" }}>
+            <div style={{ fontSize: 12.5, color: "var(--amber)", fontWeight: 700 }}>
+              ผู้ขายที่เลือกไม่มีส่วนลด — กรุณาระบุหมายเหตุก่อนส่งอนุมัติ
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 4, lineHeight: 1.55 }}>
+              กดปุ่ม &quot;ไม่สามารถต่อรองราคาได้&quot; ในช่องหมายเหตุ หรือพิมพ์เหตุผลเอง · บันทึกร่างได้ตามปกติ
+            </div>
           </div>
         )}
 

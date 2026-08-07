@@ -87,6 +87,7 @@ function CreatePageContent() {
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
     addVendorRow, removeVendorRow, updateVendorRow, handleSelectVendor,
+    updateVendorDiscountPercent, markVendorNonNegotiable, rowsMissingNonNegotiableRemark,
     applyBulkData, snapshotFormData,
   } = formFields;
 
@@ -498,6 +499,9 @@ function CreatePageContent() {
               addVendorRow={addVendorRow}
               removeVendorRow={removeVendorRow}
               updateVendorRow={updateVendorRow}
+              updateVendorDiscountPercent={updateVendorDiscountPercent}
+              markVendorNonNegotiable={markVendorNonNegotiable}
+              rowsMissingNonNegotiableRemark={rowsMissingNonNegotiableRemark}
               onSelectVendor={handleSelectVendor}
               onPdfButtonClick={() => pdfInputRef.current?.click()}
               onClearPdfError={() => setPdfError(null)}
