@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeApprovalRoute,
   buildApprovalFlow,
+  computePriceRowTotals,
+  discountAmountFromPercent,
   getApprovalLevel,
   getApprovalLevelRank,
   getApprovalRecommendation,
   getDashboardMetrics,
+  needsNonNegotiableRemark,
+  NON_NEGOTIABLE_REMARK,
   seedMemos
 } from "./approval";
 
@@ -340,5 +344,62 @@ describe("dashboard metrics", () => {
       rejected: 0,
       averageCycleHours: 0
     });
+  });
+});
+
+describe("discount percent helpers", () => {
+  it("computes discount percent from baht against the offered price", () => {
+    const { discountPercent } = computePriceRowTotals({ offeredPrice: 1000, discount: 100 });
+    expect(discountPercent).toBe(10);
+  });
+
+  it("rounds discount percent to 2 decimals", () => {
+    const { discountPercent } = computePriceRowTotals({ offeredPrice: 3000, discount: 1000 });
+    expect(discountPercent).toBe(33.33);
+  });
+
+  it("returns 0 percent when the offered price is 0 (no divide-by-zero)", () => {
+    const { discountPercent } = computePriceRowTotals({ offeredPrice: 0, discount: 500 });
+    expect(discountPercent).toBe(0);
+  });
+
+  it("keeps discount percent independent of VAT", () => {
+    const withVat = computePriceRowTotals({ offeredPrice: 1000, discount: 100, vatEnabled: true });
+    const withoutVat = computePriceRowTotals({ offeredPrice: 1000, discount: 100, vatEnabled: false });
+    expect(withVat.discountPercent).toBe(withoutVat.discountPercent);
+    expect(withVat.discountPercent).toBe(10);
+  });
+
+  it("converts a percent back into a baht amount rounded to 2 decimals", () => {
+    expect(discountAmountFromPercent(1000, 10)).toBe(100);
+    expect(discountAmountFromPercent(1001, 33)).toBe(330.33);
+  });
+
+  it("clamps the percent-to-baht conversion between 0 and the offered price", () => {
+    expect(discountAmountFromPercent(1000, -5)).toBe(0);
+    expect(discountAmountFromPercent(1000, 150)).toBe(1000);
+    expect(discountAmountFromPercent(0, 50)).toBe(0);
+  });
+});
+
+describe("needsNonNegotiableRemark", () => {
+  it("is true for the selected row with a price but no discount", () => {
+    expect(needsNonNegotiableRemark({ offeredPrice: 1000, discount: 0, isSelected: true })).toBe(true);
+  });
+
+  it("is false when the row has a discount", () => {
+    expect(needsNonNegotiableRemark({ offeredPrice: 1000, discount: 50, isSelected: true })).toBe(false);
+  });
+
+  it("is false for rows that are not the selected vendor", () => {
+    expect(needsNonNegotiableRemark({ offeredPrice: 1000, discount: 0, isSelected: false })).toBe(false);
+  });
+
+  it("is false for an empty row that has no price yet", () => {
+    expect(needsNonNegotiableRemark({ offeredPrice: 0, discount: 0, isSelected: true })).toBe(false);
+  });
+
+  it("exposes the exact Thai remark text used by the quick-fill button", () => {
+    expect(NON_NEGOTIABLE_REMARK).toBe("ไม่สามารถต่อรองราคาได้");
   });
 });

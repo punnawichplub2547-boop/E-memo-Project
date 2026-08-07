@@ -76,11 +76,35 @@ export type PriceComparison = {
 
 export const VAT_RATE = 0.07;
 
+export const NON_NEGOTIABLE_REMARK = "ไม่สามารถต่อรองราคาได้";
+
+function roundTo2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function computePriceRowTotals(row: { offeredPrice: number; discount: number; vatEnabled?: boolean }) {
-  const basePrice = Math.max(0, (row.offeredPrice ?? 0) - (row.discount ?? 0));
+  const offeredPrice = row.offeredPrice ?? 0;
+  const discount = row.discount ?? 0;
+  const basePrice = Math.max(0, offeredPrice - discount);
   const vatAmount = row.vatEnabled ? Math.round(basePrice * VAT_RATE * 100) / 100 : 0;
   const netPrice = basePrice + vatAmount;
-  return { basePrice, vatAmount, netPrice };
+  // Percent is derived from the pre-VAT offered price so it stays consistent with
+  // basePrice, which subtracts the discount before VAT is applied.
+  const discountPercent = offeredPrice > 0 ? roundTo2((discount / offeredPrice) * 100) : 0;
+  return { basePrice, vatAmount, netPrice, discountPercent };
+}
+
+export function discountAmountFromPercent(offeredPrice: number, percent: number): number {
+  const price = offeredPrice ?? 0;
+  if (price <= 0) return 0;
+  const clampedPercent = Math.min(100, Math.max(0, percent ?? 0));
+  return roundTo2((price * clampedPercent) / 100);
+}
+
+export function needsNonNegotiableRemark(
+  row: Pick<PriceComparison, "offeredPrice" | "discount" | "isSelected">
+): boolean {
+  return Boolean(row.isSelected) && (row.offeredPrice ?? 0) > 0 && (row.discount ?? 0) <= 0;
 }
 
 export type RequestItem = {
