@@ -170,4 +170,54 @@ describe("useMemoSubmit", () => {
     expect(dispatch).not.toHaveBeenCalled();
     expect(result.current.attachmentError).toBe("storage full");
   });
+
+  it("blocks SUBMIT_REVISION when canSubmitPending is false because a selected row lacks a remark", async () => {
+    const dispatch = vi.fn();
+    const push = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(
+        makeFields({
+          isRevisionMode: true,
+          reviseMemo: { id: "MEMO-9" } as never,
+          canSubmitPending: false,
+          priceComparisons: [{ id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "", isSelected: true }],
+          selectedVendor: { id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "", isSelected: true },
+        }),
+        {
+          user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+          dispatch,
+          router: { push } as never,
+        }
+      )
+    );
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("dispatches ADD_MEMO for Save Draft even when the selected row has no discount or remark", async () => {
+    const dispatch = vi.fn();
+    const push = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(
+        makeFields({
+          priceComparisons: [{ id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "", isSelected: true }],
+          selectedVendor: { id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "", isSelected: true },
+        }),
+        {
+          user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+          dispatch,
+          router: { push } as never,
+        }
+      )
+    );
+    await act(async () => { await result.current.handleSubmit("draft"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ADD_MEMO",
+        memo: expect.objectContaining({ status: "draft" }),
+      })
+    );
+    expect(push).toHaveBeenCalledWith("/");
+  });
 });
