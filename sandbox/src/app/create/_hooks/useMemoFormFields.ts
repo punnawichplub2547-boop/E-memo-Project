@@ -8,8 +8,11 @@ import {
   buildApprovalFlow,
   BudgetStatus,
   computePriceRowTotals,
+  discountAmountFromPercent,
   getApprovalRecommendation,
   MemoRecord,
+  needsNonNegotiableRemark,
+  NON_NEGOTIABLE_REMARK,
   PriceComparison,
   RequestItem,
 } from "@/lib/approval";
@@ -220,7 +223,13 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
   const selectedVendorVat = Boolean(selectedVendor?.vatEnabled);
   const selectedVendorVatAmount = selectedVendorTotals?.vatAmount ?? 0;
   const cleanVendorReason = selectedVendorReason.trim();
-  const canSubmitPending = (!routeReview.requiresReason || cleanOverrideReason.length > 0) && (!selectedNotLowest || cleanVendorReason.length > 0);
+  const rowsMissingNonNegotiableRemark = priceComparisons.filter(
+    row => needsNonNegotiableRemark(row) && (row.remark ?? "").trim().length === 0
+  );
+  const canSubmitPending =
+    (!routeReview.requiresReason || cleanOverrideReason.length > 0) &&
+    (!selectedNotLowest || cleanVendorReason.length > 0) &&
+    rowsMissingNonNegotiableRemark.length === 0;
   const currentDateLabel = useMemo(
     () => currentDateTime
       ? new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeStyle: "short" }).format(currentDateTime)
@@ -292,6 +301,14 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
       const { netPrice } = computePriceRowTotals(merged);
       return { ...merged, netPrice };
     }));
+  };
+  const updateVendorDiscountPercent = (id: string, percent: number) => {
+    const row = priceComparisons.find(r => r.id === id);
+    if (!row) return;
+    updateVendorRow(id, { discount: discountAmountFromPercent(row.offeredPrice, percent) });
+  };
+  const markVendorNonNegotiable = (id: string) => {
+    updateVendorRow(id, { remark: NON_NEGOTIABLE_REMARK });
   };
   const handleSelectVendor = (id: string) => {
     setPriceComparisons(prev => prev.map(row => ({ ...row, isSelected: row.id === id })));
@@ -401,6 +418,8 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     selectedVendorVatAmount,
     cleanVendorReason,
     canSubmitPending,
+    rowsMissingNonNegotiableRemark,
+    updateVendorDiscountPercent, markVendorNonNegotiable,
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
     addVendorRow, removeVendorRow, updateVendorRow, handleSelectVendor,

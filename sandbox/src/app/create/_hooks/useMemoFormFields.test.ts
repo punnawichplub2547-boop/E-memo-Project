@@ -150,4 +150,61 @@ describe("useMemoFormFields", () => {
     rerender({ user: makeUser() });
     expect(result.current.recommendation.recommendedFinalApprover).not.toBe(before);
   });
+
+  it("converts a discount percent into baht on the matching row", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    const rowId = result.current.priceComparisons[0].id;
+    act(() => { result.current.updateVendorRow(rowId, { offeredPrice: 2000 }); });
+    act(() => { result.current.updateVendorDiscountPercent(rowId, 25); });
+
+    expect(result.current.priceComparisons[0].discount).toBe(500);
+  });
+
+  it("fills the standard remark when the vendor cannot negotiate", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    const rowId = result.current.priceComparisons[0].id;
+    act(() => { result.current.markVendorNonNegotiable(rowId); });
+
+    expect(result.current.priceComparisons[0].remark).toBe("ไม่สามารถต่อรองราคาได้");
+  });
+
+  it("blocks pending submit while the selected vendor has no discount and no remark", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    const rowId = result.current.priceComparisons[0].id;
+    act(() => { result.current.handleSelectVendor(rowId); });
+    act(() => { result.current.updateVendorRow(rowId, { offeredPrice: 2000 }); });
+
+    expect(result.current.rowsMissingNonNegotiableRemark).toHaveLength(1);
+    expect(result.current.canSubmitPending).toBe(false);
+
+    act(() => { result.current.markVendorNonNegotiable(rowId); });
+
+    expect(result.current.rowsMissingNonNegotiableRemark).toHaveLength(0);
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("does not block submit when the selected vendor gave a discount", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    const rowId = result.current.priceComparisons[0].id;
+    act(() => { result.current.handleSelectVendor(rowId); });
+    act(() => { result.current.updateVendorRow(rowId, { offeredPrice: 2000, discount: 100 }); });
+
+    expect(result.current.canSubmitPending).toBe(true);
+  });
 });
