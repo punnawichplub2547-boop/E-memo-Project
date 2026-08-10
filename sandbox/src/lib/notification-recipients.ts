@@ -2,6 +2,7 @@
 // Department/name matching here does NOT grant workflow permission or memo visibility.
 import type { Pool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
+import { parseCustomStepKey } from "./custom-route";
 
 type IdRow = RowDataPacket & { id: number };
 
@@ -17,6 +18,23 @@ export async function resolveApprovalStepRecipients(
   departmentName: string,
   pool: Pool,
 ): Promise<number[]> {
+  // Custom per-person step: the token names one user, so notify exactly them.
+  // This also removes the level-route failure mode where a step label that no
+  // active user carries as approval_level silently notifies nobody.
+  const customStep = parseCustomStepKey(approvalLevel);
+  if (customStep) {
+    const [customRows] = await pool.query<IdRow[]>(
+      "SELECT id FROM users WHERE id = ? AND status = 'active' LIMIT 1",
+      [customStep.userId],
+    );
+    if (customRows.length === 0) {
+      console.warn(
+        `[resolveApprovalStepRecipients] custom route step "${approvalLevel}" points at user ${customStep.userId}, who is not active — approver notification not delivered`,
+      );
+    }
+    return customRows.map((r) => r.id);
+  }
+
   const isDepartmentScoped = DEPARTMENT_SCOPED_APPROVAL_LEVELS.has(approvalLevel);
   const [rows] = await pool.query<IdRow[]>(
     isDepartmentScoped

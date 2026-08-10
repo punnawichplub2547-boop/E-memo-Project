@@ -173,3 +173,49 @@ describe("resolveMemoCcRecipients", () => {
     expect(await resolveMemoCcRecipients(7, 1, pool)).toEqual([]);
   });
 });
+
+describe("resolveApprovalStepRecipients — custom step token", () => {
+  it("queries the exact user id from the token, ignoring approval_level and department", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[]) => {
+        calls.push({ sql, params });
+        return [[{ id: 42 }], undefined];
+      },
+    } as unknown as Pool;
+
+    const ids = await resolveApprovalStepRecipients("person:2#42", "IT", pool);
+
+    expect(ids).toEqual([42]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toContain("WHERE id = ?");
+    expect(calls[0].sql).not.toContain("approval_level");
+    expect(calls[0].params).toEqual([42]);
+  });
+
+  it("returns [] and warns when the named user is no longer active", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await resolveApprovalStepRecipients("person:1#42", "IT", pool1([]))).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    const logged = warn.mock.calls.map((c) => c.map(String).join(" ")).join(" ");
+    // Must name the USER, not merely echo the token — the old level-based warning
+    // ("no active user has approval_level=…") would be misleading here.
+    expect(logged).toContain("user 42");
+    expect(logged).not.toContain("approval_level");
+    warn.mockRestore();
+  });
+
+  it("still matches approval_level with a department filter for level steps", async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[]) => {
+        calls.push({ sql, params });
+        return [[{ id: 5 }], undefined];
+      },
+    } as unknown as Pool;
+
+    await resolveApprovalStepRecipients("Manager / Top Section", "IT", pool);
+    expect(calls[0].sql).toContain("approval_level = ?");
+    expect(calls[0].params).toEqual(["Manager / Top Section", "IT"]);
+  });
+});
