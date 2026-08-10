@@ -518,6 +518,10 @@ export type SubmitRevisionBody = {
   nextMemoRow: MemoSeedRow;
   readRecipients: string[];
   actorName: string | null;
+  // Ordered [{ userId }] for a per-person route. Deliberately `unknown`: the route
+  // handler re-resolves it against the users table (custom-route-server.ts) and
+  // never trusts the shape or the names the client attached.
+  customRoute?: unknown;
 };
 
 export type SubmitRevisionPayload = {

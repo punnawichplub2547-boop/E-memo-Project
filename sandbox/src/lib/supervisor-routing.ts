@@ -1,4 +1,5 @@
 import type { ApprovalStepKey } from "./approval";
+import { isCustomRoute } from "./custom-route";
 
 // Server-authoritative Supervisor prepend. The client never decides whether a memo
 // gets the optional "Supervisor" pre-Manager check step — the server does, based on
@@ -24,6 +25,12 @@ export function applySupervisorRouting(
 }
 
 function prepend(route: ApprovalStepKey[] | undefined, hasSupervisor: boolean): ApprovalStepKey[] {
+  // A custom per-person route is exactly the people the requester picked. Injecting
+  // a department Supervisor they did not pick would silently add an approver — and
+  // would make route[0] a level label, which flips isCustomRoute to false and
+  // silently demotes the whole memo back to the level rules (Q22/Q23 would stop
+  // applying with no test failing anywhere).
+  if (isCustomRoute(route)) return [...(route ?? [])];
   const stripped = (route ?? []).filter((step) => step !== "Supervisor");
   if (hasSupervisor && stripped.length > 0) {
     return ["Supervisor", ...stripped];

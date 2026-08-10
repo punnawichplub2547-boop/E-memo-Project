@@ -4,13 +4,14 @@ import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "@/lib/db";
 import { buildSubmitRevisionPayload, type SubmitRevisionBody } from "@/lib/db-memo-write";
 import type { MemoSeedRow } from "@/lib/db-seed";
-import type { ApprovalLevel } from "@/lib/approval";
+import type { ApprovalStepKey } from "@/lib/approval";
 import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
 import { isMemoOwner } from "@/lib/memo-ownership";
 import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
+import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
 
 export const dynamic = "force-dynamic";
 
@@ -83,25 +84,40 @@ export async function POST(
     const memoDbId = memo.id;
     const { memoRevision, memoUpdate, newReadActions, workflowAction } = buildSubmitRevisionPayload(body);
 
-    // Server-authoritative Supervisor step: strip any client "Supervisor" and, only
-    // when the (possibly re-picked) department has an active Supervisor, prepend it.
-    const hasSupervisor = await departmentHasActiveSupervisor(pool, memoUpdate.department_name);
-    const supervised = applySupervisorRouting(
-      JSON.parse(memoUpdate.selected_route_json || "[]") as ApprovalLevel[],
-      JSON.parse(memoUpdate.recommended_route_json || "[]") as ApprovalLevel[],
-      hasSupervisor,
-    );
-    memoUpdate.selected_route_json = supervised.selectedRoute.length ? JSON.stringify(supervised.selectedRoute) : null;
-    memoUpdate.recommended_route_json = supervised.recommendedRoute.length ? JSON.stringify(supervised.recommendedRoute) : null;
+    // Custom per-person route: same trust boundary as POST /api/memos — the client
+    // only names user ids and the server rebuilds the tokens and the name snapshot.
+    // A revision may switch a memo between the two modes in either direction, so the
+    // else-branch must clear custom_route_json rather than leave a stale snapshot.
+    const custom = await resolveCustomRouteFromRequest(pool, body.customRoute);
+    let effectiveRoute: ApprovalStepKey[];
+    if (custom) {
+      effectiveRoute = custom.route;
+      memoUpdate.selected_route_json = JSON.stringify(custom.route);
+      memoUpdate.recommended_route_json = JSON.stringify(custom.route);
+      memoUpdate.custom_route_json = JSON.stringify(custom.approvers);
+    } else {
+      memoUpdate.custom_route_json = null;
+      // Server-authoritative Supervisor step: strip any client "Supervisor" and, only
+      // when the (possibly re-picked) department has an active Supervisor, prepend it.
+      const hasSupervisor = await departmentHasActiveSupervisor(pool, memoUpdate.department_name);
+      const supervised = applySupervisorRouting(
+        JSON.parse(memoUpdate.selected_route_json || "[]") as ApprovalStepKey[],
+        JSON.parse(memoUpdate.recommended_route_json || "[]") as ApprovalStepKey[],
+        hasSupervisor,
+      );
+      effectiveRoute = supervised.selectedRoute;
+      memoUpdate.selected_route_json = supervised.selectedRoute.length ? JSON.stringify(supervised.selectedRoute) : null;
+      memoUpdate.recommended_route_json = supervised.recommendedRoute.length ? JSON.stringify(supervised.recommendedRoute) : null;
+    }
 
     // Server-derive current_step. Honor the approver's chosen return destination
     // (return_to_step) when it is still a member of the route; otherwise restart from
     // the first step. Never trust the client to redirect approval notifications.
     const returnToStep = memo.return_to_step;
     memoUpdate.current_step =
-      returnToStep && supervised.selectedRoute.includes(returnToStep as ApprovalLevel)
+      returnToStep && effectiveRoute.includes(returnToStep)
         ? returnToStep
-        : supervised.selectedRoute[0] ?? "Manager / Top Section";
+        : effectiveRoute[0] ?? "Manager / Top Section";
 
     await connection.execute(
       `INSERT INTO memo_revisions (
@@ -145,6 +161,7 @@ export async function POST(
          recommended_final_approver = ?,
          recommended_route_json = ?,
          selected_route_json = ?,
+         custom_route_json = ?,
          route_mode = ?,
          route_override_reason = ?,
          notify_md = ?,
@@ -249,6 +266,7 @@ function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
     row.recommended_final_approver,
     row.recommended_route_json,
     row.selected_route_json,
+    row.custom_route_json,
     row.route_mode,
     row.route_override_reason,
     row.notify_md,

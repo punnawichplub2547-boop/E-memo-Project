@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applySupervisorRouting } from "./supervisor-routing";
+import { buildCustomRoute, isCustomRoute } from "./custom-route";
 
 describe("applySupervisorRouting", () => {
   it("prepends Supervisor to both routes when the department has an active Supervisor", () => {
@@ -47,5 +48,32 @@ describe("applySupervisorRouting", () => {
     const result = applySupervisorRouting(undefined, undefined, true);
     expect(result.selectedRoute).toEqual([]);
     expect(result.recommendedRoute).toEqual([]);
+  });
+});
+
+describe("applySupervisorRouting — custom per-person routes", () => {
+  it("never prepends Supervisor to a custom per-person route", () => {
+    const result = applySupervisorRouting(
+      ["person:1#42", "person:2#7"],
+      ["person:1#42", "person:2#7"],
+      true,
+    );
+    expect(result.selectedRoute).toEqual(["person:1#42", "person:2#7"]);
+    expect(result.recommendedRoute).toEqual(["person:1#42", "person:2#7"]);
+  });
+
+  it("leaves the route recognizable as custom (the all-or-nothing predicate)", () => {
+    const { route } = buildCustomRoute([
+      { userId: 42, name: "สมชาย ใจดี", approvalLevel: null, department: "IT" },
+      { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+    ]);
+    const result = applySupervisorRouting(route, route, true);
+    expect(isCustomRoute(result.selectedRoute)).toBe(true);
+    expect(isCustomRoute(result.recommendedRoute)).toBe(true);
+  });
+
+  it("still prepends Supervisor to a level route", () => {
+    const result = applySupervisorRouting(["Manager / Top Section"], ["Manager / Top Section"], true);
+    expect(result.selectedRoute).toEqual(["Supervisor", "Manager / Top Section"]);
   });
 });

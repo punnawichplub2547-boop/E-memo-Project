@@ -16,6 +16,7 @@ import { isMemoVisibleTo } from "@/lib/memo-visibility";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
 import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
+import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
 
 export const dynamic = "force-dynamic";
 
@@ -101,18 +102,35 @@ export async function POST(request: NextRequest) {
 
     const pool = getDbPool();
 
-    // Server-authoritative Supervisor step: strip any client-supplied "Supervisor"
-    // and, only when the requesting department actually has an active Supervisor,
-    // prepend it to the route. sanitizeNewMemoInput then derives current_step from
-    // selectedRoute[0], so the memo starts at the Supervisor step when applicable.
-    const hasSupervisor = await departmentHasActiveSupervisor(pool, clientMemo.department);
-    const supervised = applySupervisorRouting(
-      clientMemo.selectedRoute,
-      clientMemo.recommendedRoute,
-      hasSupervisor,
-    );
-    clientMemo.selectedRoute = supervised.selectedRoute;
-    clientMemo.recommendedRoute = supervised.recommendedRoute;
+    // Custom per-person route (V2): the client sends an ordered customRoute; the
+    // server rebuilds both the route and the display snapshot from the users table
+    // and never trusts the client's tokens. Falling back to null keeps the classic
+    // Book1 level route working exactly as before.
+    const custom = await resolveCustomRouteFromRequest(pool, clientMemo.customRoute);
+    if (custom) {
+      clientMemo.selectedRoute = custom.route;
+      clientMemo.recommendedRoute = custom.route;
+      clientMemo.customRoute = custom.approvers;
+      // A per-person route never matches the Book1 ladder, so it is recorded as an
+      // exception with a reason — that is what makes it readable in the audit trail.
+      clientMemo.routeMode = "exception";
+      clientMemo.routeOverrideReason =
+        clientMemo.routeOverrideReason?.trim() || "กำหนดผู้อนุมัติเองเป็นรายบุคคล (custom route)";
+    } else {
+      clientMemo.customRoute = undefined;
+      // Server-authoritative Supervisor step: strip any client-supplied "Supervisor"
+      // and, only when the requesting department actually has an active Supervisor,
+      // prepend it to the route. sanitizeNewMemoInput then derives current_step from
+      // selectedRoute[0], so the memo starts at the Supervisor step when applicable.
+      const hasSupervisor = await departmentHasActiveSupervisor(pool, clientMemo.department);
+      const supervised = applySupervisorRouting(
+        clientMemo.selectedRoute,
+        clientMemo.recommendedRoute,
+        hasSupervisor,
+      );
+      clientMemo.selectedRoute = supervised.selectedRoute;
+      clientMemo.recommendedRoute = supervised.recommendedRoute;
+    }
 
     // Never trust the client for workflow/lifecycle state either — sanitizeNewMemoInput
     // is the trust boundary that forces status/current_step/workflow_state/revision_no/
@@ -154,7 +172,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       item_subcategory_id, item_subcategory_label,
       amount, budget_status, account_code, budget_plan, budget_used, description, closing_remark,
       status, workflow_state, current_step, cycle_hours,
-      recommended_final_approver, recommended_route_json, selected_route_json,
+      recommended_final_approver, recommended_route_json, selected_route_json, custom_route_json,
       route_mode, route_override_reason, notify_md,
       requires_md_review, md_review_status, md_review_resume_step, md_review_comment, md_review_acted_by, md_review_acted_at,
       is_price_adjustment, follows_production_plan, is_dead_stock, dept_monthly_over_budget_total,
@@ -168,7 +186,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?,
+      ?, ?, ?, ?,
       ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
@@ -246,6 +264,7 @@ function memoRowParams(row: MemoSeedRow) {
     row.recommended_final_approver,
     row.recommended_route_json,
     row.selected_route_json,
+    row.custom_route_json,
     row.route_mode,
     row.route_override_reason,
     row.notify_md,
