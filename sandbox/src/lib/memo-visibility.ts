@@ -20,6 +20,7 @@
 
 import type { MemoRecord, ApprovalLevel } from "./approval";
 import type { SessionUser } from "./auth-jwt";
+import { isCustomRoute, parseCustomStepKey } from "./custom-route";
 
 export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean {
   // Admin: full visibility — the only system-wide bypass
@@ -41,15 +42,28 @@ export function isMemoVisibleTo(memo: MemoRecord, session: SessionUser): boolean
     }
   }
 
+  // Custom per-person route: the requester named this exact user as an approver,
+  // so they must be able to see the memo — before, during, and after their turn.
+  // The user id lives inside the step token itself, so no extra payload is needed
+  // and legacy memos (no tokens) fall straight through to the level-route rules.
+  for (const step of [...(memo.selectedRoute ?? []), ...(memo.recommendedRoute ?? [])]) {
+    const custom = parseCustomStepKey(step);
+    if (custom && custom.userId === session.userId) return true;
+  }
+
   // Approver: sees memos where their approval level appears in any route source or is currentStep.
   // Manager / Top Section has an extra department filter — they only see memos from their own
   // department. GM and MD have no department restriction.
   const approvalLevel = toApprovalLevel(session.approvalLevel);
   if (approvalLevel) {
-    const routeSteps = new Set<string>([
-      ...(memo.selectedRoute ?? []),
-      ...(memo.recommendedRoute ?? []),
-    ]);
+    // On a custom per-person route the level ladder does not govern who approves,
+    // so a level label left over in recommendedRoute must NOT grant visibility —
+    // otherwise every GM would see a memo whose requester deliberately routed
+    // around them. currentStep is still honoured: it is how the MD keeps seeing a
+    // custom memo parked at "Managing Director" for the blocking MD Review gate.
+    const routeSteps = isCustomRoute(memo.selectedRoute)
+      ? new Set<string>()
+      : new Set<string>([...(memo.selectedRoute ?? []), ...(memo.recommendedRoute ?? [])]);
     const inRoute = routeSteps.has(approvalLevel) || memo.currentStep === approvalLevel;
     if (inRoute) {
       // Supervisor and Manager / Top Section are department-scoped — each department

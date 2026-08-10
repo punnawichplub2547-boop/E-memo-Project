@@ -548,3 +548,104 @@ describe("email-based CC visibility", () => {
     )).toBe(false);
   });
 });
+
+// ── Custom per-person route ──────────────────────────────────────────────────
+
+describe("isMemoVisibleTo — custom per-person route", () => {
+  const customMemo = makeMemo({
+    department: "PD",
+    requester: "คนอื่น คนไกล",
+    requesterUserId: 99,
+    currentStep: "person:1#42",
+    selectedRoute: ["person:1#42", "person:2#7"],
+    recommendedRoute: ["Manager / Top Section", "General Manager"],
+    readRecipients: [],
+    readActions: [],
+    notifyMD: false,
+  });
+
+  it("shows the memo to a person in the custom route even before their turn", () => {
+    expect(
+      isMemoVisibleTo(customMemo, makeSession({ userId: 7, roles: ["requester"], department: "QA" })),
+    ).toBe(true);
+  });
+
+  it("shows the memo to the person on the current step", () => {
+    expect(
+      isMemoVisibleTo(customMemo, makeSession({ userId: 42, roles: ["requester"], department: "IT" })),
+    ).toBe(true);
+  });
+
+  it("hides it from someone not in the route, whatever their department", () => {
+    expect(
+      isMemoVisibleTo(customMemo, makeSession({ userId: 55, roles: ["requester"], department: "PD" })),
+    ).toBe(false);
+  });
+
+  it("does not grant visibility from a matching approval_level alone", () => {
+    expect(
+      isMemoVisibleTo(
+        customMemo,
+        makeSession({ userId: 55, roles: ["manager"], approvalLevel: "General Manager", department: "PD" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves level-route visibility untouched", () => {
+    const levelMemo = makeMemo({
+      department: "PD",
+      requester: "คนอื่น คนไกล",
+      requesterUserId: 99,
+      currentStep: "General Manager",
+      selectedRoute: ["Manager / Top Section", "General Manager"],
+      recommendedRoute: ["Manager / Top Section", "General Manager"],
+      readRecipients: [],
+      readActions: [],
+      notifyMD: false,
+    });
+    expect(
+      isMemoVisibleTo(
+        levelMemo,
+        makeSession({ userId: 55, roles: ["manager"], approvalLevel: "General Manager", department: "PD" }),
+      ),
+    ).toBe(true);
+    // …and a user id that merely looks like a route position still gets nothing.
+    expect(
+      isMemoVisibleTo(levelMemo, makeSession({ userId: 42, roles: ["requester"], department: "PD" })),
+    ).toBe(false);
+  });
+});
+
+describe("isMemoVisibleTo — custom route parked at the MD review gate", () => {
+  // While the Q22 gate is open, current_step is "Managing Director" but the route
+  // is still the custom one. The MD must be able to open the memo they must review.
+  const parked = makeMemo({
+    department: "PD",
+    requester: "คนอื่น คนไกล",
+    requesterUserId: 99,
+    currentStep: "Managing Director",
+    selectedRoute: ["person:1#42", "person:2#7"],
+    recommendedRoute: ["person:1#42", "person:2#7"],
+    readRecipients: [],
+    readActions: [],
+    notifyMD: false,
+  });
+
+  it("shows the parked memo to the Managing Director", () => {
+    expect(
+      isMemoVisibleTo(
+        parked,
+        makeSession({ userId: 3, roles: ["manager"], approvalLevel: "Managing Director", department: "MD" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("still hides it from a General Manager who was not picked", () => {
+    expect(
+      isMemoVisibleTo(
+        parked,
+        makeSession({ userId: 55, roles: ["manager"], approvalLevel: "General Manager", department: "PD" }),
+      ),
+    ).toBe(false);
+  });
+});
