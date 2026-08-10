@@ -1448,6 +1448,16 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* Scoped to the price-comparison discount cell's baht/percent pair only —
+   removes native number-input spinner arrows so digits have room to render. */
+.em-table-input-nospin {
+  -moz-appearance: textfield;
+}
+.em-table-input-nospin::-webkit-inner-spin-button,
+.em-table-input-nospin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
 /* ===== Misc ===== */
 .em-row { display: flex; align-items: center; gap: 10px; }

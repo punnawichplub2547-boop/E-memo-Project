@@ -98,12 +98,12 @@ export function PriceComparisonCard({
       )}
       <div className="em-card-body" style={{ padding: "6px 18px 18px" }}>
         <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)" }}>
-          <table className="em-table" style={{ minWidth: 880, width: "100%" }}>
+          <table className="em-table" style={{ minWidth: 912, width: "100%" }}>
             <colgroup>
               <col style={{ width: 48 }} />
               <col />
               <col style={{ width: 130 }} />
-              <col style={{ width: 158 }} />
+              <col style={{ width: 190 }} />
               <col style={{ width: 118 }} />
               <col style={{ width: 168 }} />
               <col style={{ width: 150 }} />
@@ -161,15 +161,16 @@ export function PriceComparisonCard({
                       />
                     </td>
                     <td style={{ padding: "10px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10.5, color: "var(--muted)", flex: "0 0 auto" }}>฿</span>
                         <input
-                          className="em-table-input num"
+                          className="em-table-input num em-table-input-nospin"
                           type="number"
                           min={0}
                           value={row.discount || ""}
                           placeholder="0"
                           title="ส่วนลดเป็นบาท"
-                          style={{ flex: "1 1 60px", minWidth: 0 }}
+                          style={{ flex: "1 1 68px", minWidth: 0 }}
                           onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
                           onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
                           onKeyDown={(e) => {
@@ -177,9 +178,8 @@ export function PriceComparisonCard({
                           }}
                           onChange={e => updateVendorRow(row.id, { discount: coerceNonNegativeNumber(e.target.value) })}
                         />
-                        <span style={{ fontSize: 10.5, color: "var(--muted)", flex: "0 0 auto" }}>฿</span>
                         <input
-                          className="em-table-input num"
+                          className="em-table-input num em-table-input-nospin"
                           type="number"
                           min={0}
                           max={100}
@@ -187,7 +187,7 @@ export function PriceComparisonCard({
                           placeholder="0"
                           title="ส่วนลดเป็นเปอร์เซ็นต์ — ระบบจะคำนวณกลับเป็นบาทให้"
                           disabled={row.offeredPrice <= 0}
-                          style={{ flex: "1 1 52px", minWidth: 0 }}
+                          style={{ flex: "1 1 48px", minWidth: 0 }}
                           onInput={(e) => clampNonNegativeInputElement(e.currentTarget)}
                           onBlur={(e) => clampNonNegativeInputElement(e.currentTarget)}
                           onKeyDown={(e) => {
