@@ -9,7 +9,9 @@ import {
   createNotification,
   createTelegramDelivery,
   markDeliveryStatus,
+  type MemoNotificationContext,
 } from "./notifications";
+import { describeCustomStep, parseCustomRouteJson } from "./custom-route";
 import {
   resolveApprovalStepRecipients,
   resolveRequesterRecipient,
@@ -29,6 +31,8 @@ type MemoRow = RowDataPacket & {
   current_step: string; status: string; revision_no: number;
   md_review_status: "pending" | "completed" | "escalated" | null;
   md_review_resume_step: string | null;
+  // Optional: absent on legacy DBs that predate the custom-route migration.
+  custom_route_json?: unknown;
 };
 type ChatRow = RowDataPacket & { user_id: number; telegram_chat_id: string };
 type EmailRow = RowDataPacket & { id: number; email: string };
@@ -104,11 +108,27 @@ async function getMemo(memoNo: string): Promise<MemoRow | null> {
   const [rows] = await pool.query<MemoRow[]>(
     `SELECT id, memo_no, title, requester_name, requester_user_id, department_name,
             current_step, status, revision_no,
-            md_review_status, md_review_resume_step
+            md_review_status, md_review_resume_step, custom_route_json
      FROM memos WHERE memo_no = ? AND deleted_at IS NULL LIMIT 1`,
     [memoNo],
   );
   return rows[0] ?? null;
+}
+
+// Pure: the payload every outbound channel (in-app bell, Telegram, email) renders.
+// current_step is a raw string in the DB — for a custom route that string is a
+// token ("person:2#7"), which is machine plumbing and must never reach a human.
+// Resolving it here, at the single place all three channels read from, is what
+// keeps the token out of all of them at once.
+export function buildMemoNotificationContext(
+  memo: Pick<MemoRow, "memo_no" | "title" | "requester_name" | "current_step"> & { custom_route_json?: unknown },
+): MemoNotificationContext {
+  return {
+    memoNo: memo.memo_no,
+    title: memo.title,
+    requesterName: memo.requester_name,
+    currentStep: describeCustomStep(memo.current_step, parseCustomRouteJson(memo.custom_route_json ?? null)),
+  };
 }
 
 // Pure: never send an actionable "please approve" notification (with a one-tap
@@ -216,7 +236,7 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
   const emails = emailEnabled ? await getUserEmails(pool, recipientIds) : new Map<number, string>();
   const isMdReviewPending = memo.md_review_status === "pending";
   const notifType = isMdReviewPending ? "memo_md_review_pending" : "memo_pending_approval";
-  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  const ctx = buildMemoNotificationContext(memo);
   const body = buildMemoNotificationText(notifType, ctx);
   const tgHtml = buildMemoNotificationHtml(notifType, ctx);
   const title = buildMemoNotificationTitle(notifType, memo.memo_no);
@@ -276,7 +296,7 @@ async function notifyWatchers(
   const chatIds = await getChatIds(pool, recipients);
   const emailEnabled = getEmailConfig() !== null;
   const emails = emailEnabled ? await getUserEmails(pool, recipients) : new Map<number, string>();
-  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  const ctx = buildMemoNotificationContext(memo);
   for (const userId of recipients) {
     const type = userId === requesterId ? types.requesterType : types.ccType;
     const body = buildMemoNotificationText(type, ctx);
@@ -315,7 +335,7 @@ async function notifyReadRecipients(
   const chatIds = await getChatIds(pool, recipients);
   const emailEnabled = getEmailConfig() !== null;
   const emails = emailEnabled ? await getUserEmails(pool, recipients) : new Map<number, string>();
-  const ctx = { memoNo: memo.memo_no, title: memo.title, requesterName: memo.requester_name, currentStep: memo.current_step };
+  const ctx = buildMemoNotificationContext(memo);
   const body = buildMemoNotificationText("memo_pending_read", ctx);
   const tgHtml = buildMemoNotificationHtml("memo_pending_read", ctx);
   const title = buildMemoNotificationTitle("memo_pending_read", memo.memo_no);

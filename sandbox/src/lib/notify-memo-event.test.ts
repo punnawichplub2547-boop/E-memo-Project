@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { buildMdReviewButtonPlan, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { buildMdReviewButtonPlan, buildMemoNotificationContext, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { buildMemoNotificationHtml, buildMemoNotificationText } from "./notifications";
+import { buildCustomRoute } from "./custom-route";
 
 function chatPool(rows: unknown[]): Pool {
   return {
@@ -186,6 +188,80 @@ describe("sendEmailAndTrack", () => {
     expect(calls[1].params[0]).toBe("failed");
     expect(calls[1].params[1]).toBeNull();
     expect(calls[1].params[6]).toBe("email");
+  });
+});
+
+// A custom route stores steps as raw tokens ("person:2#7"). Every outbound channel
+// (in-app bell, Telegram, email) renders the step string verbatim, so the token must
+// be turned into a human name BEFORE it reaches buildMemoNotificationText/Html.
+describe("buildMemoNotificationContext", () => {
+  const { route, approvers } = buildCustomRoute([
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+    { userId: 9, name: "วิทย์ ตระกูลงาม", approvalLevel: null, department: "QA" },
+  ]);
+  const customMemo = {
+    memo_no: "EM-2026-500",
+    title: "ขอซื้อวัตถุดิบ",
+    requester_name: "ผู้ขอ ทดสอบ",
+    current_step: route[1],
+    custom_route_json: JSON.stringify(approvers),
+  };
+
+  it("renders the person named by the current token, not the token itself", () => {
+    const ctx = buildMemoNotificationContext(customMemo);
+    expect(ctx.currentStep).toBe("สุภาพร เจริญสุข · General Manager · ตรวจ/เห็นชอบ");
+  });
+
+  it("keeps the raw token out of every outbound channel body", () => {
+    const ctx = buildMemoNotificationContext(customMemo);
+    for (const body of [
+      buildMemoNotificationText("memo_pending_approval", ctx),
+      buildMemoNotificationHtml("memo_pending_approval", ctx),
+    ]) {
+      expect(body).not.toContain("person:");
+      expect(body).not.toContain("#7");
+      expect(body).toContain("สุภาพร เจริญสุข");
+    }
+  });
+
+  it("falls back to a positional label when the snapshot column is null or absent (pre-migration rows)", () => {
+    for (const memo of [
+      { ...customMemo, custom_route_json: null },
+      { memo_no: "EM-2026-501", title: "t", requester_name: "r", current_step: route[1] },
+    ]) {
+      const ctx = buildMemoNotificationContext(memo);
+      expect(ctx.currentStep).toBe("ผู้อนุมัติลำดับที่ 2");
+      expect(buildMemoNotificationText("memo_pending_approval", ctx)).not.toContain("person:");
+    }
+  });
+
+  it("passes a level-route step through unchanged", () => {
+    const ctx = buildMemoNotificationContext({
+      memo_no: "EM-2026-502",
+      title: "ขออนุมัติ",
+      requester_name: "ผู้ขอ ทดสอบ",
+      current_step: "Manager / Top Section",
+      custom_route_json: null,
+    });
+    expect(ctx.currentStep).toBe("Manager / Top Section");
+    expect(buildMemoNotificationText("memo_pending_approval", ctx)).toContain("Manager / Top Section");
+  });
+
+  it("keeps the parked MD-review step readable on a custom route", () => {
+    const ctx = buildMemoNotificationContext({
+      ...customMemo,
+      current_step: "Managing Director",
+    });
+    expect(ctx.currentStep).toBe("Managing Director");
+  });
+
+  it("copies memo_no / title / requester_name through untouched", () => {
+    expect(buildMemoNotificationContext(customMemo)).toMatchObject({
+      memoNo: "EM-2026-500",
+      title: "ขอซื้อวัตถุดิบ",
+      requesterName: "ผู้ขอ ทดสอบ",
+    });
   });
 });
 
