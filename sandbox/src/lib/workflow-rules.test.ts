@@ -1128,3 +1128,74 @@ describe("evaluateReviewAction", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("canActOnStep - custom per-person route", () => {
+  const actor = {
+    id: 42,
+    roles: ["requester"],
+    approval_level: null,
+    department: "IT",
+  };
+
+  it("lets the person named in the token act, whatever their approval_level", () => {
+    expect(
+      canActOnStep(actor, {
+        current_step: "person:2#42",
+        department_name: "PD",
+        requester_user_id: 99,
+      }),
+    ).toBe(true);
+  });
+
+  it("blocks a different user even when their approval_level looks senior", () => {
+    expect(
+      canActOnStep(
+        { id: 7, roles: [], approval_level: "Managing Director", department: "MD" },
+        { current_step: "person:2#42", department_name: "PD", requester_user_id: 99 },
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores department for custom steps (the person is picked by name, not by dept)", () => {
+    expect(
+      canActOnStep(
+        { ...actor, department: "QA" },
+        { current_step: "person:1#42", department_name: "IT", requester_user_id: 99 },
+      ),
+    ).toBe(true);
+  });
+
+  it("still refuses to let the requester act on their own custom step", () => {
+    expect(
+      canActOnStep(actor, {
+        current_step: "person:1#42",
+        department_name: "IT",
+        requester_user_id: 42,
+      }),
+    ).toBe(false);
+  });
+
+  it("still lets admin act on a custom step", () => {
+    expect(
+      canActOnStep(
+        { id: 1, roles: ["admin"], approval_level: null, department: "IT" },
+        { current_step: "person:1#42", department_name: "IT", requester_user_id: 99 },
+      ),
+    ).toBe(true);
+  });
+
+  it("leaves level-route behaviour untouched", () => {
+    expect(
+      canActOnStep(
+        { id: 5, roles: [], approval_level: "Manager / Top Section", department: "IT" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 99 },
+      ),
+    ).toBe(true);
+    expect(
+      canActOnStep(
+        { id: 5, roles: [], approval_level: "Manager / Top Section", department: "PD" },
+        { current_step: "Manager / Top Section", department_name: "IT", requester_user_id: 99 },
+      ),
+    ).toBe(false);
+  });
+});

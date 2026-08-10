@@ -2,6 +2,8 @@
 // No DB imports — everything here is unit-testable without MySQL.
 // Transactional orchestration lives in workflow-actions.ts.
 
+import { parseCustomStepKey } from "./custom-route";
+
 export type WorkflowActionSource = "web" | "telegram";
 
 // Subset of a `memos` row needed for workflow decisions (SELECT * FOR UPDATE result).
@@ -55,6 +57,13 @@ export function canActOnStep(
 ): boolean {
   if (actor.roles.includes("admin")) return true;
   if (isSelfRequester(actor, memo)) return false;
+
+  // Custom per-person route: the step names exactly one user, so identity is the
+  // whole permission check. approval_level and department are deliberately NOT
+  // consulted — the requester picked this individual, not a tier or a department.
+  const customStep = parseCustomStepKey(memo.current_step);
+  if (customStep) return customStep.userId === actor.id;
+
   if (actor.approval_level === null || actor.approval_level !== memo.current_step) return false;
   // Supervisor and Manager / Top Section are both department-scoped: every
   // department has its own Supervisor/Manager sharing the same label, so action
