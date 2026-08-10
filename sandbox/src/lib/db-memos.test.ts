@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildCustomRoute } from "./custom-route";
 import { serializeMemoRecord, serializeWorkflowAction, toBangkokDisplayTimestamp, type WorkflowActionDbRow } from "./db-memos";
 
 describe("DB memo serializer", () => {
@@ -340,5 +341,89 @@ describe("serializeWorkflowAction", () => {
     expect(action.actorName).toBeNull();
     expect(action.result).toBeNull();
     expect(action.reason).toBeNull();
+  });
+});
+
+describe("custom route persistence", () => {
+  // Minimal row shared by the custom-route cases. Mirrors the fixture used by the
+  // serializer tests above and adds the column introduced by the custom-route
+  // migration, defaulted to NULL (= classic Book1 level route).
+  const baseMemoRow = () => ({
+    id: 42,
+    memo_no: "EM-20260810-CUSTOM",
+    title: "Custom route memo",
+    requester_name: "Requester",
+    department_name: "HR&GA",
+    category: "general-purchase",
+    amount: "9200.00",
+    budget_status: null,
+    account_code: null,
+    budget_plan: null,
+    budget_used: null,
+    description: null,
+    status: "pending",
+    workflow_state: "Issued",
+    current_step: "Manager / Top Section",
+    cycle_hours: null,
+    recommended_final_approver: null,
+    recommended_route_json: null,
+    selected_route_json: null,
+    custom_route_json: null,
+    route_mode: null,
+    route_override_reason: null,
+    notify_md: 0 as const,
+    is_price_adjustment: 0 as const,
+    follows_production_plan: 0 as const,
+    is_dead_stock: 0 as const,
+    dept_monthly_over_budget_total: null,
+    return_reason: null,
+    reject_reason: null,
+    reject_disposition: null,
+    revision_no: 0,
+    revision_submitted_at: null,
+    revision_note: null,
+    price_comparisons_json: null,
+    selected_vendor_id: null,
+    selected_vendor_reason: null,
+    price_adjustment_reason: null,
+    request_items_json: null,
+    read_recipients_json: null,
+    created_at: new Date("2026-08-10T10:00:00.000Z"),
+    updated_at: new Date("2026-08-10T10:00:00.000Z"),
+  });
+
+  it("serializes custom_route_json into MemoRecord.customRoute", () => {
+    const { approvers } = buildCustomRoute([
+      { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    ]);
+    const row = {
+      ...baseMemoRow(),
+      selected_route_json: JSON.stringify(["person:1#42"]),
+      custom_route_json: JSON.stringify(approvers),
+      current_step: "person:1#42",
+    };
+    const record = serializeMemoRecord(row as never, [], []);
+    expect(record.customRoute).toEqual(approvers);
+    expect(record.selectedRoute).toEqual(["person:1#42"]);
+    expect(record.currentStep).toBe("person:1#42");
+  });
+
+  it("leaves customRoute undefined for a legacy level-route memo", () => {
+    const record = serializeMemoRecord(
+      {
+        ...baseMemoRow(),
+        selected_route_json: JSON.stringify(["Manager / Top Section"]),
+      } as never,
+      [],
+      [],
+    );
+    expect(record.customRoute).toBeUndefined();
+    expect(record.selectedRoute).toEqual(["Manager / Top Section"]);
+  });
+
+  it("leaves customRoute undefined when the column is absent (pre-migration DB)", () => {
+    const row = baseMemoRow() as Record<string, unknown>;
+    delete row.custom_route_json;
+    expect(serializeMemoRecord(row as never, [], []).customRoute).toBeUndefined();
   });
 });

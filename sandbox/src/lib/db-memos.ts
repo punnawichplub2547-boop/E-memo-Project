@@ -1,9 +1,11 @@
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "./db";
+import { parseCustomRouteJson } from "./custom-route";
 import type {
   ApprovalCategory,
   ApprovalLevel,
   ApprovalRouteMode,
+  ApprovalStepKey,
   BudgetStatus,
   MemoRecord,
   MemoRevision,
@@ -48,6 +50,8 @@ export type MemoDbRow = {
   recommended_final_approver: string | null;
   recommended_route_json: DbJson;
   selected_route_json: DbJson;
+  // Optional: absent on legacy DBs that predate the custom-route migration.
+  custom_route_json?: DbJson | Record<string, unknown> | null;
   route_mode: string | null;
   route_override_reason: string | null;
   notify_md: DbBoolean;
@@ -120,17 +124,18 @@ export function serializeMemoRecord(
     closingRemark: optional(row.closing_remark),
     status: row.status as MemoStatus,
     workflowState: optional(row.workflow_state) as WorkflowState | undefined,
-    currentStep: row.current_step as ApprovalLevel,
+    currentStep: row.current_step as ApprovalStepKey,
     cycleHours: row.cycle_hours ?? 0,
     recommendedFinalApprover: optional(row.recommended_final_approver) as ApprovalLevel | undefined,
-    recommendedRoute: parseJsonArray<ApprovalLevel>(row.recommended_route_json),
-    selectedRoute: parseJsonArray<ApprovalLevel>(row.selected_route_json),
+    recommendedRoute: parseJsonArray<ApprovalStepKey>(row.recommended_route_json),
+    selectedRoute: parseJsonArray<ApprovalStepKey>(row.selected_route_json),
+    customRoute: parseCustomRouteJson(row.custom_route_json ?? null) ?? undefined,
     routeMode: optional(row.route_mode) as ApprovalRouteMode | undefined,
     routeOverrideReason: optional(row.route_override_reason),
     notifyMD: toBoolean(row.notify_md),
     requiresMdReview: toBoolean(row.requires_md_review),
     mdReviewStatus: optional(row.md_review_status) as MemoRecord["mdReviewStatus"],
-    mdReviewResumeStep: optional(row.md_review_resume_step) as ApprovalLevel | undefined,
+    mdReviewResumeStep: optional(row.md_review_resume_step) as ApprovalStepKey | undefined,
     mdReviewComment: optional(row.md_review_comment),
     mdReviewActedBy: optional(row.md_review_acted_by),
     mdReviewActedAt: row.md_review_acted_at ? toBangkokDisplayTimestamp(row.md_review_acted_at) : undefined,

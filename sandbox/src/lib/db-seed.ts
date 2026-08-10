@@ -25,6 +25,7 @@ export type MemoSeedRow = {
   recommended_final_approver: Nullable<string>;
   recommended_route_json: Nullable<string>;
   selected_route_json: Nullable<string>;
+  custom_route_json: Nullable<string>;
   route_mode: Nullable<string>;
   route_override_reason: Nullable<string>;
   notify_md: boolean;
@@ -145,6 +146,7 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     recommended_final_approver: memo.recommendedFinalApprover ?? null,
     recommended_route_json: stringifyJson(memo.recommendedRoute),
     selected_route_json: stringifyJson(memo.selectedRoute),
+    custom_route_json: stringifyJson(memo.customRoute),
     route_mode: memo.routeMode ?? null,
     route_override_reason: memo.routeOverrideReason ?? null,
     notify_md: memo.notifyMD ?? false,

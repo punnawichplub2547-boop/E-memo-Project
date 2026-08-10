@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedMemos } from "./approval";
+import { buildCustomRoute } from "./custom-route";
 import { assertSeedAllowed, buildSeedWorkflowAction, memoToDbSeedRow, toMysqlUtcDateTime } from "./db-seed";
 
 describe("DB seed helpers", () => {
@@ -95,5 +96,13 @@ describe("DB seed helpers", () => {
     expect(() =>
       assertSeedAllowed("mysql://hr_ememo:password@hr-ememo-db:3306/hr_ememo", "YES")
     ).not.toThrow();
+  });
+  it("writes customRoute to custom_route_json and null when absent", () => {
+    const { approvers } = buildCustomRoute([
+      { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+    ]);
+    const withCustom = memoToDbSeedRow({ ...seedMemos[0], customRoute: approvers });
+    expect(withCustom.custom_route_json).toBe(JSON.stringify(approvers));
+    expect(memoToDbSeedRow(seedMemos[0]).custom_route_json).toBeNull();
   });
 });

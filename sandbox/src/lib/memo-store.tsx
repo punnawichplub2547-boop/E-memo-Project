@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState } from "react";
 import {
-  seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalCategory, BudgetStatus,
+  seedMemos, MemoRecord, MemoStatus, ApprovalLevel, ApprovalStepKey, ApprovalCategory, BudgetStatus,
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
@@ -24,7 +24,7 @@ type Action =
   | { type: "HYDRATE_MEMOS"; memos: MemoRecord[] }
   | { type: "ADD_MEMO"; memo: MemoRecord }
   | { type: "UPDATE_STATUS"; id: string; status: MemoStatus; updatedAt?: string }
-  | { type: "UPDATE_STEP"; id: string; step: ApprovalLevel; updatedAt?: string }
+  | { type: "UPDATE_STEP"; id: string; step: ApprovalStepKey; updatedAt?: string }
   | { type: "ADVANCE_STEP"; id: string; updatedAt?: string }
   | { type: "MARK_READ"; id: string; recipient: string; actedAt?: string }
   | { type: "SKIP_ALL_READS"; id: string; skipReason: string; actedAt?: string }
@@ -66,8 +66,8 @@ type Action =
       readRecipients?: string[];
       readActions?: ReadAction[];
       recommendedFinalApprover?: ApprovalLevel;
-      recommendedRoute?: ApprovalLevel[];
-      selectedRoute?: ApprovalLevel[];
+      recommendedRoute?: ApprovalStepKey[];
+      selectedRoute?: ApprovalStepKey[];
       routeMode?: ApprovalRouteMode;
       routeOverrideReason?: string;
       notifyMD?: boolean;
@@ -162,7 +162,7 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           m.requiresMdReview === true &&
           m.mdReviewStatus == null;
         if (needsReviewStash) {
-          const resumeStep: ApprovalLevel = isLastOrMissing ? "Managing Director" : route![idx + 1];
+          const resumeStep: ApprovalStepKey = isLastOrMissing ? "Managing Director" : route![idx + 1];
           return {
             ...m,
             currentStep: "Managing Director",

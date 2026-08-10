@@ -1,4 +1,4 @@
-import type { ApprovalLevel } from "./approval";
+import type { ApprovalStepKey } from "./approval";
 
 // Server-authoritative Supervisor prepend. The client never decides whether a memo
 // gets the optional "Supervisor" pre-Manager check step — the server does, based on
@@ -13,17 +13,17 @@ import type { ApprovalLevel } from "./approval";
 // Supervisor is NOT on the rank ladder (approval.ts approvalLevels), so this only
 // affects routing/step order, never the Book1 amount/budget matrix.
 export function applySupervisorRouting(
-  selectedRoute: ApprovalLevel[] | undefined,
-  recommendedRoute: ApprovalLevel[] | undefined,
+  selectedRoute: ApprovalStepKey[] | undefined,
+  recommendedRoute: ApprovalStepKey[] | undefined,
   hasSupervisor: boolean,
-): { selectedRoute: ApprovalLevel[]; recommendedRoute: ApprovalLevel[] } {
+): { selectedRoute: ApprovalStepKey[]; recommendedRoute: ApprovalStepKey[] } {
   return {
     selectedRoute: prepend(selectedRoute, hasSupervisor),
     recommendedRoute: prepend(recommendedRoute, hasSupervisor),
   };
 }
 
-function prepend(route: ApprovalLevel[] | undefined, hasSupervisor: boolean): ApprovalLevel[] {
+function prepend(route: ApprovalStepKey[] | undefined, hasSupervisor: boolean): ApprovalStepKey[] {
   const stripped = (route ?? []).filter((step) => step !== "Supervisor");
   if (hasSupervisor && stripped.length > 0) {
     return ["Supervisor", ...stripped];

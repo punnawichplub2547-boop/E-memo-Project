@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS memos (
   recommended_final_approver      VARCHAR(100)  NULL,
   recommended_route_json          JSON          NULL,
   selected_route_json             JSON          NULL,
+  custom_route_json               JSON          NULL,
   route_mode                      VARCHAR(80)   NULL,
   route_override_reason           TEXT          NULL,
   notify_md                       BOOLEAN       NOT NULL DEFAULT FALSE,

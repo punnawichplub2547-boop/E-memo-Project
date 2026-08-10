@@ -1,3 +1,7 @@
+import type { CustomApprover, CustomStepKey } from "./custom-route";
+
+export type { CustomApprover };
+
 export type ApprovalCategory =
   | "raw-material"
   | "fixed-asset"
@@ -12,6 +16,10 @@ export type ApprovalLevel =
   | "Manager / Top Section"
   | "General Manager"
   | "Managing Director";
+
+/** A step in a memo's route. Either a Book1 approval level, or a per-person
+ *  token from custom-route.ts. Both are plain strings in selected_route_json. */
+export type ApprovalStepKey = ApprovalLevel | CustomStepKey;
 
 export type WorkflowState =
   | "Issued"
@@ -151,14 +159,16 @@ export type MemoSnapshot = {
   departmentMonthlyOverBudgetTotal?: number;
   readRecipients?: string[];
   recommendedFinalApprover?: ApprovalLevel;
-  recommendedRoute?: ApprovalLevel[];
-  selectedRoute?: ApprovalLevel[];
+  recommendedRoute?: ApprovalStepKey[];
+  selectedRoute?: ApprovalStepKey[];
+  /** Display snapshot for a per-person route. Undefined for level routes. */
+  customRoute?: CustomApprover[];
   routeMode?: ApprovalRouteMode;
   routeOverrideReason?: string;
   notifyMD?: boolean;
   requiresMdReview?: boolean;
   mdReviewStatus?: "pending" | "completed" | "escalated";
-  mdReviewResumeStep?: ApprovalLevel;
+  mdReviewResumeStep?: ApprovalStepKey;
   mdReviewComment?: string;
   mdReviewActedBy?: string;
   mdReviewActedAt?: string;
@@ -188,11 +198,13 @@ export type MemoRecord = {
   itemSubcategoryLabel?: string;
   amount: number;
   status: MemoStatus;
-  currentStep: ApprovalLevel;
+  currentStep: ApprovalStepKey;
   workflowState?: WorkflowState;
   recommendedFinalApprover?: ApprovalLevel;
-  recommendedRoute?: ApprovalLevel[];
-  selectedRoute?: ApprovalLevel[];
+  recommendedRoute?: ApprovalStepKey[];
+  selectedRoute?: ApprovalStepKey[];
+  /** Display snapshot for a per-person route. Undefined for level routes. */
+  customRoute?: CustomApprover[];
   routeMode?: ApprovalRouteMode;
   routeOverrideReason?: string;
   readRecipients?: string[];
@@ -213,7 +225,7 @@ export type MemoRecord = {
   notifyMD?: boolean;
   requiresMdReview?: boolean;
   mdReviewStatus?: "pending" | "completed" | "escalated";
-  mdReviewResumeStep?: ApprovalLevel;
+  mdReviewResumeStep?: ApprovalStepKey;
   mdReviewComment?: string;
   mdReviewActedBy?: string;
   mdReviewActedAt?: string;
