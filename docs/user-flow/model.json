@@ -1,0 +1,166 @@
+{
+  "title": "HR&GA E-Memo — User Flow (flow การใช้งานสำหรับผู้ใช้ทั่วไป)",
+  "canvas": { "width": 1400, "height": 2480 },
+  "nodes": [
+    { "id": "n_start", "x": 490, "y": 40, "w": 280, "h": 64,
+      "label": "Start\nเข้าเว็บ E-Memo", "shape": "ellipse", "role": "start" },
+
+    { "id": "d_account", "x": 520, "y": 160, "w": 220, "h": 110,
+      "label": "Have account?\nมีบัญชีแล้วหรือยัง?", "shape": "diamond", "role": "decision" },
+
+    { "id": "n_register", "x": 1000, "y": 180, "w": 300, "h": 70,
+      "label": "Register  /register\nกรอกรหัสพนักงาน ชื่อ อีเมล แผนก", "shape": "round", "role": "process" },
+
+    { "id": "n_wait_admin", "x": 1000, "y": 300, "w": 300, "h": 80,
+      "label": "Wait for admin\nรอ Admin อนุมัติบัญชี\nและกำหนดสิทธิ์ (role) ให้", "shape": "round", "role": "wait" },
+
+    { "id": "n_login", "x": 490, "y": 305, "w": 280, "h": 70,
+      "label": "Login  /login\nอีเมล + รหัสผ่าน (ลืมรหัสได้)", "shape": "round", "role": "process" },
+
+    { "id": "n_dashboard", "x": 490, "y": 430, "w": 280, "h": 70,
+      "label": "Dashboard  /\nงานค้าง สถานะล่าสุด กระดิ่งแจ้งเตือน", "shape": "round", "role": "process" },
+
+    { "id": "n_create", "x": 490, "y": 550, "w": 280, "h": 70,
+      "label": "Create Memo  /create\nกดสร้างเมโมใหม่", "shape": "round", "role": "primary" },
+
+    { "id": "n_step1", "x": 450, "y": 680, "w": 360, "h": 100,
+      "label": "Step 1 — Memo details\nเรื่อง แผนก ประเภท รายการที่ขอ\nงบประมาณ เปรียบเทียบราคา ไฟล์แนบ", "shape": "round", "role": "process" },
+
+    { "id": "n_ai", "x": 1000, "y": 685, "w": 300, "h": 90,
+      "label": "Helpers (optional)\nAI ช่วยร่างข้อความ · ดึงข้อมูลจาก\nใบเสนอราคา PDF · โหลดเทมเพลต", "shape": "round", "role": "external" },
+
+    { "id": "n_step2", "x": 450, "y": 830, "w": 360, "h": 100,
+      "label": "Step 2 — Approval route\nเลือกผู้อนุมัติปลายทาง + ผู้รับทราบ (Read)", "shape": "round", "role": "process" },
+
+    { "id": "n_recommend", "x": 100, "y": 830, "w": 300, "h": 100,
+      "label": "System recommends\nระบบแนะนำผู้อนุมัติให้อัตโนมัติ\nเปลี่ยนเองได้ แต่ต้องระบุเหตุผล", "shape": "round", "role": "info" },
+
+    { "id": "n_step3", "x": 450, "y": 980, "w": 360, "h": 80,
+      "label": "Step 3 — Review & send\nตรวจทานร่างเมโมก่อนส่ง", "shape": "round", "role": "process" },
+
+    { "id": "d_send", "x": 520, "y": 1090, "w": 220, "h": 110,
+      "label": "Send now?\nส่งเลย หรือ เก็บร่าง?", "shape": "diamond", "role": "decision" },
+
+    { "id": "n_draft", "x": 100, "y": 1110, "w": 300, "h": 70,
+      "label": "Draft saved\nเก็บร่างไว้ ยังไม่เข้าสายอนุมัติ", "shape": "round", "role": "neutral" },
+
+    { "id": "n_pending", "x": 490, "y": 1230, "w": 280, "h": 70,
+      "label": "Status: Pending\nเมโมเข้าสู่สายอนุมัติแล้ว", "shape": "round", "role": "primary" },
+
+    { "id": "n_notify", "x": 1000, "y": 1220, "w": 300, "h": 90,
+      "label": "Notifications\nกระดิ่งในระบบ + อีเมล + Telegram\nแจ้งผู้ขอ ผู้ถูก CC และผู้อนุมัติคนถัดไป", "shape": "round", "role": "warn" },
+
+    { "id": "n_manager", "x": 460, "y": 1360, "w": 340, "h": 80,
+      "label": "First step — Manager / Top Section\nด่านแรกบังคับเสมอ (ตรวจแล้ว/ผ่าน)", "shape": "round", "role": "process" },
+
+    { "id": "n_read", "x": 1000, "y": 1355, "w": 300, "h": 90,
+      "label": "Read recipients\nผู้รับทราบกด Mark Read\nต้องครบก่อนอนุมัติ หรือขอข้ามพร้อมเหตุผล", "shape": "round", "role": "external" },
+
+    { "id": "d_mdreview", "x": 520, "y": 1500, "w": 220, "h": 110,
+      "label": "MD Review?\nกรณีซัพพลายเออร์ขึ้นราคา", "shape": "diamond", "role": "decision" },
+
+    { "id": "n_mdgate", "x": 1000, "y": 1500, "w": 300, "h": 110,
+      "label": "MD Review gate\nMD เลือก: ไม่มีข้อโต้แย้ง / ให้ความเห็น /\nขอแก้ไข / ยกระดับเป็นผู้อนุมัติเอง\n(workflow หยุดรอจนกว่าจะผ่านด่านนี้)", "shape": "round", "role": "wait" },
+
+    { "id": "n_approver_step", "x": 460, "y": 1670, "w": 340, "h": 80,
+      "label": "Approver reviews\nผู้อนุมัติตามเส้นทาง (Manager > GM > MD)", "shape": "round", "role": "process" },
+
+    { "id": "d_decision", "x": 505, "y": 1800, "w": 250, "h": 120,
+      "label": "Decision?\nผู้อนุมัติตัดสินอย่างไร?", "shape": "diamond", "role": "decision" },
+
+    { "id": "n_returned", "x": 100, "y": 1820, "w": 300, "h": 80,
+      "label": "Returned\nส่งกลับพร้อมเหตุผล + ระบุขั้นที่ให้กลับไป", "shape": "round", "role": "wait" },
+
+    { "id": "n_rejected", "x": 1000, "y": 1820, "w": 300, "h": 80,
+      "label": "Rejected\nปฏิเสธ: ปิดคำขอ หรือ อนุญาตให้แก้ไข", "shape": "round", "role": "danger" },
+
+    { "id": "n_resubmit", "x": 100, "y": 1950, "w": 300, "h": 80,
+      "label": "Edit & resubmit\nผู้ขอแก้ไขแล้วส่งใหม่ (เลข Rev. เพิ่มขึ้น)", "shape": "round", "role": "process" },
+
+    { "id": "d_more", "x": 520, "y": 2010, "w": 220, "h": 110,
+      "label": "More steps?\nยังมีผู้อนุมัติถัดไปไหม?", "shape": "diamond", "role": "decision" },
+
+    { "id": "n_approved", "x": 470, "y": 2180, "w": 320, "h": 76,
+      "label": "Approved\nอนุมัติครบทุกขั้นแล้ว", "shape": "ellipse", "role": "success" },
+
+    { "id": "n_after", "x": 440, "y": 2320, "w": 380, "h": 90,
+      "label": "After approval\nดูย้อนหลังที่ History · ค้นด้วย AI Search\nExport / ส่ง Excel ให้ผู้เกี่ยวข้อง", "shape": "round", "role": "info" }
+  ],
+
+  "edges": [
+    { "source": "n_start", "sside": "b", "target": "d_account", "tside": "t" },
+
+    { "source": "d_account", "sside": "r", "target": "n_register", "tside": "l",
+      "label": "no · ยังไม่มี", "label_at": [865, 190] },
+    { "source": "n_register", "sside": "b", "target": "n_wait_admin", "tside": "t" },
+    { "source": "n_wait_admin", "sside": "l", "target": "n_login", "tside": "r",
+      "label": "อนุมัติแล้ว · approved", "label_at": [885, 316] },
+
+    { "source": "d_account", "sside": "b", "target": "n_login", "tside": "t",
+      "label": "yes · มีแล้ว", "label_at": [700, 288] },
+    { "source": "n_login", "sside": "b", "target": "n_dashboard", "tside": "t" },
+    { "source": "n_dashboard", "sside": "b", "target": "n_create", "tside": "t" },
+    { "source": "n_create", "sside": "b", "target": "n_step1", "tside": "t" },
+
+    { "source": "n_ai", "sside": "l", "target": "n_step1", "tside": "r",
+      "dashed": true, "label": "ช่วยกรอกให้", "label_at": [905, 712] },
+
+    { "source": "n_step1", "sside": "b", "target": "n_step2", "tside": "t" },
+    { "source": "n_recommend", "sside": "r", "target": "n_step2", "tside": "l",
+      "dashed": true },
+
+    { "source": "n_step2", "sside": "b", "target": "n_step3", "tside": "t" },
+    { "source": "n_step3", "sside": "b", "target": "d_send", "tside": "t" },
+
+    { "source": "d_send", "sside": "l", "target": "n_draft", "tside": "r",
+      "label": "เก็บร่าง · draft", "label_at": [462, 1122] },
+    { "source": "n_draft", "sside": "l", "target": "n_create", "tside": "l",
+      "dashed": true, "mids": [[30, 1145], [30, 585]],
+      "label": "กลับมาแก้ต่อได้", "label_at": [200, 565] },
+
+    { "source": "d_send", "sside": "b", "target": "n_pending", "tside": "t",
+      "label": "Submit · ส่งอนุมัติ", "label_at": [700, 1215] },
+
+    { "source": "n_pending", "sside": "r", "target": "n_notify", "tside": "l",
+      "dashed": true },
+
+    { "source": "n_pending", "sside": "b", "target": "n_manager", "tside": "t" },
+    { "source": "n_manager", "sside": "r", "target": "n_read", "tside": "l",
+      "dashed": true },
+
+    { "source": "n_manager", "sside": "b", "target": "d_mdreview", "tside": "t" },
+    { "source": "d_mdreview", "sside": "r", "target": "n_mdgate", "tside": "l",
+      "label": "yes · ต้องผ่าน MD", "label_at": [872, 1535] },
+    { "source": "n_mdgate", "sside": "b", "target": "n_approver_step", "tside": "r",
+      "mids": [[1150, 1710]], "label": "ผ่านด่านแล้ว", "label_at": [960, 1688] },
+
+    { "source": "d_mdreview", "sside": "b", "target": "n_approver_step", "tside": "t",
+      "label": "no · ไม่ต้อง", "label_at": [700, 1640] },
+
+    { "source": "n_approver_step", "sside": "b", "target": "d_decision", "tside": "t" },
+
+    { "source": "d_decision", "sside": "l", "target": "n_returned", "tside": "r",
+      "label": "Return · ส่งกลับ", "label_at": [452, 1838] },
+    { "source": "d_decision", "sside": "r", "target": "n_rejected", "tside": "l",
+      "label": "Reject · ปฏิเสธ", "label_at": [878, 1838] },
+    { "source": "d_decision", "sside": "b", "target": "d_more", "tside": "t",
+      "label": "Approve · อนุมัติ", "label_at": [700, 1965] },
+
+    { "source": "n_returned", "sside": "b", "target": "n_resubmit", "tside": "t" },
+    { "source": "n_rejected", "sside": "b", "target": "n_resubmit", "tside": "r",
+      "dashed": true, "mids": [[1150, 1990]],
+      "label": "ถ้าอนุญาตให้แก้ไข", "label_at": [880, 1968] },
+
+    { "source": "n_resubmit", "sside": "l", "target": "n_pending", "tside": "l",
+      "mids": [[70, 1990], [70, 1265]],
+      "label": "ส่งใหม่ · resubmit", "label_at": [225, 1245] },
+
+    { "source": "d_more", "sside": "l", "target": "n_approver_step", "tside": "l",
+      "mids": [[30, 2065], [30, 1710]],
+      "label": "yes · ส่งต่อขั้นถัดไป", "label_at": [230, 1690] },
+    { "source": "d_more", "sside": "b", "target": "n_approved", "tside": "t",
+      "label": "no · ครบแล้ว", "label_at": [700, 2150] },
+
+    { "source": "n_approved", "sside": "b", "target": "n_after", "tside": "t" }
+  ]
+}
