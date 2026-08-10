@@ -189,6 +189,17 @@ export type WorkflowActionRow = {
   metadata_json: string;
 };
 
+// The step whose completion triggers the blocking MD Review gate.
+//   - level route  : "Manager / Top Section" — the mandatory first check (unchanged)
+//   - custom route : the first person the requester picked — the equivalent
+//                    "first check completed" point (Q22: the gate stays, only the
+//                    choice of approvers is free)
+function mdReviewGateStep(selectedRouteJson: unknown): string {
+  const route = parseRouteJson(selectedRouteJson);
+  if (route && isCustomRoute(route)) return route[0];
+  return "Manager / Top Section";
+}
+
 export type ApproveActionPayload = {
   memoUpdate: {
     status: "pending" | "approved";
@@ -226,7 +237,7 @@ export function evaluateApproveAction(input: {
   // stash "Managing Director" itself so the review resolution auto-finalizes
   // (merge MD_REVIEW+APPROVE per spec §6.5).
   const needsReviewStash =
-    input.memo.current_step === "Manager / Top Section" &&
+    input.memo.current_step === mdReviewGateStep(input.memo.selected_route_json) &&
     input.memo.requires_md_review &&
     input.memo.md_review_status === null;
 
@@ -311,8 +322,11 @@ function resolveReturnToStep(memo: WorkflowMemoRow, returnToStep: string | undef
   if (targetIndex === -1 || currentIndex === -1) return null;
   if (targetIndex > currentIndex) return null;
   if (memo.requires_md_review) {
-    const managerIndex = route.indexOf("Manager / Top Section");
-    if (managerIndex !== -1 && targetIndex > managerIndex) return null;
+    // Cannot resume past the gate step, or the memo would skip MD review entirely.
+    // The anchor is "Manager / Top Section" on a level route and the first picked
+    // person on a custom route — same rule, same code path.
+    const gateIndex = route.indexOf(mdReviewGateStep(memo.selected_route_json));
+    if (gateIndex !== -1 && targetIndex > gateIndex) return null;
   }
   return returnToStep;
 }

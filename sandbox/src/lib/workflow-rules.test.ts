@@ -1297,3 +1297,188 @@ describe("evaluateRejectAction - Q23 custom check steps cannot reject", () => {
     expect(allowed.ok).toBe(true);
   });
 });
+
+describe("MD review gate - custom route (Q22)", () => {
+  const route = ["person:1#42", "person:2#7", "person:3#9"];
+  const memoBase = {
+    id: 1,
+    memo_no: "EM-2026-101",
+    status: "pending" as const,
+    revision_no: 0,
+    selected_route_json: JSON.stringify(route),
+    deleted_at: null,
+    department_name: "IT",
+    requester_user_id: 99,
+    requires_md_review: true,
+    md_review_status: null,
+    md_review_resume_step: null,
+  };
+  const actor = (id: number) => ({
+    id,
+    first_name: "ก",
+    last_name: "ข",
+    roles: [] as string[],
+    approval_level: null,
+    department: "IT",
+    status: "active" as const,
+  });
+
+  it("parks at Managing Director after the first custom step and stashes the next person", () => {
+    const result = evaluateApproveAction({
+      memo: { ...memoBase, current_step: "person:1#42" },
+      actor: actor(42),
+      pendingReadCount: 0,
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.memoUpdate.current_step).toBe("Managing Director");
+      expect(result.payload.memoUpdate.md_review_status).toBe("pending");
+      expect(result.payload.memoUpdate.md_review_resume_step).toBe("person:2#7");
+      expect(result.payload.memoUpdate.status).toBe("pending");
+    }
+  });
+
+  it("does NOT re-trigger the gate on later custom steps", () => {
+    const result = evaluateApproveAction({
+      memo: { ...memoBase, current_step: "person:2#7", md_review_status: "completed" },
+      actor: actor(7),
+      pendingReadCount: 0,
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload.memoUpdate.current_step).toBe("person:3#9");
+  });
+
+  it("stashes Managing Director itself when the custom route has one person", () => {
+    const result = evaluateApproveAction({
+      memo: {
+        ...memoBase,
+        selected_route_json: JSON.stringify(["person:1#42"]),
+        current_step: "person:1#42",
+      },
+      actor: actor(42),
+      pendingReadCount: 0,
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.payload.memoUpdate.md_review_resume_step).toBe("Managing Director");
+  });
+
+  it("still gates level routes at Manager / Top Section only", () => {
+    const levelMemo = {
+      ...memoBase,
+      selected_route_json: JSON.stringify(["Supervisor", "Manager / Top Section", "General Manager"]),
+      current_step: "Supervisor",
+    };
+    const supervisorPass = evaluateApproveAction({
+      memo: levelMemo,
+      actor: { ...actor(5), approval_level: "Supervisor" },
+      pendingReadCount: 0,
+      source: "web",
+    });
+    expect(supervisorPass.ok).toBe(true);
+    if (supervisorPass.ok) {
+      expect(supervisorPass.payload.memoUpdate.current_step).toBe("Manager / Top Section");
+      expect(supervisorPass.payload.memoUpdate.md_review_status).toBeNull();
+    }
+
+    const managerPass = evaluateApproveAction({
+      memo: { ...levelMemo, current_step: "Manager / Top Section" },
+      actor: { ...actor(6), approval_level: "Manager / Top Section" },
+      pendingReadCount: 0,
+      source: "web",
+    });
+    expect(managerPass.ok).toBe(true);
+    if (managerPass.ok) {
+      expect(managerPass.payload.memoUpdate.current_step).toBe("Managing Director");
+      expect(managerPass.payload.memoUpdate.md_review_status).toBe("pending");
+      expect(managerPass.payload.memoUpdate.md_review_resume_step).toBe("General Manager");
+    }
+  });
+});
+
+describe("resolveReturnToStep - custom route", () => {
+  const route = ["person:1#42", "person:2#7", "person:3#9"];
+  const memo = (over: Record<string, unknown>) => ({
+    id: 1,
+    memo_no: "EM-2026-102",
+    status: "pending" as const,
+    revision_no: 0,
+    selected_route_json: JSON.stringify(route),
+    deleted_at: null,
+    department_name: "IT",
+    requester_user_id: 99,
+    requires_md_review: false,
+    md_review_status: null,
+    md_review_resume_step: null,
+    current_step: "person:3#9",
+    ...over,
+  });
+  const actor = {
+    id: 9,
+    first_name: "ก",
+    last_name: "ข",
+    roles: [] as string[],
+    approval_level: null,
+    department: "IT",
+    status: "active" as const,
+  };
+
+  it("accepts an earlier person as the return destination", () => {
+    const r = evaluateReturnAction({
+      memo: memo({}), actor, reason: "แก้ราคา", returnToStep: "person:2#7", source: "web",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.memoUpdate.return_to_step).toBe("person:2#7");
+  });
+
+  it("degrades a forward destination to null (restart from step 1)", () => {
+    const r = evaluateReturnAction({
+      memo: memo({ current_step: "person:1#42" }), actor: { ...actor, id: 42 },
+      reason: "แก้", returnToStep: "person:3#9", source: "web",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  it("cannot resume past the MD-review gate (first person) when review is required", () => {
+    const r = evaluateReturnAction({
+      memo: memo({ requires_md_review: true }), actor,
+      reason: "แก้", returnToStep: "person:2#7", source: "web",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.memoUpdate.return_to_step).toBeNull();
+  });
+
+  it("still allows returning to the first person when review is required", () => {
+    const r = evaluateReturnAction({
+      memo: memo({ requires_md_review: true }), actor,
+      reason: "แก้", returnToStep: "person:1#42", source: "web",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.memoUpdate.return_to_step).toBe("person:1#42");
+  });
+
+  it("leaves the level-route MD gate anchored at Manager / Top Section", () => {
+    const levelRoute = ["Manager / Top Section", "General Manager", "Managing Director"];
+    const levelMemo = {
+      ...memo({}),
+      selected_route_json: JSON.stringify(levelRoute),
+      current_step: "Managing Director",
+      requires_md_review: true,
+    };
+    const gm = { ...actor, approval_level: "Managing Director" };
+    const blocked = evaluateReturnAction({
+      memo: levelMemo, actor: gm, reason: "แก้", returnToStep: "General Manager", source: "web",
+    });
+    expect(blocked.ok).toBe(true);
+    if (blocked.ok) expect(blocked.payload.memoUpdate.return_to_step).toBeNull();
+
+    const allowed = evaluateReturnAction({
+      memo: levelMemo, actor: gm, reason: "แก้", returnToStep: "Manager / Top Section", source: "web",
+    });
+    expect(allowed.ok).toBe(true);
+    if (allowed.ok) expect(allowed.payload.memoUpdate.return_to_step).toBe("Manager / Top Section");
+  });
+});
