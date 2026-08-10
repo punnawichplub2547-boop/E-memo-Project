@@ -1199,3 +1199,101 @@ describe("canActOnStep - custom per-person route", () => {
     ).toBe(false);
   });
 });
+
+describe("evaluateRejectAction - Q23 custom check steps cannot reject", () => {
+  const route = ["person:1#42", "person:2#7", "person:3#9"];
+  const baseMemo = {
+    id: 1,
+    memo_no: "EM-2026-100",
+    status: "pending" as const,
+    revision_no: 0,
+    selected_route_json: JSON.stringify(route),
+    deleted_at: null,
+    department_name: "IT",
+    requester_user_id: 99,
+    requires_md_review: false,
+    md_review_status: null,
+    md_review_resume_step: null,
+  };
+  const activeActor = (id: number) => ({
+    id,
+    first_name: "ผู้",
+    last_name: "อนุมัติ",
+    roles: [] as string[],
+    approval_level: null,
+    department: "IT",
+    status: "active" as const,
+  });
+
+  it("blocks a non-final custom approver with 403", () => {
+    const result = evaluateRejectAction({
+      memo: { ...baseMemo, current_step: "person:2#7" },
+      actor: activeActor(7),
+      disposition: "close",
+      reason: "ไม่เหมาะสม",
+      source: "web",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(403);
+      expect(result.message).toContain("ตรวจ/เห็นชอบ");
+    }
+  });
+
+  it("allows the final custom approver to reject", () => {
+    const result = evaluateRejectAction({
+      memo: { ...baseMemo, current_step: "person:3#9" },
+      actor: activeActor(9),
+      disposition: "revision-allowed",
+      reason: "ขอให้แก้ไข",
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("allows a single-person custom route to reject", () => {
+    const result = evaluateRejectAction({
+      memo: {
+        ...baseMemo,
+        selected_route_json: JSON.stringify(["person:1#42"]),
+        current_step: "person:1#42",
+      },
+      actor: activeActor(42),
+      disposition: "close",
+      reason: "ไม่อนุมัติ",
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("still lets admin reject from a non-final custom step", () => {
+    const result = evaluateRejectAction({
+      memo: { ...baseMemo, current_step: "person:2#7" },
+      actor: { ...activeActor(1), roles: ["admin"] },
+      disposition: "close",
+      reason: "ยกเลิก",
+      source: "web",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("leaves the Supervisor rule and normal level rejects untouched", () => {
+    const levelMemo = {
+      ...baseMemo,
+      selected_route_json: JSON.stringify(["Supervisor", "Manager / Top Section"]),
+      current_step: "Supervisor",
+    };
+    const supervisor = { ...activeActor(5), approval_level: "Supervisor" };
+    const blocked = evaluateRejectAction({
+      memo: levelMemo, actor: supervisor, disposition: "close", reason: "x", source: "web",
+    });
+    expect(blocked.ok).toBe(false);
+
+    const manager = { ...activeActor(6), approval_level: "Manager / Top Section" };
+    const allowed = evaluateRejectAction({
+      memo: { ...levelMemo, current_step: "Manager / Top Section" },
+      actor: manager, disposition: "close", reason: "x", source: "web",
+    });
+    expect(allowed.ok).toBe(true);
+  });
+});

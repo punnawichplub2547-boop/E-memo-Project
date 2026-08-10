@@ -2,7 +2,7 @@
 // No DB imports — everything here is unit-testable without MySQL.
 // Transactional orchestration lives in workflow-actions.ts.
 
-import { parseCustomStepKey } from "./custom-route";
+import { isCustomRoute, parseCustomStepKey } from "./custom-route";
 
 export type WorkflowActionSource = "web" | "telegram";
 
@@ -383,6 +383,23 @@ export function evaluateRejectAction(input: {
   // may pass forward or return for revision, but never reject (Q3). Admin bypasses.
   if (!input.actor.roles.includes("admin") && input.actor.approval_level === "Supervisor") {
     return { ok: false, status: 403, message: "Supervisor ไม่มีสิทธิ์ปฏิเสธเมโม" };
+  }
+  // Q23: in a custom per-person route, only the LAST person (the "อนุมัติ" role)
+  // may reject. Everyone before them is a "ตรวจ/เห็นชอบ" step — they can pass the
+  // memo forward or return it for revision, but not kill it. Same shape as the
+  // Supervisor rule above; enforced here so web and Telegram share it. Admin bypasses.
+  if (!input.actor.roles.includes("admin")) {
+    const route = parseRouteJson(input.memo.selected_route_json);
+    if (route && isCustomRoute(route)) {
+      const stepIndex = route.indexOf(input.memo.current_step);
+      if (stepIndex !== -1 && stepIndex < route.length - 1) {
+        return {
+          ok: false,
+          status: 403,
+          message: "ผู้ตรวจ/เห็นชอบไม่มีสิทธิ์ปฏิเสธเมโม — ทำได้เฉพาะตีกลับให้แก้ไข",
+        };
+      }
+    }
   }
   const reason = input.reason.trim();
   if (!reason) {
