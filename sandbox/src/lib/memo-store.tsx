@@ -6,6 +6,7 @@ import {
   ApprovalRouteMode, PriceComparison, RequestItem, ReadAction,
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
+import type { CustomApprover } from "./custom-route";
 import { memoToDbSeedRow } from "./db-seed";
 import { memoPersistErrorMessage } from "./memo-persist-error";
 import { showErrorToast } from "./toast";
@@ -70,6 +71,10 @@ type Action =
       recommendedFinalApprover?: ApprovalLevel;
       recommendedRoute?: ApprovalStepKey[];
       selectedRoute?: ApprovalStepKey[];
+      /** Per-person route for this revision. Authoritative like selectedRoute:
+       *  undefined means "this revision uses a Book1 level route", which is how a
+       *  memo switches back out of custom mode. */
+      customRoute?: CustomApprover[];
       routeMode?: ApprovalRouteMode;
       routeOverrideReason?: string;
       notifyMD?: boolean;
@@ -111,6 +116,9 @@ export function buildMemoSnapshot(m: MemoRecord): MemoSnapshot {
     recommendedFinalApprover: m.recommendedFinalApprover,
     recommendedRoute: m.recommendedRoute,
     selectedRoute: m.selectedRoute,
+    // The per-person name snapshot is part of "what was submitted": without it an
+    // archived revision's token route could never be read back as people.
+    customRoute: m.customRoute,
     routeMode: m.routeMode,
     routeOverrideReason: m.routeOverrideReason,
     notifyMD: m.notifyMD,
@@ -329,13 +337,19 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
           recommendedFinalApprover: action.recommendedFinalApprover,
           recommendedRoute: action.recommendedRoute,
           selectedRoute: action.selectedRoute,
+          // Not `?? m.customRoute`: a revision that switches back to a Book1 route
+          // must clear the old per-person snapshot, not inherit it.
+          customRoute: action.customRoute,
           routeMode: action.routeMode,
           routeOverrideReason: action.routeOverrideReason,
           notifyMD: action.notifyMD,
           requiresMdReview: action.requiresMdReview,
           // Workflow reset (same as RESUBMIT_MEMO):
           status: "pending" as const,
-          currentStep: action.selectedRoute?.[0] ?? "Manager / Top Section",
+          // Falling back to the memo's own first step (not straight to Manager)
+          // matters for a custom route: "Manager / Top Section" would hand the
+          // memo to a department manager the requester never chose.
+          currentStep: action.selectedRoute?.[0] ?? m.selectedRoute?.[0] ?? "Manager / Top Section",
           workflowState: "Issued" as const,
           revisionNo: currentRevNo + 1,
           revisions: [...(m.revisions ?? []), newRevision],
@@ -680,6 +694,12 @@ async function persistSubmitRevisionMemo(
                     next.readRecipients ??
                     [],
     actorName,
+    // Per-person route: send ids only and let the server rebuild the tokens and
+    // the name snapshot against the users table (same trust boundary as POST
+    // /api/memos). Omitting this is not neutral — the route handler reads its
+    // absence as "Book1 route" and clears custom_route_json, which would quietly
+    // convert a per-person memo back to a level route on every resubmit.
+    customRoute: next.customRoute?.map((a) => ({ userId: a.userId })),
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/submit-revision`, {

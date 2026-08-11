@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildMemoSnapshot, memoReducer } from "./memo-store";
 import { seedMemos, type MemoRecord } from "./approval";
+import { buildCustomRoute } from "./custom-route";
 
 describe("memoReducer — HYDRATE_MEMOS", () => {
   it("accepts an empty DB result instead of falling back to seed memos", () => {
@@ -902,5 +903,96 @@ describe("memoReducer — DESTROY_MEMO", () => {
   it("is a no-op for an unknown id", () => {
     const next = memoReducer(state, { type: "DESTROY_MEMO", id: "EM-DOES-NOT-EXIST" });
     expect(next).toEqual(state);
+  });
+});
+
+describe("memoReducer — SUBMIT_REVISION with a custom route", () => {
+  const approvers = buildCustomRoute([
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+  ]).approvers;
+
+  const customBase: MemoRecord = {
+    id: "EM-2026-CUSTREV",
+    title: "Original Title",
+    requester: "Test User",
+    department: "IT",
+    category: "general-purchase",
+    amount: 5000,
+    status: "returned",
+    currentStep: approvers[0].stepKey,
+    selectedRoute: approvers.map((a) => a.stepKey),
+    customRoute: approvers,
+    returnReason: "เอกสารไม่ครบ",
+    cycleHours: 0,
+    createdAt: "01 Jun 2026 10:00",
+    updatedAt: "02 Jun 2026 14:00",
+  };
+
+  const payload = {
+    type: "SUBMIT_REVISION" as const,
+    id: customBase.id,
+    title: "Updated Title",
+    category: "general-purchase" as const,
+    department: "IT",
+    amount: 5000,
+    updatedAt: "10 Aug 2026 10:00",
+  };
+
+  it("archives the old custom route in the revision snapshot", () => {
+    const [next] = memoReducer([customBase], payload);
+    expect(next.revisions?.[0].snapshot.customRoute).toEqual(approvers);
+  });
+
+  // Routing fields on this action are authoritative — selectedRoute already
+  // behaves this way, so customRoute must too, or switching back to Book1 could
+  // never clear the old snapshot. The one thing that must NOT happen is a memo
+  // silently falling back to "Manager / Top Section": that hands approval rights
+  // to a department manager the requester never picked.
+  it("keeps the memo on its own first step when the payload carries no route", () => {
+    const [next] = memoReducer([customBase], payload);
+    expect(next.currentStep).toBe("person:1#42");
+    expect(next.currentStep).not.toBe("Manager / Top Section");
+  });
+
+  it("applies a new custom route when one is supplied", () => {
+    const swapped = buildCustomRoute([
+      { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+      { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    ]).approvers;
+    const [next] = memoReducer([customBase], {
+      ...payload,
+      customRoute: swapped,
+      selectedRoute: swapped.map((a) => a.stepKey),
+    });
+    expect(next.customRoute).toEqual(swapped);
+    expect(next.selectedRoute).toEqual(["person:1#7", "person:2#42"]);
+    expect(next.currentStep).toBe("person:1#7");
+  });
+
+  it("clears customRoute when the revision switches back to a Book1 route", () => {
+    const [next] = memoReducer([customBase], {
+      ...payload,
+      customRoute: undefined,
+      selectedRoute: ["Manager / Top Section", "General Manager"],
+    });
+    expect(next.customRoute).toBeUndefined();
+    expect(next.currentStep).toBe("Manager / Top Section");
+  });
+
+  it("leaves a level-route revision free of any custom route", () => {
+    const levelMemo: MemoRecord = {
+      ...customBase,
+      currentStep: "Manager / Top Section",
+      selectedRoute: ["Manager / Top Section", "General Manager"],
+      customRoute: undefined,
+    };
+    const [next] = memoReducer([levelMemo], {
+      ...payload,
+      selectedRoute: ["Manager / Top Section", "General Manager"],
+    });
+    expect(next.customRoute).toBeUndefined();
+    expect(next.currentStep).toBe("Manager / Top Section");
+    expect(next.revisions?.[0].snapshot.customRoute).toBeUndefined();
   });
 });

@@ -7,6 +7,7 @@ import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
 import { buildMemoDraftRecord } from "@/lib/build-memo-draft-record";
+import { buildCustomRoute } from "@/lib/custom-route";
 import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
 import { showErrorToast } from "@/lib/toast";
 import type { useMemos } from "@/lib/memo-store";
@@ -28,7 +29,17 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     effectiveIsPriceAdjustment, priceAdjustmentReason, effectiveFollowsProductionPlan,
     effectiveIsDeadStock, showDeptMonthly, deptMonthlyOverBudgetTotal, orderedReadRecipients,
     recommendation, routeReview, selectedRoute, cleanOverrideReason, canSubmitPending,
+    routeSource, customRoutePeople,
   } = fields;
+
+  // Which route this submission carries. The custom tab wins only when it is
+  // actually active AND has people on it; anything else stays on the Book1 level
+  // route. buildMemoDraftRecord() applies the identical rule for a brand-new memo,
+  // so both paths agree on what "custom mode" means.
+  const customRouteResult =
+    routeSource === "custom" && (customRoutePeople?.length ?? 0) > 0
+      ? buildCustomRoute(customRoutePeople!)
+      : null;
 
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -183,7 +194,11 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
           : undefined,
         recommendedFinalApprover: recommendation.recommendedFinalApprover,
         recommendedRoute: routeReview.recommendedRoute,
-        selectedRoute,
+        // In custom mode the route is the person tokens, not the Book1 levels.
+        // customRoute is sent even when undefined: the reducer treats it as
+        // authoritative, which is how a revision switches back out of custom mode.
+        selectedRoute: customRouteResult ? customRouteResult.route : selectedRoute,
+        customRoute: customRouteResult ? customRouteResult.approvers : undefined,
         routeMode: routeReview.mode,
         routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
         notifyMD: recommendation.notifyMD,

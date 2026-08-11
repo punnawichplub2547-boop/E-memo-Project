@@ -221,3 +221,72 @@ describe("useMemoSubmit", () => {
     expect(push).toHaveBeenCalledWith("/");
   });
 });
+
+describe("useMemoSubmit — custom per-person route on revision", () => {
+  const customPeople = [
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+  ];
+
+  const renderWithRoute = (overrides: Partial<MemoFormFieldsResult>) => {
+    const dispatch = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(
+        makeFields({ isRevisionMode: true, reviseMemo: { id: "MEMO-9" } as never, ...overrides }),
+        {
+          user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+          dispatch,
+          router: { push: vi.fn() } as never,
+        }
+      )
+    );
+    return { dispatch, result };
+  };
+
+  it("dispatches person tokens and the approver snapshot when the custom tab is active", async () => {
+    const { dispatch, result } = renderWithRoute({
+      routeSource: "custom",
+      customRoutePeople: customPeople,
+    } as never);
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SUBMIT_REVISION",
+        selectedRoute: ["person:1#42", "person:2#7"],
+        customRoute: [
+          { stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+          { stepKey: "person:2#7", userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+        ],
+      })
+    );
+  });
+
+  it("keeps the Book1 level route and no customRoute when the custom tab is not active", async () => {
+    const { dispatch, result } = renderWithRoute({
+      routeSource: "book1",
+      customRoutePeople: customPeople,
+    } as never);
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SUBMIT_REVISION",
+        selectedRoute: ["Manager / Top Section"],
+        customRoute: undefined,
+      })
+    );
+  });
+
+  it("falls back to the Book1 route when the custom tab is active but empty", async () => {
+    const { dispatch, result } = renderWithRoute({
+      routeSource: "custom",
+      customRoutePeople: [],
+    } as never);
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedRoute: ["Manager / Top Section"],
+        customRoute: undefined,
+      })
+    );
+  });
+});
