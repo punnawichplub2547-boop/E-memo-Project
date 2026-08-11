@@ -6,12 +6,19 @@
 // it only ranks/filters the already-visible set.
 import type { MemoRecord } from "./approval";
 import { approvalLabels } from "./approval";
+import { describeCustomStep, describeRouteSummary } from "./custom-route";
 
 /**
  * The lowercased text blob a memo is matched against. Covers what the topbar
  * placeholder promises — memo title, doc number, requester, department,
  * category/subcategory label — PLUS the approver route (current step + full selected
  * route) so searching "MD" / "General Manager" finds memos at that tier.
+ *
+ * Route entries go through the same describe* helpers the UI renders with, so a
+ * custom route contributes the approvers' names rather than its internal
+ * "person:<order>#<userId>" tokens: the name is the only form the searcher has
+ * ever seen, and the raw token would otherwise make every custom-route memo match
+ * the term "person".
  */
 export function memoSearchHaystack(m: MemoRecord): string {
   return [
@@ -21,8 +28,8 @@ export function memoSearchHaystack(m: MemoRecord): string {
     m.department,
     approvalLabels[m.category],
     m.itemSubcategoryLabel,
-    m.currentStep,
-    m.selectedRoute?.join(" ") ?? "",
+    describeCustomStep(m.currentStep, m.customRoute, m.selectedRoute?.length),
+    describeRouteSummary(m.selectedRoute, m.customRoute),
   ]
     .filter(Boolean)
     .join(" ")

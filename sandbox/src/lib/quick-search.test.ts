@@ -27,6 +27,36 @@ const sample: MemoRecord[] = [
   memo({ id: "EM-2026-003", title: "งบอบรมพนักงาน", department: "HR&GA", requester: "ปุณณวิช ภูประเสริฐ", currentStep: "General Manager", selectedRoute: ["Manager / Top Section", "General Manager"] }),
 ];
 
+// A custom route stores its steps as "person:<order>#<userId>" tokens, so the raw
+// route text is meaningless to a human searcher. The haystack comment promises
+// that searching for an approver finds memos sitting with them - which for a
+// custom route means searching the person's NAME, the only form the user ever sees.
+describe("memoSearchHaystack on a custom route", () => {
+  const customMemo = memo({
+    id: "EM-2026-900",
+    title: "จัดซื้อวัตถุดิบ",
+    requester: "ปุณณวิช ภูประเสริฐ",
+    currentStep: "person:1#4",
+    selectedRoute: ["person:1#4", "person:2#6"],
+    customRoute: [
+      { stepKey: "person:1#4", userId: 4, name: "สมชาย ขายความจริง", approvalLevel: null, department: "EN" },
+      { stepKey: "person:2#6", userId: 6, name: "ผู้ดูแลระบบ E-Memo", approvalLevel: null, department: "IT" },
+    ],
+  } as Partial<MemoRecord>);
+
+  it("finds the memo by the current approver's name", () => {
+    expect(quickSearchMemos([customMemo], "สมชาย")).toHaveLength(1);
+  });
+
+  it("finds the memo by a later approver's name", () => {
+    expect(quickSearchMemos([customMemo], "ผู้ดูแลระบบ")).toHaveLength(1);
+  });
+
+  it("does not leak the raw token into the searchable text", () => {
+    expect(memoSearchHaystack(customMemo)).not.toContain("person:");
+  });
+});
+
 describe("quickSearchMemos", () => {
   it("returns [] for an empty / blank query", () => {
     expect(quickSearchMemos(sample, "")).toEqual([]);
