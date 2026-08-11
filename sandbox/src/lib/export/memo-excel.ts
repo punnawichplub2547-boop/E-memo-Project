@@ -3,11 +3,15 @@
 import ExcelJS from "exceljs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { ApprovalLevel, MemoRecord } from "../approval";
+import type { ApprovalLevel, ApprovalStepKey, MemoRecord } from "../approval";
 import { approvalLabels, computePriceRowTotals } from "../approval";
+import { describeCustomStep } from "../custom-route";
+import { buildCustomSignatureSlots, type SignatureSlot } from "./memo-signature-slots";
 
 export type MemoSignature = {
-  stepLabel: ApprovalLevel;
+  // Either a Book1 approval level or a custom route's person token — the same
+  // string that workflow_step_actions.step_label stores.
+  stepLabel: ApprovalStepKey;
   actorName: string;
   actedAt: string;
 };
@@ -204,7 +208,7 @@ export async function buildMemoExcelWorkbook(
     ["Ref.No", memo.id],
     ["Date", memo.createdAt],
     ["From (ผู้จัดทำเอกสาร)", memo.requester],
-    ["To (ผู้บังคับบัญชา)", memo.currentStep],
+    ["To (ผู้บังคับบัญชา)", describeCustomStep(memo.currentStep, memo.customRoute, memo.selectedRoute?.length)],
     ["Subject", memo.title],
     ["Category", approvalLabels[memo.category] ?? memo.category],
     ["Subcategory", memo.itemSubcategoryLabel ?? "-"],
@@ -363,22 +367,61 @@ export async function buildMemoExcelWorkbook(
   // Manager, Managing Director) — Supervisor and Sr.General Manager have no workflow
   // equivalent and are always left blank for a human wet-signature.
   r++;
-  const deptManagerSig = findSignature(signatures, "Manager / Top Section");
-  const gmSig = findSignature(signatures, "General Manager");
-  const mdSig = findSignature(signatures, "Managing Director");
-  const sigCols: Array<[number, number, string, MemoSignature | undefined]> = [
-    [1, 2, "Supervisor", undefined],
-    [3, 4, "Department Manager", deptManagerSig],
-    [5, 7, "General Manager", gmSig],
-    [8, 9, "Sr.General Manager", undefined],
-    [10, 12, "Managing Director", mdSig],
-  ];
-  sigCols.forEach(([from, to, label]) => headerCell(ws, from, to, r, label));
-  r++;
-  sigCols.forEach(([from, to, , sig]) => setRange(ws, from, to, r, sig ? `(${sig.actorName})` : "(...ชื่อ-สกุล...)", { align: "center" }));
-  r++;
-  sigCols.forEach(([from, to, , sig]) => setRange(ws, from, to, r, sig ? `Date: ${sig.actedAt}` : "Date: ____________", { align: "center", size: 9 }));
-  r++;
+  // Column spans are shared by both modes so the printed layout never moves (Q21).
+  const SIG_SPANS: Array<[number, number]> = [[1, 2], [3, 4], [5, 7], [8, 9], [10, 12]];
+  const customSlots =
+    memo.customRoute && memo.customRoute.length > 0
+      ? buildCustomSignatureSlots(memo.customRoute, signatures)
+      : null;
+
+  if (customSlots) {
+    // Custom per-person route: the 5 columns carry the people the requester chose
+    // rather than the fixed org tiers, so each column needs a second line naming
+    // the level and the role — without it a reader cannot tell who merely checked
+    // the memo from who approved it.
+    // Bound outside the callbacks below: TS drops the null-narrowing of customSlots
+    // once it is only referenced from inside a closure.
+    const slots = customSlots.slots;
+    const eachSpan = (fn: (span: [number, number], slot: SignatureSlot | undefined) => void) =>
+      SIG_SPANS.forEach((span, i) => fn(span, slots[i]));
+
+    eachSpan(([from, to], slot) => headerCell(ws, from, to, r, slot?.label ?? ""));
+    r++;
+    eachSpan(([from, to], slot) =>
+      setRange(ws, from, to, r, slot?.subLabel ?? "", { align: "center", size: 8.5 }));
+    r++;
+    eachSpan(([from, to], slot) =>
+      setRange(ws, from, to, r, slot ? (slot.signature ? `(${slot.signature.actorName})` : "(...ชื่อ-สกุล...)") : "", { align: "center" }));
+    r++;
+    eachSpan(([from, to], slot) =>
+      setRange(ws, from, to, r, slot ? (slot.signature ? `Date: ${slot.signature.actedAt}` : "Date: ____________") : "", { align: "center", size: 9 }));
+    r++;
+    if (customSlots.hiddenCount > 0) {
+      // Q24: the sheet is a summary once the route outgrows 5 columns; say so
+      // rather than letting the reader assume these 5 are the whole route.
+      setRange(ws, 1, TOTAL_COLS, r,
+        `หมายเหตุ: มีผู้อนุมัติเพิ่มอีก ${customSlots.hiddenCount} คน ดูรายชื่อทั้งหมดในระบบ E-Memo`,
+        { align: "left", italic: true, size: 8.5, border: false });
+      r++;
+    }
+  } else {
+    const deptManagerSig = findSignature(signatures, "Manager / Top Section");
+    const gmSig = findSignature(signatures, "General Manager");
+    const mdSig = findSignature(signatures, "Managing Director");
+    const sigCols: Array<[number, number, string, MemoSignature | undefined]> = [
+      [1, 2, "Supervisor", undefined],
+      [3, 4, "Department Manager", deptManagerSig],
+      [5, 7, "General Manager", gmSig],
+      [8, 9, "Sr.General Manager", undefined],
+      [10, 12, "Managing Director", mdSig],
+    ];
+    sigCols.forEach(([from, to, label]) => headerCell(ws, from, to, r, label));
+    r++;
+    sigCols.forEach(([from, to, , sig]) => setRange(ws, from, to, r, sig ? `(${sig.actorName})` : "(...ชื่อ-สกุล...)", { align: "center" }));
+    r++;
+    sigCols.forEach(([from, to, , sig]) => setRange(ws, from, to, r, sig ? `Date: ${sig.actedAt}` : "Date: ____________", { align: "center", size: 9 }));
+    r++;
+  }
 
   // ---- Footer ----
   r++;

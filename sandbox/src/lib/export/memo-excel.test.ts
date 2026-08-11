@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
 import { buildMemoExcelWorkbook, memoToExcelBuffer, type MemoSignature } from "./memo-excel";
 import type { MemoRecord } from "../approval";
+import { buildCustomRoute } from "../custom-route";
 
 async function reasonRowHeight(description: string): Promise<number> {
   const wb = await buildMemoExcelWorkbook(makeMemo({ description }));
@@ -224,5 +225,83 @@ describe("Thai layout fit", () => {
     expect(hit, "subject row not found").not.toBeNull();
     expect(hit!.cell.alignment?.wrapText).toBe(true);
     expect(hit!.rowHeight).toBeGreaterThan(16);
+  });
+});
+
+describe("buildMemoExcelWorkbook — custom per-person signature block", () => {
+  function sheetText(ws: ExcelJS.Worksheet): string {
+    const parts: string[] = [];
+    ws.eachRow((row) => row.eachCell((cell) => parts.push(String(cell.value ?? ""))));
+    return parts.join("\n");
+  }
+
+  const manyApprovers = buildCustomRoute(
+    Array.from({ length: 8 }, (_, i) => ({
+      userId: i + 1,
+      name: `ผู้อนุมัติ ${i + 1}`,
+      approvalLevel: "Manager / Top Section",
+      department: "IT",
+    })),
+  ).approvers;
+
+  it("prints custom approver names in the signature block and a hidden-count note", async () => {
+    const wb = await buildMemoExcelWorkbook(
+      makeMemo({
+        currentStep: manyApprovers[0].stepKey,
+        selectedRoute: manyApprovers.map((a) => a.stepKey),
+        customRoute: manyApprovers,
+      }),
+      [],
+    );
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain("ผู้อนุมัติ 1");
+    expect(text).toContain("ผู้อนุมัติ 8");
+    expect(text).not.toContain("ผู้อนุมัติ 6");
+    expect(text).toContain("มีผู้อนุมัติเพิ่มอีก 3 คน");
+  });
+
+  it("names the current approver on the To line instead of a raw token", async () => {
+    const wb = await buildMemoExcelWorkbook(
+      makeMemo({
+        currentStep: manyApprovers[1].stepKey,
+        selectedRoute: manyApprovers.map((a) => a.stepKey),
+        customRoute: manyApprovers,
+      }),
+      [],
+    );
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).not.toContain("person:2#2");
+    expect(text).toContain("ผู้อนุมัติ 2");
+  });
+
+  it("omits the hidden-count note when every approver fits", async () => {
+    const three = buildCustomRoute(
+      Array.from({ length: 3 }, (_, i) => ({
+        userId: i + 1,
+        name: `ผู้อนุมัติ ${i + 1}`,
+        approvalLevel: "Manager / Top Section",
+        department: "IT",
+      })),
+    ).approvers;
+    const wb = await buildMemoExcelWorkbook(
+      makeMemo({
+        currentStep: three[0].stepKey,
+        selectedRoute: three.map((a) => a.stepKey),
+        customRoute: three,
+      }),
+      [],
+    );
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).not.toContain("มีผู้อนุมัติเพิ่มอีก");
+    expect(text).toContain("ผู้อนุมัติ 3");
+  });
+
+  it("keeps the classic 5 fixed labels for a level-route memo", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ currentStep: "General Manager" }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain("Sr.General Manager");
+    expect(text).toContain("Department Manager");
+    expect(text).toContain("Supervisor");
+    expect(text).not.toContain("มีผู้อนุมัติเพิ่มอีก");
   });
 });
