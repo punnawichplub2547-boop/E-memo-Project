@@ -51,7 +51,9 @@ export async function GET(
     );
 
     return NextResponse.json(
-      actionRows.map((row) => serializeWorkflowAction(memoNo, row))
+      // loadMemoRecord already decoded custom_route_json — pass it so a custom route's
+      // step tokens are rendered as the people who acted, not as "person:2#6".
+      actionRows.map((row) => serializeWorkflowAction(memoNo, row, memo.customRoute ?? null))
     );
   } catch (error) {
     console.error("[GET /api/memos/[id]/workflow-actions]", error);

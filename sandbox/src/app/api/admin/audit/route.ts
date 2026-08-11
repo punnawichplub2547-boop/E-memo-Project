@@ -3,6 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
 import { serializeWorkflowAction, type WorkflowActionDbRow } from "@/lib/db-memos";
+import { parseCustomRouteJson } from "@/lib/custom-route";
 import { buildAuditQuery } from "@/lib/audit-query";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 // Row shape from the JOIN: workflow_step_actions columns + memo_no from memos.
 // memo_no is added so serializeWorkflowAction can stamp it onto each action
 // (the table itself only stores memo_id).
-type AuditRow = RowDataPacket & WorkflowActionDbRow & { memo_no: string };
+type AuditRow = RowDataPacket & WorkflowActionDbRow & { memo_no: string; custom_route_json: unknown };
 type CountRow = RowDataPacket & { total: number };
 
 function intParam(value: string | null): number | undefined {
@@ -48,7 +49,9 @@ export async function GET(req: NextRequest) {
     // must remain visible. (Destroyed memos already had their action rows
     // hard-deleted, so they simply do not appear.)
     const [rows] = await pool.query<AuditRow[]>(
-      `SELECT m.memo_no,
+      // custom_route_json comes along so a per-person route's step tokens render as
+      // the people who acted rather than as raw "person:2#6" storage tokens.
+      `SELECT m.memo_no, m.custom_route_json,
               w.revision_no, w.action_type, w.step_label, w.actor_name,
               w.result, w.reason, w.acted_at, w.metadata_json
        FROM workflow_step_actions w
@@ -69,7 +72,7 @@ export async function GET(req: NextRequest) {
     const total = Number(countRows[0]?.total ?? 0);
 
     return NextResponse.json({
-      rows: rows.map((row) => serializeWorkflowAction(row.memo_no, row)),
+      rows: rows.map((row) => serializeWorkflowAction(row.memo_no, row, parseCustomRouteJson(row.custom_route_json))),
       total,
     });
   } catch (error) {

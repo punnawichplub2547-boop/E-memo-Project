@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2";
 import { getDbPool } from "./db";
-import { parseCustomRouteJson } from "./custom-route";
+import { describeCustomStepShort, parseCustomRouteJson, type CustomApprover } from "./custom-route";
 import type {
   ApprovalCategory,
   ApprovalLevel,
@@ -230,15 +230,24 @@ export type WorkflowAction = {
   metadata: Record<string, unknown> | null;
 };
 
+/**
+ * `approvers` is the memo's custom_route_json snapshot. workflow_step_actions.step_label
+ * stores the raw person token on a custom route, and every reader of these rows is a
+ * human (the /audit page, the admin Audit Log tab, the queue drawer's audit section), so
+ * the label is resolved here rather than in each of those three places. Callers that
+ * cannot cheaply fetch the snapshot may omit it: the token then degrades to the
+ * positional "ผู้อนุมัติลำดับที่ N" label, never to the raw token.
+ */
 export function serializeWorkflowAction(
   memoNo: string,
   row: WorkflowActionDbRow,
+  approvers?: CustomApprover[] | null,
 ): WorkflowAction {
   return {
     memoNo,
     revisionNo: row.revision_no,
     actionType: row.action_type,
-    stepLabel: row.step_label ?? null,
+    stepLabel: row.step_label ? describeCustomStepShort(row.step_label, approvers ?? null) : null,
     actorName: row.actor_name ?? null,
     result: row.result ?? null,
     reason: row.reason ?? null,

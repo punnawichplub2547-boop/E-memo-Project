@@ -281,6 +281,31 @@ describe("serializeWorkflowAction", () => {
     expect(action.actedAt).toBe("01 Jun 2026 14:30");
   });
 
+  // Audit rows are read by people (the /audit page, the admin Audit Log tab and the
+  // queue drawer). step_label holds the raw person token on a custom route, so the
+  // label is resolved here — the one place all three of those surfaces pass through.
+  describe("custom route step labels", () => {
+    const approvers = buildCustomRoute([
+      { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    ]).approvers;
+
+    it("resolves a person token to the approver's name", () => {
+      const action = serializeWorkflowAction("EM-001", { ...baseRow, step_label: "person:1#42" }, approvers);
+      expect(action.stepLabel).toBe("สมชาย ใจดี");
+    });
+
+    it("falls back to a positional label when no snapshot is supplied", () => {
+      const action = serializeWorkflowAction("EM-001", { ...baseRow, step_label: "person:2#6" });
+      expect(action.stepLabel).toBe("ผู้อนุมัติลำดับที่ 2");
+    });
+
+    it("leaves Book1 level labels and nulls untouched", () => {
+      expect(serializeWorkflowAction("EM-001", { ...baseRow, step_label: "General Manager" }, approvers).stepLabel)
+        .toBe("General Manager");
+      expect(serializeWorkflowAction("EM-001", baseRow, approvers).stepLabel).toBeNull();
+    });
+  });
+
   it("converts acted_at Date object to Bangkok display format", () => {
     const date = new Date("2026-06-01T07:30:00Z");
     const action = serializeWorkflowAction("EM-001", { ...baseRow, acted_at: date });
