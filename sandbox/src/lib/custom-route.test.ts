@@ -3,6 +3,7 @@ import {
   buildCustomRoute,
   buildCustomStepKey,
   customStepRole,
+  describeRouteSummary,
   findForgedCustomStep,
   describeCustomStep,
   describeCustomStepShort,
@@ -170,5 +171,31 @@ describe("findForgedCustomStep", () => {
 
   it("ignores a value that merely looks like a token", () => {
     expect(findForgedCustomStep(["person:0#1", "person:abc", "person:1#0"])).toBeNull();
+  });
+});
+
+describe("describeRouteSummary", () => {
+  const { route, approvers } = buildCustomRoute(people);
+
+  it("renders a custom route as names, never raw tokens", () => {
+    expect(describeRouteSummary(route, approvers)).toBe("สมชาย ใจดี -> สุภาพร เจริญสุข -> วิทย์ ตระกูลงาม");
+  });
+
+  it("passes a Book1 level route through unchanged", () => {
+    expect(describeRouteSummary(["Manager / Top Section", "General Manager"], null)).toBe(
+      "Manager / Top Section -> General Manager",
+    );
+  });
+
+  it("falls back to positional labels when the snapshot is missing", () => {
+    expect(describeRouteSummary(route, null)).toBe(
+      "ผู้อนุมัติลำดับที่ 1 -> ผู้อนุมัติลำดับที่ 2 -> ผู้อนุมัติลำดับที่ 3",
+    );
+  });
+
+  it("returns an empty string for an empty or missing route", () => {
+    expect(describeRouteSummary([], approvers)).toBe("");
+    expect(describeRouteSummary(undefined, approvers)).toBe("");
+    expect(describeRouteSummary(null, null)).toBe("");
   });
 });

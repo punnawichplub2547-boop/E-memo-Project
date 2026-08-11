@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { csvCell, memoToCsvRow, memosToCsv, MEMO_CSV_HEADERS } from "./memo-csv";
 import type { MemoRecord } from "../approval";
+import { buildCustomRoute } from "../custom-route";
 
 // Minimal MemoRecord factory — only the fields the CSV reads matter.
 function memo(over: Partial<MemoRecord>): MemoRecord {
@@ -99,5 +100,27 @@ describe("memosToCsv", () => {
   it("emits one data row per memo", () => {
     const csv = memosToCsv([memo({ id: "EM-1" }), memo({ id: "EM-2" })]);
     expect(csv.split("\r\n")).toHaveLength(3); // header + 2
+  });
+});
+
+// The CSV is a file people forward to others, so a raw "person:2#6" travels further
+// than a token on screen does — and outside the app there is nothing to decode it.
+describe("memoToCsvRow — custom route", () => {
+  const { route, approvers } = buildCustomRoute([
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+  ]);
+
+  it("writes approver names in the route and current-step columns", () => {
+    const row = memoToCsvRow(memo({ currentStep: route[1], selectedRoute: route, customRoute: approvers }));
+    expect(row).toContain("สมชาย ใจดี -> สุภาพร เจริญสุข");
+    expect(row).toContain("สุภาพร เจริญสุข");
+    expect(row).not.toContain("person:");
+  });
+
+  it("falls back to positional labels when the snapshot is missing", () => {
+    const row = memoToCsvRow(memo({ currentStep: route[0], selectedRoute: route }));
+    expect(row).not.toContain("person:");
+    expect(row).toContain("ผู้อนุมัติลำดับที่ 1");
   });
 });

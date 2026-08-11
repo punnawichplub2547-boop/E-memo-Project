@@ -11,15 +11,19 @@ import { AuditLogSection } from "./audit-log-section";
 import { EmailExcelButton } from "./email-excel-button";
 import { canMarkReadRecipient, type PrototypeUser } from "@/lib/prototype-users";
 import { formatAttachmentSize } from "@/lib/attachments";
-import { describeCustomStep, describeCustomStepShort, parseCustomStepKey } from "@/lib/custom-route";
+import {
+  describeCustomStep,
+  describeCustomStepShort,
+  describeRouteSummary,
+  parseCustomStepKey,
+} from "@/lib/custom-route";
 
 // A custom route stores positional person tokens ("person:1#42"), never a label a
 // human should read. Every step rendered here goes through describeCustomStep*,
 // which passes classic approval-level steps straight through unchanged.
 const routeSummary = (memo: MemoRecord) =>
-  (memo.selectedRoute ?? [memo.currentStep])
-    .map((step) => describeCustomStepShort(step, memo.customRoute))
-    .join(" -> ");
+  describeRouteSummary(memo.selectedRoute, memo.customRoute) ||
+  describeCustomStepShort(memo.currentStep, memo.customRoute);
 
 export function DrawerPanel({
   memo,

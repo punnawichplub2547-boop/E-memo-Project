@@ -2,6 +2,9 @@
 // Pure (no DB/fs/DOM) so it is fully unit-testable; the page wraps the output in a
 // UTF-8 BOM + Blob for download so Excel opens Thai text without mojibake.
 import { MemoRecord, approvalLabels } from "../approval";
+// A CSV leaves the app: an unresolved "person:2#6" in a file someone forwards has
+// nothing left to decode it, so route columns are rendered as people here too.
+import { describeCustomStepShort, describeRouteSummary } from "../custom-route";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "ร่าง",
@@ -54,8 +57,8 @@ export function memoToCsvRow(m: MemoRecord): string {
     m.itemSubcategoryLabel ?? "",
     m.amount,
     STATUS_LABELS[m.status] ?? m.status,
-    m.currentStep,
-    m.selectedRoute?.join(" -> ") ?? m.currentStep,
+    describeCustomStepShort(m.currentStep, m.customRoute),
+    describeRouteSummary(m.selectedRoute, m.customRoute) || describeCustomStepShort(m.currentStep, m.customRoute),
     m.routeMode ?? "",
     m.revisionNo ?? 0,
     m.cycleHours,

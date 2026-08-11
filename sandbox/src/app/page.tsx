@@ -308,14 +308,17 @@ function LiveFlow({ memo }: { memo: MemoRecord }) {
         const isCurrent = i === currentIdx && memo.status === "pending";
         const isMd      = step === "Managing Director";
         const isInRoute = i > 0;
+        // A custom route's steps are storage tokens ("person:2#6"); this panel is the
+        // first thing on the dashboard, so it must show the person, not the token.
+        const stepLabel = describeCustomStepShort(step, memo.customRoute);
 
         const who = i === 0
           ? `${memo.requester} · ${memo.department}`
           : isDone
-            ? `${step} — อนุมัติแล้ว`
+            ? `${stepLabel} — อนุมัติแล้ว`
             : isCurrent
-              ? `${step} — รอการอนุมัติ`
-              : `${step} — ยังไม่ดำเนินการ`;
+              ? `${stepLabel} — รอการอนุมัติ`
+              : `${stepLabel} — ยังไม่ดำเนินการ`;
 
         const detail = i === 0
           ? `${approvalLabels[memo.category]} · ฿${memo.amount.toLocaleString()}`
@@ -334,7 +337,7 @@ function LiveFlow({ memo }: { memo: MemoRecord }) {
             done={isDone}
             current={isCurrent}
             md={isMd && isInRoute}
-            title={i === 0 ? "Requester" : step}
+            title={i === 0 ? "Requester" : stepLabel}
             who={who}
             detail={detail}
             time={time}

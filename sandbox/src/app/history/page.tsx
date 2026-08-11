@@ -15,11 +15,13 @@ import { groupMemosByDate } from "@/lib/group-memos";
 import Link from "next/link";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
-import { describeCustomStepShort } from "@/lib/custom-route";
+import { describeCustomStepShort, describeRouteSummary } from "@/lib/custom-route";
 import { memosToCsv } from "@/lib/export/memo-csv";
 
+// A custom route stores person tokens, never a label a human should read.
 const routeSummary = (memo: MemoRecord) =>
-  memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
+  describeRouteSummary(memo.selectedRoute, memo.customRoute) ||
+  describeCustomStepShort(memo.currentStep, memo.customRoute);
 
 type HistoryAction = "approved" | "rejected" | "returned" | "submitted" | "draft";
 const ACTION_CONFIG: Record<HistoryAction, { icon: React.ReactNode; color: string; bg: string; label: string }> = {

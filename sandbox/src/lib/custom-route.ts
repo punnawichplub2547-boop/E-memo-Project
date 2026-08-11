@@ -155,6 +155,18 @@ export function describeCustomStep(
   return [approver.name, approver.approvalLevel, role].filter(Boolean).join(" · ");
 }
 
+/** One readable line for a whole route ("สมชาย ใจดี -> สุภาพร เจริญสุข").
+ *  Every screen and export that prints a route must go through this: a route is a
+ *  list of storage tokens, and joining it raw puts "person:2#6" in front of a user.
+ *  Level routes pass through unchanged, so callers never branch on the route mode. */
+export function describeRouteSummary(
+  route: readonly string[] | null | undefined,
+  approvers: readonly CustomApprover[] | null | undefined,
+): string {
+  if (!route || route.length === 0) return "";
+  return route.map((step) => describeCustomStepShort(step, approvers)).join(" -> ");
+}
+
 /** Name-only label for compact cells (list rows, table columns, tier pills) where
  *  the full "name · level · role" string would be truncated to uselessness.
  *  Same fallbacks as describeCustomStep: positional label when the snapshot is
