@@ -51,6 +51,32 @@ export function isCustomRoute(route: readonly string[] | null | undefined): bool
   return route.every((step) => isCustomStepKey(step));
 }
 
+/**
+ * Finds the first person token in routes that arrived on a request.
+ *
+ * A token is an authorization primitive, not a display string: canActOnStep reads
+ * the approving user's id straight out of the step text, so whoever writes the token
+ * chooses the approver. Only the server may mint one (custom-route-server.ts rebuilds
+ * every token from the users table). A token in a request that did NOT resolve to a
+ * server-built custom route is therefore forged, and the handler must refuse it —
+ * accepting it would name an arbitrary or inactive user as approver, leave route_mode
+ * saying "recommended" while the route is per-person, and (for a mixed route) make
+ * isCustomRoute false so the Q23 reject rule and the MD review gate stop applying.
+ *
+ * Entries are typed unknown on purpose: this inspects unvalidated request bodies.
+ */
+export function findForgedCustomStep(
+  ...routes: ReadonlyArray<readonly unknown[] | null | undefined>
+): string | null {
+  for (const route of routes) {
+    if (!Array.isArray(route)) continue;
+    for (const step of route) {
+      if (typeof step === "string" && isCustomStepKey(step)) return step;
+    }
+  }
+  return null;
+}
+
 /** Q4: the last position approves; everyone before it checks/endorses. */
 export function customStepRole(index: number, routeLength: number): CustomStepRole {
   return index >= routeLength ? "approve" : "check";

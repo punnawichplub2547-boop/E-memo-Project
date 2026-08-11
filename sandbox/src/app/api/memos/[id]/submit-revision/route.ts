@@ -12,6 +12,7 @@ import { isMemoOwner } from "@/lib/memo-ownership";
 import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
+import { findForgedCustomStep } from "@/lib/custom-route";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,10 @@ export async function POST(
     // else-branch must clear custom_route_json rather than leave a stale snapshot.
     const custom = await resolveCustomRouteFromRequest(pool, body.customRoute);
     // Same refusal contract as POST /api/memos - never silently reroute.
+    // Roll back first: the SELECT ... FOR UPDATE above opened a transaction and holds a
+    // row lock, and releasing the connection without ending the transaction leaks both.
     if (custom.status === "invalid") {
+      await connection.rollback();
       return NextResponse.json({ error: custom.message }, { status: 400 });
     }
     let effectiveRoute: ApprovalStepKey[];
@@ -100,6 +104,20 @@ export async function POST(
       memoUpdate.recommended_route_json = JSON.stringify(custom.route);
       memoUpdate.custom_route_json = JSON.stringify(custom.approvers);
     } else {
+      // No server-built route, so any person token here is client-authored. Same reasoning
+      // as POST /api/memos: the token IS the approver's identity to canActOnStep, so a
+      // forged one silently reassigns approval authority on an existing document.
+      const forged = findForgedCustomStep(
+        JSON.parse(memoUpdate.selected_route_json || "[]") as unknown[],
+        JSON.parse(memoUpdate.recommended_route_json || "[]") as unknown[],
+      );
+      if (forged) {
+        await connection.rollback();
+        console.warn(
+          `[POST /api/memos/[id]/submit-revision] rejected forged custom route step "${forged}" from user ${session.userId}`,
+        );
+        return NextResponse.json({ error: "รูปแบบเส้นทางอนุมัติไม่ถูกต้อง — กรุณาเลือกผู้อนุมัติใหม่" }, { status: 400 });
+      }
       memoUpdate.custom_route_json = null;
       // Server-authoritative Supervisor step: strip any client "Supervisor" and, only
       // when the (possibly re-picked) department has an active Supervisor, prepend it.

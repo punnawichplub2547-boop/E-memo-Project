@@ -3,6 +3,7 @@ import {
   buildCustomRoute,
   buildCustomStepKey,
   customStepRole,
+  findForgedCustomStep,
   describeCustomStep,
   describeCustomStepShort,
   findCustomApprover,
@@ -143,5 +144,31 @@ describe("display helpers", () => {
   it("describeCustomStepShort falls back positionally and passes level labels through", () => {
     expect(describeCustomStepShort("person:4#88", null)).toBe("ผู้อนุมัติลำดับที่ 4");
     expect(describeCustomStepShort("General Manager", null)).toBe("General Manager");
+  });
+});
+
+// A person token is an authorization primitive: canActOnStep reads the user id
+// straight out of the step string. Only the server may mint one, so any token
+// arriving on a request that did not go through resolveCustomRouteFromRequest is
+// forged and must be refused outright.
+describe("findForgedCustomStep", () => {
+  it("finds a token in a route the server did not build", () => {
+    expect(findForgedCustomStep(["person:1#999", "Managing Director"])).toBe("person:1#999");
+  });
+
+  it("finds a token in any of the routes it is given", () => {
+    expect(findForgedCustomStep(["General Manager"], ["person:2#6"])).toBe("person:2#6");
+  });
+
+  it("returns null for plain Book1 level routes", () => {
+    expect(findForgedCustomStep(["Manager / Top Section", "General Manager"])).toBeNull();
+  });
+
+  it("tolerates missing, empty and non-string entries", () => {
+    expect(findForgedCustomStep(undefined, null, [], [42, { userId: 9 }, null])).toBeNull();
+  });
+
+  it("ignores a value that merely looks like a token", () => {
+    expect(findForgedCustomStep(["person:0#1", "person:abc", "person:1#0"])).toBeNull();
   });
 });

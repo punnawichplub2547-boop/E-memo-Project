@@ -17,6 +17,7 @@ import { notifyMemoEvent } from "@/lib/notify-memo-event";
 import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
+import { findForgedCustomStep } from "@/lib/custom-route";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +124,16 @@ export async function POST(request: NextRequest) {
       clientMemo.routeOverrideReason =
         clientMemo.routeOverrideReason?.trim() || "กำหนดผู้อนุมัติเองเป็นรายบุคคล (custom route)";
     } else {
+      // No server-built route, so no person token has any business being here. A token
+      // reaching the level-route branch would be written to selected_route_json and
+      // current_step verbatim, handing approval authority to whatever user id the client
+      // typed — canActOnStep authorizes a custom step by reading that id. Refuse instead
+      // of stripping: a silent strip would reroute the document without telling anyone.
+      const forged = findForgedCustomStep(clientMemo.selectedRoute, clientMemo.recommendedRoute);
+      if (forged) {
+        console.warn(`[POST /api/memos] rejected forged custom route step "${forged}" from user ${session.userId}`);
+        return NextResponse.json({ error: "รูปแบบเส้นทางอนุมัติไม่ถูกต้อง — กรุณาเลือกผู้อนุมัติใหม่" }, { status: 400 });
+      }
       clientMemo.customRoute = undefined;
       // Server-authoritative Supervisor step: strip any client-supplied "Supervisor"
       // and, only when the requesting department actually has an active Supervisor,
