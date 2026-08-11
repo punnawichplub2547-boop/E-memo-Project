@@ -11,16 +11,25 @@ import {
   type ReadActionDbRow,
   type WorkflowActionDbRow,
 } from "@/lib/db-memos";
-import type { ApprovalLevel, MemoRecord } from "@/lib/approval";
+import type { ApprovalLevel, ApprovalStepKey, MemoRecord } from "@/lib/approval";
+import { isCustomStepKey } from "@/lib/custom-route";
 import type { MemoSignature } from "./memo-excel";
 
 const SIGNATURE_LEVELS: ApprovalLevel[] = ["Manager / Top Section", "General Manager", "Managing Director"];
 
+// A custom route persists workflow_step_actions.step_label as the raw person token
+// ("person:1#42"), so a level-only allowlist silently dropped every custom signature and
+// the exported F-DC-006 stayed blank forever (B1). Both shapes are signature-bearing
+// steps; non-approval labels such as "Read" still have no column on the form.
+function isSignatureStep(stepLabel: string): boolean {
+  return SIGNATURE_LEVELS.includes(stepLabel as ApprovalLevel) || isCustomStepKey(stepLabel);
+}
+
 export function mapSignatureRows(rows: WorkflowActionDbRow[]): MemoSignature[] {
   return rows
-    .filter((r) => r.step_label && SIGNATURE_LEVELS.includes(r.step_label as ApprovalLevel))
+    .filter((r) => r.step_label && isSignatureStep(r.step_label))
     .map((r) => ({
-      stepLabel: r.step_label as ApprovalLevel,
+      stepLabel: r.step_label as ApprovalStepKey,
       actorName: r.actor_name ?? "-",
       actedAt: typeof r.acted_at === "string" ? r.acted_at : r.acted_at.toISOString(),
     }));
