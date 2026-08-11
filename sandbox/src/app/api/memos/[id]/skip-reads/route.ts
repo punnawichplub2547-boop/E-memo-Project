@@ -5,10 +5,18 @@ import { getDbPool } from "@/lib/db";
 import { buildSkipAllReadsPayload, type SkipAllReadsBody } from "@/lib/db-memo-write";
 import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
+import { canActOnStep } from "@/lib/workflow-rules";
 
 export const dynamic = "force-dynamic";
 
-type MemoIdRow = RowDataPacket & { id: number; current_step: string; status: string; revision_no: number };
+type MemoIdRow = RowDataPacket & {
+  id: number;
+  current_step: string;
+  status: string;
+  revision_no: number;
+  department_name: string;
+  requester_user_id: number | null;
+};
 
 export async function POST(
   request: NextRequest,
@@ -28,7 +36,7 @@ export async function POST(
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id, current_step, status, revision_no FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
+      "SELECT id, current_step, status, revision_no, department_name, requester_user_id FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -39,8 +47,26 @@ export async function POST(
 
     const memo = rows[0];
 
-    const isAdmin = session.roles.includes("admin");
-    if (!isAdmin && session.approvalLevel !== memo.current_step) {
+    // Same authority rule as approve/return/reject — canActOnStep is the one place that
+    // knows what "the current approver" means. The old inline comparison of
+    // session.approvalLevel to current_step could never match a custom route's step
+    // ("person:2#6"), so a per-person approver could not skip outstanding reads, and
+    // evaluateApproveAction answers 409 while any read is pending: the memo had no way
+    // forward at all. It also missed the department scope and the self-requester rule
+    // that the approval actions apply.
+    if (!canActOnStep(
+      {
+        id: session.userId,
+        roles: session.roles,
+        approval_level: session.approvalLevel ?? null,
+        department: session.department,
+      },
+      {
+        current_step: memo.current_step,
+        department_name: memo.department_name,
+        requester_user_id: memo.requester_user_id,
+      },
+    )) {
       await connection.rollback();
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
