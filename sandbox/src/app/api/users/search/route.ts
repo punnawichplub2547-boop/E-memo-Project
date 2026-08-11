@@ -11,8 +11,10 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const q = request.nextUrl.searchParams.get("q") ?? "";
+  // Anything other than the explicit "approver" opt-in keeps the CC-picker scope.
+  const scope = request.nextUrl.searchParams.get("scope") === "approver" ? "approver" : "cc";
   try {
-    const users = await searchActiveUsers(q);
+    const users = await searchActiveUsers(q, scope);
     return NextResponse.json({ users });
   } catch {
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

@@ -139,11 +139,17 @@ export function parseRoles(rolesJson: string): string[] {
 }
 
 export type UserSearchResult = {
+  userId: number;
   email: string;
   firstName: string;
   lastName: string;
   department: string;
+  approvalLevel: string | null;
 };
+
+/** Which picker is asking. "cc" is the historical read-recipient picker; "approver"
+ *  powers the custom-route picker, where the MD is a legitimate choice (Q2). */
+export type UserSearchScope = "cc" | "approver";
 
 export async function findActiveUsersByApprovalLevel(
   approvalLevel: string,
@@ -157,25 +163,43 @@ export async function findActiveUsersByApprovalLevel(
   return rows as PublicUser[];
 }
 
-// MD is excluded — they have their own notifyMD notification path.
 // Requires q.length >= 2 to prevent full-list enumeration.
-export async function searchActiveUsers(q: string): Promise<UserSearchResult[]> {
+// scope "cc" (the default) keeps the historical read-recipient behaviour: the MD is
+// excluded because they have their own notifyMD path. scope "approver" must NOT
+// exclude them — a custom route may legitimately end at the MD (Q2).
+export async function searchActiveUsers(
+  q: string,
+  scope: UserSearchScope = "cc",
+): Promise<UserSearchResult[]> {
   if (q.trim().length < 2) return [];
   const pool = getDbPool();
   const prefix = `${q.trim()}%`;
+  const mdFilter =
+    scope === "approver" ? "" : "AND (approval_level IS NULL OR approval_level != 'Managing Director')";
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT email, first_name, last_name, department FROM users
+    `SELECT id, email, first_name, last_name, department, approval_level FROM users
      WHERE status = 'active'
-       AND (approval_level IS NULL OR approval_level != 'Managing Director')
+       ${mdFilter}
        AND (email LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?)
      ORDER BY first_name, last_name
      LIMIT 8`,
     [prefix, prefix],
   );
-  return (rows as Array<{ email: string; first_name: string; last_name: string; department: string }>).map(r => ({
+  return (
+    rows as Array<{
+      id: number;
+      email: string;
+      first_name: string;
+      last_name: string;
+      department: string;
+      approval_level: string | null;
+    }>
+  ).map(r => ({
+    userId: r.id,
     email: r.email,
     firstName: r.first_name,
     lastName: r.last_name,
     department: r.department,
+    approvalLevel: r.approval_level ?? null,
   }));
 }
