@@ -7,7 +7,9 @@ import {
   canResubmitMemo,
   canReturnOrRejectMemo,
   canReviewMdMemo,
+  prototypeUserAuthId,
   PROTOTYPE_USERS,
+  type PrototypeUser,
 } from "./prototype-users";
 
 const baseMemo: MemoRecord = {
@@ -128,5 +130,91 @@ describe("prototype user permissions", () => {
     expect(canMarkReadRecipient(user("accfin-reader"), "ACC/FIN")).toBe(true);
     expect(canMarkReadRecipient(user("accfin-reader"), "HR&GA")).toBe(false);
     expect(canMarkReadRecipient(user("admin"), "ACC/FIN")).toBe(true);
+  });
+});
+
+describe("custom route permissions", () => {
+  const customMemo = {
+    ...baseMemo,
+    status: "pending",
+    currentStep: "person:2#42",
+    selectedRoute: ["person:1#7", "person:2#42", "person:3#9"],
+  } as MemoRecord;
+
+  const authUser = (id: number, over: Partial<PrototypeUser> = {}): PrototypeUser => ({
+    id: `auth-${id}`,
+    name: `ผู้ใช้ ${id}`,
+    department: "IT",
+    roleLabel: "Requester",
+    roles: ["requester"],
+    approvalLevel: undefined,
+    ...over,
+  });
+
+  it("extracts the numeric user id from an auth-backed prototype user", () => {
+    expect(prototypeUserAuthId(authUser(42))).toBe(42);
+    expect(prototypeUserAuthId(user("manager"))).toBeNull();
+    expect(prototypeUserAuthId(authUser(7, { id: "auth-x7" }))).toBeNull();
+  });
+
+  it("lets the named person approve their custom step", () => {
+    expect(canApproveMemo(authUser(42), customMemo)).toBe(true);
+  });
+
+  it("blocks everyone else, including a Managing Director", () => {
+    expect(canApproveMemo(authUser(9, { approvalLevel: "Managing Director" }), customMemo)).toBe(false);
+    expect(canApproveMemo(user("md"), customMemo)).toBe(false);
+  });
+
+  it("keeps admin able to act on a custom step", () => {
+    expect(canApproveMemo(authUser(3, { roles: ["admin"] }), customMemo)).toBe(true);
+    expect(canRejectMemo(authUser(3, { roles: ["admin"] }), customMemo)).toBe(true);
+  });
+
+  it("hides Reject for a non-final custom step but keeps Approve and Return", () => {
+    expect(canApproveMemo(authUser(42), customMemo)).toBe(true);
+    expect(canReturnOrRejectMemo(authUser(42), customMemo)).toBe(true);
+    expect(canRejectMemo(authUser(42), customMemo)).toBe(false);
+  });
+
+  it("allows Reject for the final custom step", () => {
+    const finalMemo = { ...customMemo, currentStep: "person:3#9" } as MemoRecord;
+    expect(canRejectMemo(authUser(9), finalMemo)).toBe(true);
+  });
+
+  it("allows Reject for a single-person custom route", () => {
+    const soloMemo = {
+      ...baseMemo,
+      status: "pending",
+      currentStep: "person:1#42",
+      selectedRoute: ["person:1#42"],
+    } as MemoRecord;
+    expect(canRejectMemo(authUser(42), soloMemo)).toBe(true);
+  });
+
+  it("does not approve a custom step when the memo is not pending", () => {
+    const approved = { ...customMemo, status: "approved" } as MemoRecord;
+    expect(canApproveMemo(authUser(42), approved)).toBe(false);
+  });
+
+  it("leaves level-route permissions untouched", () => {
+    const levelMemo = {
+      ...baseMemo,
+      status: "pending",
+      currentStep: "General Manager",
+      selectedRoute: ["Manager / Top Section", "General Manager"],
+    } as MemoRecord;
+    expect(canApproveMemo(user("gm"), levelMemo)).toBe(true);
+    expect(canRejectMemo(user("gm"), levelMemo)).toBe(true);
+    expect(canApproveMemo(authUser(9), levelMemo)).toBe(false);
+
+    const supervisorMemo = {
+      ...baseMemo,
+      status: "pending",
+      currentStep: "Supervisor",
+      selectedRoute: ["Supervisor", "Manager / Top Section"],
+    } as MemoRecord;
+    expect(canApproveMemo(user("supervisor"), supervisorMemo)).toBe(true);
+    expect(canRejectMemo(user("supervisor"), supervisorMemo)).toBe(false);
   });
 });

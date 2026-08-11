@@ -1,5 +1,6 @@
 import type { ApprovalLevel, MemoRecord } from "./approval";
 import type { SessionUser } from "./auth-jwt";
+import { isCustomRoute, parseCustomStepKey } from "./custom-route";
 
 export type PrototypeRole =
   | "requester"
@@ -147,9 +148,20 @@ export function isPrototypeAdmin(user: PrototypeUser): boolean {
   return user.roles.includes("admin");
 }
 
+/** users.id behind an auth-backed PrototypeUser ("auth-42" → 42). Mock prototype
+ *  users ("manager", "gm", …) have no real id and return null. */
+export function prototypeUserAuthId(user: PrototypeUser): number | null {
+  const match = /^auth-(\d+)$/.exec(user.id);
+  return match ? Number(match[1]) : null;
+}
+
 export function canApproveMemo(user: PrototypeUser, memo: MemoRecord): boolean {
   if (memo.status !== "pending") return false;
   if (isPrototypeAdmin(user)) return true;
+  // Custom per-person step: identity decides, not tier. Mirrors canActOnStep in
+  // workflow-rules.ts — the server stays authoritative, this only shapes the UI.
+  const customStep = parseCustomStepKey(memo.currentStep);
+  if (customStep) return prototypeUserAuthId(user) === customStep.userId;
   return user.approvalLevel === memo.currentStep;
 }
 
@@ -162,7 +174,16 @@ export function canReturnOrRejectMemo(user: PrototypeUser, memo: MemoRecord): bo
 // Admin keeps full power (approvalLevel is undefined, never "Supervisor").
 export function canRejectMemo(user: PrototypeUser, memo: MemoRecord): boolean {
   if (!canApproveMemo(user, memo)) return false;
-  return user.approvalLevel !== "Supervisor";
+  if (isPrototypeAdmin(user)) return true;
+  if (user.approvalLevel === "Supervisor") return false;
+  // Q23: in a custom per-person route only the LAST person holds the "อนุมัติ"
+  // role; everyone before them is a check step that can return but not reject.
+  const route = memo.selectedRoute ?? [];
+  if (isCustomRoute(route)) {
+    const index = route.indexOf(memo.currentStep);
+    if (index !== -1 && index < route.length - 1) return false;
+  }
+  return true;
 }
 
 export function canResubmitMemo(user: PrototypeUser, memo: MemoRecord): boolean {
