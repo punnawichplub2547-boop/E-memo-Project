@@ -17,6 +17,7 @@ import { DraftPreviewPanel } from "./_components/DraftPreviewPanel";
 import { DescriptionCard } from "./_components/DescriptionCard";
 import { MemoDetailsCard } from "./_components/MemoDetailsCard";
 import { RoutingCard } from "./_components/RoutingCard";
+import { CustomRouteCard } from "./_components/CustomRouteCard";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
 import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
 import { useMemoFormFields } from "./_hooks/useMemoFormFields";
@@ -84,6 +85,7 @@ function CreatePageContent() {
     selectedVendorVat,
     selectedVendorVatAmount,
     canSubmitPending,
+    customRoute, routeSource,
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
     addVendorRow, removeVendorRow, updateVendorRow, handleSelectVendor,
@@ -372,6 +374,33 @@ function CreatePageContent() {
                   data-tab={assistantTab}
                 >
                   <div className="em-create-tab-pane" data-pane="routing">
+                    <div className="em-tabs em-route-source-tabs" role="tablist" aria-label="วิธีกำหนดผู้อนุมัติ">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={routeSource === "book1"}
+                        className={`em-tab ${routeSource === "book1" ? "active" : ""}`}
+                        onClick={() => customRoute.setRouteSource("book1")}
+                      >
+                        แนะนำตาม Book1
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={routeSource === "custom"}
+                        className={`em-tab ${routeSource === "custom" ? "active" : ""}`}
+                        onClick={() => customRoute.setRouteSource("custom")}
+                      >
+                        Customize route เอง
+                      </button>
+                    </div>
+                    {routeSource === "custom" ? (
+                      <CustomRouteCard
+                        route={customRoute}
+                        notifyMD={recommendation.notifyMD}
+                        notifyMDReason={recommendation.notifyMDReason}
+                      />
+                    ) : (
                     <RoutingCard
                       effectiveApprover={effectiveApprover}
                       tierClass={tierClass}
@@ -387,6 +416,7 @@ function CreatePageContent() {
                       onSkipGmChange={setSkipGmStep}
                       onRouteOverrideReasonChange={setRouteOverrideReason}
                     />
+                    )}
                     <div style={{
                       marginTop: 12,
                       background: "var(--surface)",

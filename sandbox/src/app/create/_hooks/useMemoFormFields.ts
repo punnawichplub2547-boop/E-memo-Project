@@ -18,8 +18,9 @@ import {
 } from "@/lib/approval";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { newClientRowId } from "@/lib/client-row-id";
-import { canResubmitMemo, PrototypeUser } from "@/lib/prototype-users";
+import { canResubmitMemo, prototypeUserAuthId, PrototypeUser } from "@/lib/prototype-users";
 import type { ItemSubcategory } from "@/lib/item-subcategories";
+import { useCustomRoute } from "./useCustomRoute";
 
 function getEffectiveRequestQty(qty: number) {
   return qty > 0 ? qty : 1;
@@ -117,6 +118,26 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
   );
 
   // ── Routing fields — always default to fresh recommendation (user decision) ──
+  // The per-person route is the exception: a revision reopens on whichever tab the
+  // memo was submitted from, with the same people, so resubmitting does not
+  // silently swap the approvers the requester originally chose.
+  const revisionCustomPeople =
+    isRevisionMode && (reviseMemo!.customRoute?.length ?? 0) > 0
+      ? reviseMemo!.customRoute!.map((a) => ({
+          userId: a.userId,
+          name: a.name,
+          approvalLevel: a.approvalLevel,
+          department: a.department,
+        }))
+      : undefined;
+  const customRoute = useCustomRoute({
+    initialPeople: revisionCustomPeople,
+    initialSource: revisionCustomPeople ? "custom" : "book1",
+    // Only a real auth-backed user has a users.id; mock prototype users get null,
+    // which simply disables the self-pick warning.
+    currentUserId: prototypeUserAuthId(user),
+  });
+
   const [chosenApprover, setChosenApprover] = useState<ApprovalLevel | null>(null);
   const [skipGmStep, setSkipGmStep] = useState(false);
   const [routeOverrideReason, setRouteOverrideReason] = useState("");
@@ -227,9 +248,13 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     row => needsNonNegotiableRemark(row) && (row.remark ?? "").trim().length === 0
   );
   const canSubmitPending =
-    (!routeReview.requiresReason || cleanOverrideReason.length > 0) &&
+    // The Book1 override reason only makes sense against the Book1 ladder. On the
+    // custom tab the recommended route is not the route being used at all, and the
+    // server writes its own audit reason when it rebuilds the per-person route.
+    (customRoute.routeSource === "custom" || !routeReview.requiresReason || cleanOverrideReason.length > 0) &&
     (!selectedNotLowest || cleanVendorReason.length > 0) &&
-    rowsMissingNonNegotiableRemark.length === 0;
+    rowsMissingNonNegotiableRemark.length === 0 &&
+    customRoute.canSubmitCustom;
   const currentDateLabel = useMemo(
     () => currentDateTime
       ? new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeStyle: "short" }).format(currentDateTime)
@@ -418,6 +443,9 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     selectedVendorVatAmount,
     cleanVendorReason,
     canSubmitPending,
+    customRoute,
+    routeSource: customRoute.routeSource,
+    customRoutePeople: customRoute.people,
     rowsMissingNonNegotiableRemark,
     updateVendorDiscountPercent, markVendorNonNegotiable,
     requestItemsGrandTotal,

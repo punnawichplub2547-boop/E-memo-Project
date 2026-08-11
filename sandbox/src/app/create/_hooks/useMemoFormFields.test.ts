@@ -208,3 +208,112 @@ describe("useMemoFormFields", () => {
     expect(result.current.canSubmitPending).toBe(true);
   });
 });
+
+describe("useMemoFormFields — custom route tab", () => {
+  const person = (userId: number, name: string) => ({
+    userId,
+    name,
+    approvalLevel: "Manager / Top Section",
+    department: "IT",
+  });
+
+  it("starts on the Book1 tab and emits no custom route data", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.routeSource).toBe("book1");
+    expect(result.current.customRoutePeople).toEqual([]);
+    expect(result.current.customRoute.customRoutePayload).toBeUndefined();
+  });
+
+  it("blocks pending submit on an empty custom route and unblocks once someone is picked", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    expect(result.current.canSubmitPending).toBe(false);
+
+    act(() => { result.current.customRoute.addPerson(person(42, "สมชาย ใจดี")); });
+    expect(result.current.canSubmitPending).toBe(true);
+    expect(result.current.customRoutePeople.map((p) => p.userId)).toEqual([42]);
+  });
+
+  it("does not demand a Book1 override reason while the custom tab is active", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    // Routing a large request below its recommended approver is an exception, and
+    // an exception normally cannot be submitted without a written reason.
+    act(() => { result.current.setAmount(200000); });
+    act(() => { result.current.setChosenApprover("Manager / Top Section"); });
+    expect(result.current.routeReview.requiresReason).toBe(true);
+    expect(result.current.canSubmitPending).toBe(false);
+
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    act(() => { result.current.customRoute.addPerson(person(42, "สมชาย ใจดี")); });
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("still demands the Book1 override reason on the Book1 tab", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => { result.current.setAmount(200000); });
+    act(() => { result.current.setChosenApprover("Manager / Top Section"); });
+    expect(result.current.routeReview.requiresReason).toBe(true);
+    expect(result.current.canSubmitPending).toBe(false);
+    act(() => { result.current.setRouteOverrideReason("เหตุผลเร่งด่วน"); });
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("flags a self-pick using the signed-in user's real id without blocking submit", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser({ id: "auth-42" }) })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    act(() => { result.current.customRoute.addPerson(person(42, "สมชาย ใจดี")); });
+    expect(result.current.customRoute.selfPickedIndexes).toEqual([0]);
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("reopens a revision that used a custom route on the custom tab, prefilled", async () => {
+    const memo = makeMemo({
+      selectedRoute: ["person:1#42", "person:2#7"],
+      customRoute: [
+        { stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+        { stepKey: "person:2#7", userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+      ],
+    });
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [memo], reviseId: memo.id, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.isRevisionMode).toBe(true);
+    expect(result.current.routeSource).toBe("custom");
+    expect(result.current.customRoutePeople.map((p) => p.userId)).toEqual([42, 7]);
+    expect(result.current.customRoute.customRoutePayload).toEqual([{ userId: 42 }, { userId: 7 }]);
+  });
+
+  it("reopens a revision that used a level route on the Book1 tab", async () => {
+    const memo = makeMemo({ selectedRoute: ["Manager / Top Section", "General Manager"] });
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [memo], reviseId: memo.id, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.isRevisionMode).toBe(true);
+    expect(result.current.routeSource).toBe("book1");
+    expect(result.current.customRoutePeople).toEqual([]);
+  });
+});

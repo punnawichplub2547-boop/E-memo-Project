@@ -191,3 +191,67 @@ describe("buildMemoDraftRecord", () => {
     expect(memo.title).toBe("ขออนุมัติจัดซื้อกระดาษ");
   });
 });
+
+describe("custom route preview", () => {
+  const people = [
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+  ];
+
+  it("emits placeholder person tokens and a snapshot for the Excel preview", () => {
+    const record = buildMemoDraftRecord(
+      makeFields({ routeSource: "custom", customRoutePeople: people }),
+      { ...opts, id: "", status: "draft" },
+    );
+    expect(record.selectedRoute).toEqual(["person:1#42", "person:2#7"]);
+    expect(record.recommendedRoute).toEqual(["person:1#42", "person:2#7"]);
+    expect(record.currentStep).toBe("person:1#42");
+    expect(record.customRoute?.[1]).toEqual({
+      stepKey: "person:2#7",
+      userId: 7,
+      name: "สุภาพร เจริญสุข",
+      approvalLevel: "General Manager",
+      department: "PD",
+    });
+    expect(record.routeMode).toBe("exception");
+  });
+
+  it("leaves the Book1 route untouched when routeSource is book1", () => {
+    const record = buildMemoDraftRecord(
+      makeFields({ routeSource: "book1", customRoutePeople: people }),
+      { ...opts, id: "", status: "draft" },
+    );
+    expect(record.customRoute).toBeUndefined();
+    expect(record.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
+    expect(record.currentStep).toBe("Manager / Top Section");
+    expect(record.routeMode).toBe("recommended");
+  });
+
+  it("leaves the Book1 route untouched when the custom tab has nobody picked", () => {
+    const record = buildMemoDraftRecord(
+      makeFields({ routeSource: "custom", customRoutePeople: [] }),
+      { ...opts, id: "", status: "draft" },
+    );
+    expect(record.customRoute).toBeUndefined();
+    expect(record.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
+  });
+
+  it("leaves an untouched (undefined) routeSource on the legacy Book1 path", () => {
+    const record = buildMemoDraftRecord(makeFields(), opts);
+    expect(record.customRoute).toBeUndefined();
+    expect(record.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
+  });
+
+  it("keeps the override reason out of a custom route (the server writes its own)", () => {
+    const record = buildMemoDraftRecord(
+      makeFields({
+        routeSource: "custom",
+        customRoutePeople: people,
+        routeReview: { recommendedRoute: ["Manager / Top Section"], mode: "recommended", requiresReason: true },
+        cleanOverrideReason: "เหตุผลของโหมดเดิม",
+      }),
+      { ...opts, id: "", status: "draft" },
+    );
+    expect(record.routeOverrideReason).toBeUndefined();
+  });
+});

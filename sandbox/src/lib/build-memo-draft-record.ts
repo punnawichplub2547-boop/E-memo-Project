@@ -22,6 +22,7 @@ import type {
   ReadAction,
   RequestItem,
 } from "./approval";
+import { buildCustomRoute } from "./custom-route";
 
 /** The slice of the create form this needs. `MemoFormFieldsResult` satisfies it
  *  structurally, so the hook can be passed straight in. */
@@ -63,6 +64,15 @@ export type MemoDraftFields = {
   selectedRoute: ApprovalLevel[];
   cleanOverrideReason: string;
   firstCheckingStep: ApprovalLevel;
+  /** Which tab of the routing card is active. Absent means the classic Book1 route. */
+  routeSource?: "book1" | "custom";
+  /** People picked on the "Customize route เอง" tab, in order. */
+  customRoutePeople?: ReadonlyArray<{
+    userId: number;
+    name: string;
+    approvalLevel: string | null;
+    department: string | null;
+  }>;
 };
 
 export type MemoDraftOptions = {
@@ -91,6 +101,14 @@ export function buildMemoDraftRecord(
       ? fields.orderedReadRecipients.map((recipient) => ({ recipient, status: "pending" }))
       : undefined;
 
+  // Custom per-person route. These tokens are for local preview only — POST
+  // /api/memos rebuilds both the route and the snapshot from the users table
+  // (custom-route-server.ts), so a tampered preview cannot reach the DB.
+  const custom =
+    fields.routeSource === "custom" && (fields.customRoutePeople?.length ?? 0) > 0
+      ? buildCustomRoute(fields.customRoutePeople!)
+      : null;
+
   return {
     id,
     title: fields.subject,
@@ -101,13 +119,18 @@ export function buildMemoDraftRecord(
     itemSubcategoryLabel: fields.itemSubcategoryLabel,
     amount: fields.amount,
     status,
-    currentStep: fields.firstCheckingStep,
+    currentStep: custom ? custom.route[0] : fields.firstCheckingStep,
     workflowState: "Issued",
     recommendedFinalApprover: fields.recommendation.recommendedFinalApprover,
-    recommendedRoute: fields.routeReview.recommendedRoute,
-    selectedRoute: fields.selectedRoute,
-    routeMode: fields.routeReview.mode,
-    routeOverrideReason: fields.routeReview.requiresReason ? fields.cleanOverrideReason : undefined,
+    recommendedRoute: custom ? custom.route : fields.routeReview.recommendedRoute,
+    selectedRoute: custom ? custom.route : fields.selectedRoute,
+    // A hand-picked route never matches the Book1 recommendation by construction.
+    routeMode: custom ? "exception" : fields.routeReview.mode,
+    customRoute: custom ? custom.approvers : undefined,
+    // The Book1 override reason does not apply to a custom route — the server
+    // records its own reason when it rebuilds the route.
+    routeOverrideReason:
+      !custom && fields.routeReview.requiresReason ? fields.cleanOverrideReason : undefined,
     readRecipients: fields.orderedReadRecipients,
     readActions,
     description: fields.description.trim() || undefined,

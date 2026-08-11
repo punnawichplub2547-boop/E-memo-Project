@@ -7,6 +7,8 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import { memoToDbSeedRow } from "./db-seed";
+import { memoPersistErrorMessage } from "./memo-persist-error";
+import { showErrorToast } from "./toast";
 import { allowSeedFallbackOnDbError } from "./seed-fallback";
 import { usePrototypeUser } from "./prototype-user-context";
 import type {
@@ -837,10 +839,16 @@ async function persistNewMemo(memo: MemoRecord) {
       body: JSON.stringify(memo),
     });
     if (!response.ok && response.status !== 409) {
-      console.error("[MemoProvider] Failed to persist memo", response.status, await response.text());
+      const body = await response.json().catch(() => null);
+      console.error("[MemoProvider] Failed to persist memo", response.status, body);
+      const message = memoPersistErrorMessage(response.status, body);
+      // Without this the memo looks sent while nothing was stored — e.g. a custom
+      // route naming an approver who was deactivated before submit (400).
+      if (message) showErrorToast(message, 8000);
     }
   } catch (error) {
     console.error("[MemoProvider] Failed to persist memo", error);
+    showErrorToast("บันทึกเมโมไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง", 8000);
   }
 }
 
