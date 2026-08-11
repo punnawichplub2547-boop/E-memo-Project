@@ -89,8 +89,12 @@ export async function POST(
     // A revision may switch a memo between the two modes in either direction, so the
     // else-branch must clear custom_route_json rather than leave a stale snapshot.
     const custom = await resolveCustomRouteFromRequest(pool, body.customRoute);
+    // Same refusal contract as POST /api/memos - never silently reroute.
+    if (custom.status === "invalid") {
+      return NextResponse.json({ error: custom.message }, { status: 400 });
+    }
     let effectiveRoute: ApprovalStepKey[];
-    if (custom) {
+    if (custom.status === "ok") {
       effectiveRoute = custom.route;
       memoUpdate.selected_route_json = JSON.stringify(custom.route);
       memoUpdate.recommended_route_json = JSON.stringify(custom.route);

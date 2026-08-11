@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
 import { resolveCustomRouteFromRequest } from "./custom-route-server";
 import { isCustomRoute } from "./custom-route";
@@ -13,12 +13,14 @@ type UserRow = {
   department: string;
 };
 
-function fakePool(users: UserRow[]): Pool {
+// Two queries can reach the pool: the active-only lookup that builds the route, and
+// (only on the failure path) a status-agnostic name lookup used for the error text.
+function fakePool(users: UserRow[], allUsers: UserRow[] = users): Pool {
   return {
-    query: async (_sql: string, params: unknown[]) => {
+    query: async (sql: string, params: unknown[]) => {
       const wanted = params[0] as number[];
-      const rows = users.filter((u) => wanted.includes(u.id));
-      return [rows, undefined];
+      const source = sql.includes("status = 'active'") ? users : allUsers;
+      return [source.filter((u) => wanted.includes(u.id)), undefined];
     },
   } as unknown as Pool;
 }
@@ -28,12 +30,18 @@ const users: UserRow[] = [
   { id: 7, first_name: "สุภาพร", last_name: "เจริญสุข", approval_level: "General Manager", department: "PD" },
 ];
 
+async function resolveOk(pool: Pool, requested: unknown) {
+  const result = await resolveCustomRouteFromRequest(pool, requested);
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") throw new Error("unreachable");
+  return result;
+}
+
 describe("resolveCustomRouteFromRequest", () => {
   it("builds tokens and a name snapshot from the DB, preserving the requested order", async () => {
-    const result = await resolveCustomRouteFromRequest(fakePool(users), [{ userId: 7 }, { userId: 42 }]);
-    expect(result).not.toBeNull();
-    expect(result!.route).toEqual(["person:1#7", "person:2#42"]);
-    expect(result!.approvers[0]).toEqual({
+    const result = await resolveOk(fakePool(users), [{ userId: 7 }, { userId: 42 }]);
+    expect(result.route).toEqual(["person:1#7", "person:2#42"]);
+    expect(result.approvers[0]).toEqual({
       stepKey: "person:1#7",
       userId: 7,
       name: "สุภาพร เจริญสุข",
@@ -43,40 +51,81 @@ describe("resolveCustomRouteFromRequest", () => {
   });
 
   it("ignores client-supplied names and levels entirely", async () => {
-    const result = await resolveCustomRouteFromRequest(fakePool(users), [
+    const result = await resolveOk(fakePool(users), [
       { userId: 42, name: "ปลอม ปลอม", approvalLevel: "Managing Director", stepKey: "person:9#1" },
     ]);
-    expect(result!.approvers[0].name).toBe("สมชาย ใจดี");
-    expect(result!.approvers[0].approvalLevel).toBe("Manager / Top Section");
-    expect(result!.route).toEqual(["person:1#42"]);
+    expect(result.approvers[0].name).toBe("สมชาย ใจดี");
+    expect(result.approvers[0].approvalLevel).toBe("Manager / Top Section");
+    expect(result.route).toEqual(["person:1#42"]);
   });
 
-  it("returns null when any requested user is missing or inactive", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await resolveCustomRouteFromRequest(fakePool(users), [{ userId: 42 }, { userId: 404 }])).toBeNull();
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+  // Silently dropping back to the Book1 level route would send the document down a
+  // completely different chain of people than the requester chose, with nothing on
+  // screen to say so. Refusing the submit is the safer failure.
+  it("reports the inactive person by name instead of falling back to the level route", async () => {
+    const withInactive = [
+      ...users,
+      { id: 55, first_name: "อดีต", last_name: "พนักงาน", approval_level: null, department: "IT" },
+    ];
+    const result = await resolveCustomRouteFromRequest(
+      fakePool(users, withInactive),
+      [{ userId: 42 }, { userId: 55 }],
+    );
+    expect(result.status).toBe("invalid");
+    if (result.status !== "invalid") throw new Error("unreachable");
+    expect(result.message).toContain("อดีต พนักงาน");
+    expect(result.message).toContain("เลือกผู้อนุมัติใหม่");
+    // The people who ARE fine must not be named as the problem.
+    expect(result.message).not.toContain("สมชาย ใจดี");
   });
 
-  it("returns null for an empty, absent, or malformed request", async () => {
-    expect(await resolveCustomRouteFromRequest(fakePool(users), undefined)).toBeNull();
-    expect(await resolveCustomRouteFromRequest(fakePool(users), [])).toBeNull();
-    expect(await resolveCustomRouteFromRequest(fakePool(users), "nope")).toBeNull();
-    expect(await resolveCustomRouteFromRequest(fakePool(users), [{ userId: "42" }])).toBeNull();
-    expect(await resolveCustomRouteFromRequest(fakePool(users), [{ userId: 0 }])).toBeNull();
-    expect(await resolveCustomRouteFromRequest(fakePool(users), [null])).toBeNull();
+  it("names every unavailable person, not just the first", async () => {
+    const withInactive = [
+      ...users,
+      { id: 55, first_name: "อดีต", last_name: "พนักงาน", approval_level: null, department: "IT" },
+      { id: 56, first_name: "ลาออก", last_name: "ไปแล้ว", approval_level: null, department: "PD" },
+    ];
+    const result = await resolveCustomRouteFromRequest(
+      fakePool(users, withInactive),
+      [{ userId: 55 }, { userId: 42 }, { userId: 56 }],
+    );
+    if (result.status !== "invalid") throw new Error("expected invalid");
+    expect(result.message).toContain("อดีต พนักงาน");
+    expect(result.message).toContain("ลาออก ไปแล้ว");
+  });
+
+  it("falls back to the user id when the person no longer exists at all", async () => {
+    const result = await resolveCustomRouteFromRequest(fakePool(users), [{ userId: 42 }, { userId: 404 }]);
+    if (result.status !== "invalid") throw new Error("expected invalid");
+    expect(result.message).toContain("404");
+  });
+
+  it("reports a malformed approver list rather than routing by Book1 behind the user's back", async () => {
+    for (const bad of [[{ userId: "42" }], [{ userId: 0 }], [null]]) {
+      const result = await resolveCustomRouteFromRequest(fakePool(users), bad);
+      expect(result.status).toBe("invalid");
+    }
+  });
+
+  // Backward compatibility: a request that never asked for a custom route must keep
+  // taking the classic Book1 path, never a 400.
+  it("reports 'none' for an absent, empty, or non-array customRoute", async () => {
+    expect((await resolveCustomRouteFromRequest(fakePool(users), undefined)).status).toBe("none");
+    expect((await resolveCustomRouteFromRequest(fakePool(users), null)).status).toBe("none");
+    expect((await resolveCustomRouteFromRequest(fakePool(users), [])).status).toBe("none");
+    expect((await resolveCustomRouteFromRequest(fakePool(users), "nope")).status).toBe("none");
   });
 
   it("keeps a person picked twice as two distinct steps", async () => {
-    const result = await resolveCustomRouteFromRequest(fakePool(users), [
+    const result = await resolveOk(fakePool(users), [
       { userId: 42 },
       { userId: 7 },
       { userId: 42 },
     ]);
-    expect(result!.route).toEqual(["person:1#42", "person:2#7", "person:3#42"]);
+    expect(result.route).toEqual(["person:1#42", "person:2#7", "person:3#42"]);
   });
 
-  it("only ever queries active users", async () => {
+  it("only ever builds the route from active users", async () => {
     const calls: string[] = [];
     const pool = {
       query: async (sql: string, params: unknown[]) => {
@@ -87,6 +136,7 @@ describe("resolveCustomRouteFromRequest", () => {
     } as unknown as Pool;
     await resolveCustomRouteFromRequest(pool, [{ userId: 42 }]);
     expect(calls[0]).toContain("status = 'active'");
+    expect(calls).toHaveLength(1); // no second query on the happy path
   });
 });
 
@@ -100,8 +150,9 @@ describe("server route pipeline keeps a custom route custom", () => {
 
   async function pipeline(hasSupervisor: boolean) {
     const custom = await resolveCustomRouteFromRequest(fakePool(users), request);
-    expect(custom).not.toBeNull();
-    const supervised = applySupervisorRouting(custom!.route, custom!.route, hasSupervisor);
+    expect(custom.status).toBe("ok");
+    if (custom.status !== "ok") throw new Error("unreachable");
+    const supervised = applySupervisorRouting(custom.route, custom.route, hasSupervisor);
     return supervised;
   }
 

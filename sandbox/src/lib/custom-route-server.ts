@@ -18,10 +18,25 @@ type ApproverRow = RowDataPacket & {
   department: string;
 };
 
+/**
+ * - `none`    — the request never asked for a custom route; the caller keeps its
+ *               existing Book1 level-route behaviour untouched.
+ * - `ok`      — a verified route rebuilt from the users table.
+ * - `invalid` — the request DID ask for a custom route that cannot be honoured.
+ *               The caller must answer 400 with `message`, never fall back: a silent
+ *               fallback would send the document down a completely different chain of
+ *               approvers than the requester picked, with nothing on screen saying so.
+ */
+export type CustomRouteResolution =
+  | { status: "none" }
+  | { status: "ok"; route: string[]; approvers: CustomApprover[] }
+  | { status: "invalid"; message: string };
+
+const RETRY_HINT = "กรุณาเลือกผู้อนุมัติใหม่";
+
 function readOrderedUserIds(requested: unknown): number[] | null {
-  if (!Array.isArray(requested) || requested.length === 0) return null;
   const ids: number[] = [];
-  for (const entry of requested) {
+  for (const entry of requested as unknown[]) {
     if (typeof entry !== "object" || entry === null) return null;
     const userId = (entry as { userId?: unknown }).userId;
     if (typeof userId !== "number" || !Number.isInteger(userId) || userId < 1) return null;
@@ -30,14 +45,34 @@ function readOrderedUserIds(requested: unknown): number[] | null {
   return ids;
 }
 
-/** Returns null when the request carries no usable custom route — the caller then
- *  falls back to the classic Book1 level route. Never throws on bad input. */
+/** Names the unavailable people for the error message. Runs only on the failure
+ *  path, and deliberately without the status filter — an inactive user still has a
+ *  name, and "สมชาย ใจดี ไม่อยู่ในระบบแล้ว" is actionable where a bare id is not. */
+async function describeUnavailable(pool: Pool, missingIds: number[]): Promise<string> {
+  let names = new Map<number, string>();
+  try {
+    const [rows] = await pool.query<ApproverRow[]>(
+      "SELECT id, first_name, last_name, approval_level, department FROM users WHERE id IN (?)",
+      [missingIds],
+    );
+    names = new Map(rows.map((r) => [r.id, `${r.first_name} ${r.last_name}`.trim()]));
+  } catch {
+    // Naming is a nicety; the refusal itself must still happen.
+  }
+  return missingIds.map((id) => names.get(id) || `รหัสผู้ใช้ ${id}`).join(", ");
+}
+
 export async function resolveCustomRouteFromRequest(
   pool: Pool,
   requested: unknown,
-): Promise<{ route: string[]; approvers: CustomApprover[] } | null> {
+): Promise<CustomRouteResolution> {
+  // Absent / empty / not-a-list: the client is on the Book1 tab. Not an error.
+  if (!Array.isArray(requested) || requested.length === 0) return { status: "none" };
+
   const ids = readOrderedUserIds(requested);
-  if (!ids) return null;
+  if (!ids) {
+    return { status: "invalid", message: `รูปแบบรายชื่อผู้อนุมัติไม่ถูกต้อง — ${RETRY_HINT}` };
+  }
 
   const unique = [...new Set(ids)];
   const [rows] = await pool.query<ApproverRow[]>(
@@ -46,16 +81,18 @@ export async function resolveCustomRouteFromRequest(
   );
   const byId = new Map(rows.map((r) => [r.id, r]));
 
-  // All-or-nothing: a route with a hole would deadlock at that step, and silently
-  // dropping a person the requester deliberately picked is worse than refusing.
-  if (unique.some((id) => !byId.has(id))) {
-    console.warn(
-      "[resolveCustomRouteFromRequest] custom route references a user who is not active — rejected",
-    );
-    return null;
+  // All-or-nothing: a route with a hole would deadlock at that step.
+  const missing = unique.filter((id) => !byId.has(id));
+  if (missing.length > 0) {
+    const who = await describeUnavailable(pool, missing);
+    console.warn(`[resolveCustomRouteFromRequest] custom route names inactive/unknown user(s): ${missing.join(", ")}`);
+    return {
+      status: "invalid",
+      message: `ไม่สามารถส่งได้: ${who} ไม่อยู่ในระบบแล้ว ${RETRY_HINT}`,
+    };
   }
 
-  return buildCustomRoute(
+  const built = buildCustomRoute(
     ids.map((id) => {
       const row = byId.get(id)!;
       return {
@@ -66,4 +103,5 @@ export async function resolveCustomRouteFromRequest(
       };
     }),
   );
+  return { status: "ok", ...built };
 }

@@ -104,10 +104,16 @@ export async function POST(request: NextRequest) {
 
     // Custom per-person route (V2): the client sends an ordered customRoute; the
     // server rebuilds both the route and the display snapshot from the users table
-    // and never trusts the client's tokens. Falling back to null keeps the classic
-    // Book1 level route working exactly as before.
+    // and never trusts the client's tokens. Status "none" keeps the classic Book1
+    // level route working exactly as before.
     const custom = await resolveCustomRouteFromRequest(pool, clientMemo.customRoute);
-    if (custom) {
+    // Refuse rather than fall back: the requester deliberately named these people,
+    // and silently routing the document past a different chain of approvers with
+    // nothing on screen saying so is worse than not accepting the submission.
+    if (custom.status === "invalid") {
+      return NextResponse.json({ error: custom.message }, { status: 400 });
+    }
+    if (custom.status === "ok") {
       clientMemo.selectedRoute = custom.route;
       clientMemo.recommendedRoute = custom.route;
       clientMemo.customRoute = custom.approvers;
