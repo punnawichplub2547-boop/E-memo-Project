@@ -15,6 +15,7 @@ import { groupMemosByDate } from "@/lib/group-memos";
 import Link from "next/link";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
+import { describeCustomStepShort } from "@/lib/custom-route";
 import { memosToCsv } from "@/lib/export/memo-csv";
 
 const routeSummary = (memo: MemoRecord) =>
@@ -37,7 +38,7 @@ export default function HistoryPage() {
   const now = new Date();
 
   const filtered = memos.filter(m => {
-    if (!matchesTier(m.currentStep, actorTier)) return false;
+    if (!matchesTier(m.currentStep, actorTier, m.customRoute)) return false;
     if (!isWithinDays(m.createdAt, Number(dateDays), now)) return false;
     if (tabFilter === "all") return true;
     if (tabFilter === "md") return m.currentStep === "Managing Director";
@@ -193,7 +194,9 @@ export default function HistoryPage() {
                               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{m.title}</span>
                             </div>
                             <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                              <strong style={{ color: "var(--ink-2)", fontWeight: 600 }}>{m.currentStep}</strong>
+                              <strong style={{ color: "var(--ink-2)", fontWeight: 600 }}>
+                                {describeCustomStepShort(m.currentStep, m.customRoute)}
+                              </strong>
                               <span>· {cfg.label}</span>
                               <span className="em-amt" style={{ color: "var(--ink-2)" }}>฿{m.amount.toLocaleString()}</span>
                               <span className={`em-tier ${isMd ? "md" : m.currentStep === "General Manager" ? "gm" : "mgr"}`} style={{ height: 18, padding: "0 6px", fontSize: 10 }}>

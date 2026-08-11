@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseMemoDate, isWithinDays, matchesTier } from "./memo-filters";
+import { buildCustomRoute } from "./custom-route";
 
 describe("parseMemoDate", () => {
   it("parses 'DD Mon YYYY HH:MM'", () => {
@@ -43,5 +44,39 @@ describe("matchesTier", () => {
   });
   it("rejects non-match", () => {
     expect(matchesTier("Manager / Top Section", "Managing Director")).toBe(false);
+  });
+});
+
+describe("matchesTier — custom route", () => {
+  const approvers = buildCustomRoute([
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+    { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+  ]).approvers;
+
+  it("matches by the current person's approval level", () => {
+    expect(matchesTier("person:2#7", "General Manager", approvers)).toBe(true);
+    expect(matchesTier("person:2#7", "Manager / Top Section", approvers)).toBe(false);
+  });
+
+  it("still matches everything when no tier is selected", () => {
+    expect(matchesTier("person:1#42", "", approvers)).toBe(true);
+  });
+
+  it("does not match any tier when the person has no approval level", () => {
+    const noLevel = buildCustomRoute([
+      { userId: 9, name: "ก ข", approvalLevel: null, department: "QA" },
+    ]).approvers;
+    expect(matchesTier("person:1#9", "General Manager", noLevel)).toBe(false);
+    expect(matchesTier("person:1#9", "", noLevel)).toBe(true);
+  });
+
+  it("does not match any tier when the custom snapshot is missing", () => {
+    expect(matchesTier("person:1#42", "General Manager")).toBe(false);
+    expect(matchesTier("person:1#42", "General Manager", [])).toBe(false);
+  });
+
+  it("leaves level routes untouched", () => {
+    expect(matchesTier("General Manager", "General Manager")).toBe(true);
+    expect(matchesTier("General Manager", "Managing Director")).toBe(false);
   });
 });

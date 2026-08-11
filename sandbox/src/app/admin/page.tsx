@@ -9,6 +9,7 @@ import { isPrototypeAdmin } from "@/lib/prototype-users";
 import { useAuth } from "@/lib/auth-context";
 import type { PublicUser } from "@/lib/db-users";
 import type { ApprovalLevel, MemoStatus } from "@/lib/approval";
+import { describeCustomStepShort } from "@/lib/custom-route";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import type { WorkflowAction } from "@/lib/db-memos";
@@ -553,7 +554,7 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "10px 14px", fontSize: 12 }}>{m.department}</td>
                         <td style={{ padding: "10px 14px", fontSize: 12, whiteSpace: "nowrap" }}>฿{m.amount.toLocaleString()}</td>
-                        <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{m.currentStep}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{describeCustomStepShort(m.currentStep, m.customRoute)}</td>
                         <td style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{isVoided ? `voided ${m.deletedAt}` : m.createdAt}</td>
                         <td style={{ padding: "10px 14px", position: "sticky", right: 0, minWidth: 270, background: isVoided ? "rgba(254,242,242,0.98)" : "var(--surface)", boxShadow: "-10px 0 18px -18px rgba(15,23,42,0.35)" }}>
                           {isVoided ? (

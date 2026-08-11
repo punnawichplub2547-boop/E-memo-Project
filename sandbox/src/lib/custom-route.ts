@@ -128,3 +128,16 @@ export function describeCustomStep(
   const role = ROLE_LABEL[customStepRole(parsed.index, routeLength ?? approvers?.length ?? parsed.index)];
   return [approver.name, approver.approvalLevel, role].filter(Boolean).join(" · ");
 }
+
+/** Name-only label for compact cells (list rows, table columns, tier pills) where
+ *  the full "name · level · role" string would be truncated to uselessness.
+ *  Same fallbacks as describeCustomStep: positional label when the snapshot is
+ *  missing, and non-token steps pass through unchanged. */
+export function describeCustomStepShort(
+  step: string,
+  approvers: readonly CustomApprover[] | null | undefined,
+): string {
+  const parsed = parseCustomStepKey(step);
+  if (!parsed) return step;
+  return findCustomApprover(approvers, step)?.name ?? `ผู้อนุมัติลำดับที่ ${parsed.index}`;
+}

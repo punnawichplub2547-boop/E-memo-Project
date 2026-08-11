@@ -1,3 +1,5 @@
+import { findCustomApprover, type CustomApprover } from "./custom-route";
+
 export type FilterOption = { value: string; label: string };
 
 const MONTHS: Record<string, number> = {
@@ -24,8 +26,20 @@ export function isWithinDays(createdAt: string, days: number, now: Date): boolea
 }
 
 // tier "" → matches all; otherwise exact currentStep match.
-export function matchesTier(currentStep: string, tier: string): boolean {
-  return tier === "" || currentStep === tier;
+//
+// Tier = an approval level. A custom step names a person, so it matches the tier
+// of whatever approval_level that person carried at submit time. A person with no
+// approval level (or a token with no snapshot to resolve) matches no tier — the
+// executive views are tier views, and a raw token is never a tier name.
+export function matchesTier(
+  currentStep: string,
+  tier: string,
+  customRoute?: readonly CustomApprover[],
+): boolean {
+  if (tier === "") return true;
+  const approver = findCustomApprover(customRoute, currentStep);
+  if (approver) return approver.approvalLevel === tier;
+  return currentStep === tier;
 }
 
 export const DATE_OPTIONS: FilterOption[] = [

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MemoRecord } from "@/lib/approval";
 import { IconCheck, IconPen, IconReturn, IconX } from "@/components/icons";
+import { describeCustomStepShort, isCustomRoute } from "@/lib/custom-route";
 import {
   canApproveMemo,
   canRejectMemo,
@@ -65,18 +66,23 @@ export function DrawerFooter({
   // Reject is Manager-and-above only (Supervisor can return but not reject, Q3).
   const canReject = canRejectMemo(currentUser, memo);
   const canResubmit = canResubmitMemo(currentUser, memo);
-  // Approve button label follows the step: a Supervisor "passes/checks", not "approves" (Q3).
-  const approveVerb = memo.currentStep === "Supervisor" ? "ตรวจแล้ว/ผ่าน" : "Approve";
+  // Approve button label follows the step: a Supervisor "passes/checks", not
+  // "approves" (Q3), and so does every non-final person in a custom route (Q4).
+  const approveVerb =
+    memo.currentStep === "Supervisor" || isNonFinalCustomStep(memo) ? "ตรวจแล้ว/ผ่าน" : "Approve";
 
   // Selectable return-destination options: steps in the route from the first up to
   // (and including) the current step — Q2 forbids picking a step ahead of the actor.
-  // Q1 caps an md-review memo so it cannot resume past Manager (gate-bypass guard).
+  // Q1 caps an md-review memo so it cannot resume past the gate step (gate-bypass
+  // guard). The gate is "Manager / Top Section" on a level route and the first
+  // person on a custom route — mirroring mdReviewGateStep() in workflow-rules.ts,
+  // which is what the server actually enforces.
   const route = memo.selectedRoute ?? [];
   const currentStepIndex = route.indexOf(memo.currentStep);
   let maxReturnIndex = currentStepIndex >= 0 ? currentStepIndex : route.length - 1;
   if (memo.requiresMdReview) {
-    const managerIndex = route.indexOf("Manager / Top Section");
-    if (managerIndex >= 0) maxReturnIndex = Math.min(maxReturnIndex, managerIndex);
+    const gateIndex = isCustomRoute(route) ? 0 : route.indexOf("Manager / Top Section");
+    if (gateIndex >= 0) maxReturnIndex = Math.min(maxReturnIndex, gateIndex);
   }
   const returnStepOptions = route.slice(0, maxReturnIndex + 1);
   const noWorkflowPermissionText = "ไม่มีสิทธิ์ดำเนินการในขั้นตอนนี้";
@@ -348,7 +354,10 @@ export function DrawerFooter({
                 <div style={{ fontSize: 12, color: "var(--ink-2)", fontWeight: 600 }}>
                   ส่งกลับไปที่ขั้น
                   {memo.requiresMdReview && (
-                    <span style={{ fontWeight: 400, color: "var(--muted)" }}> (จำกัดไม่เกิน Manager เพราะต้องผ่าน MD)</span>
+                    <span style={{ fontWeight: 400, color: "var(--muted)" }}>
+                      {" "}
+                      (จำกัดไม่เกิน{isCustomRoute(route) ? "ผู้ตรวจลำดับแรก" : " Manager"} เพราะต้องผ่าน MD)
+                    </span>
                   )}
                 </div>
                 <select
@@ -359,7 +368,8 @@ export function DrawerFooter({
                 >
                   {returnStepOptions.map((step, i) => (
                     <option key={step} value={step}>
-                      {step}{i === 0 ? " (เริ่มต้นใหม่ / default)" : ""}
+                      {describeCustomStepShort(step, memo.customRoute)}
+                      {i === 0 ? " (เริ่มต้นใหม่ / default)" : ""}
                     </option>
                   ))}
                 </select>
@@ -502,4 +512,14 @@ export function DrawerFooter({
       )}
     </div>
   );
+}
+
+/** True when the memo sits on a custom-route step that is not the last one — i.e.
+ *  the actor is a "ตรวจ/เห็นชอบ" checker, not the approver (Q4). Only affects the
+ *  button wording; the Reject block itself is gated by canRejectMemo (Q23). */
+function isNonFinalCustomStep(memo: MemoRecord): boolean {
+  const route = memo.selectedRoute ?? [];
+  if (!isCustomRoute(route)) return false;
+  const index = route.indexOf(memo.currentStep);
+  return index !== -1 && index < route.length - 1;
 }

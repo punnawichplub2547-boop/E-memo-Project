@@ -15,6 +15,7 @@ import {
 } from "@/components/icons";
 import Link from "next/link";
 import type { MemoRecord } from "@/lib/approval";
+import { describeCustomStepShort } from "@/lib/custom-route";
 
 // Parses "DD Mon YYYY HH:MM" → ms for sorting.
 function parseMemoDate(s: string): number {
@@ -276,7 +277,7 @@ export default function DashboardPage() {
                       <td>
                         <span className={`em-tier ${isMd ? "md" : m.currentStep === "General Manager" ? "gm" : "mgr"}`}>
                           {isMd ? <IconCrown size={11} /> : <IconUsers size={11} />}
-                          {m.currentStep}
+                          {describeCustomStepShort(m.currentStep, m.customRoute)}
                         </span>
                       </td>
                       <td><span className={`em-pill ${m.status}`}><span className="dot" />{m.status.charAt(0).toUpperCase() + m.status.slice(1)}</span></td>

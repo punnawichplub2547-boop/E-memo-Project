@@ -11,9 +11,15 @@ import { AuditLogSection } from "./audit-log-section";
 import { EmailExcelButton } from "./email-excel-button";
 import { canMarkReadRecipient, type PrototypeUser } from "@/lib/prototype-users";
 import { formatAttachmentSize } from "@/lib/attachments";
+import { describeCustomStep, describeCustomStepShort, parseCustomStepKey } from "@/lib/custom-route";
 
+// A custom route stores positional person tokens ("person:1#42"), never a label a
+// human should read. Every step rendered here goes through describeCustomStep*,
+// which passes classic approval-level steps straight through unchanged.
 const routeSummary = (memo: MemoRecord) =>
-  memo.selectedRoute?.join(" -> ") ?? memo.currentStep;
+  (memo.selectedRoute ?? [memo.currentStep])
+    .map((step) => describeCustomStepShort(step, memo.customRoute))
+    .join(" -> ");
 
 export function DrawerPanel({
   memo,
@@ -46,6 +52,11 @@ export function DrawerPanel({
   inline?: boolean;
 }) {
   const isMd = memo.currentStep === "Managing Director";
+  const currentStepLabel = describeCustomStep(
+    memo.currentStep,
+    memo.customRoute,
+    memo.selectedRoute?.length,
+  );
   const createdAt = memo.createdAt ?? memo.updatedAt;
   const readStepOffset = memo.readActions?.length ?? 0;
   const auditRefreshKey = [
@@ -90,7 +101,7 @@ export function DrawerPanel({
                 isMd ? "md" : memo.currentStep === "General Manager" ? "gm" : "mgr"
               }`}
             >
-              {isMd ? <IconCrown size={11} /> : <IconUsers size={11} />} {memo.currentStep}
+              {isMd ? <IconCrown size={11} /> : <IconUsers size={11} />} {currentStepLabel}
             </span>
             {(memo.revisionNo ?? 0) > 0 && (
               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)", letterSpacing: "0.02em" }}>
@@ -184,7 +195,7 @@ export function DrawerPanel({
               value={
                 <span className={`em-tier ${isMd ? "md" : memo.currentStep === "General Manager" ? "gm" : "mgr"}`} style={{ fontSize: 11 }}>
                   {isMd ? <IconCrown size={10} /> : <IconUsers size={10} />}
-                  {memo.currentStep}
+                  {currentStepLabel}
                 </span>
               }
             />
@@ -564,9 +575,18 @@ export function DrawerPanel({
               const isDone = isApproved || i < effectiveIdx;
               const isCurrent = !isApproved && i === effectiveIdx;
               const isMdStep = step === "Managing Director";
+              // Custom steps print the person's name; the role ("ตรวจ/เห็นชอบ" vs
+              // "อนุมัติ") rides in its own badge, so the short label is used here
+              // to avoid saying the role twice on one line.
+              const customStep = parseCustomStepKey(step);
+              const stepLabel = describeCustomStepShort(step, memo.customRoute);
+              const customLevel = customStep
+                ? memo.customRoute?.find((a) => a.stepKey === step)?.approvalLevel ?? null
+                : null;
+              const isFinalCustom = customStep !== null && i === arr.length - 1;
               return (
                 <div
-                  key={step}
+                  key={`${step}-${i}`}
                   className={`em-flow-step${isDone ? " done" : isCurrent ? " current" : ""}${isMdStep && isCurrent ? " md" : ""}`}
                 >
                   <div className="em-flow-dot">
@@ -574,11 +594,15 @@ export function DrawerPanel({
                   </div>
                   <div>
                     <div className="em-flow-title" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {step}
+                      {stepLabel}
                       {isMdStep && <span className="em-tier md">MD tier</span>}
+                      {customStep && (
+                        <span className="em-tier mgr">{isFinalCustom ? "อนุมัติ" : "ตรวจ/เห็นชอบ"}</span>
+                      )}
                     </div>
                     <div className="em-flow-meta">
                       {isDone ? "อนุมัติแล้ว" : isCurrent ? "รอการอนุมัติ" : "รอคิว"}
+                      {customLevel ? ` · ${customLevel}` : ""}
                     </div>
                   </div>
                 </div>

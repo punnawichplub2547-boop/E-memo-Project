@@ -24,6 +24,7 @@ import {
 } from "@/lib/prototype-users";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { DATE_OPTIONS, isWithinDays, matchesTier, tierOptions } from "@/lib/memo-filters";
+import { describeCustomStepShort } from "@/lib/custom-route";
 
 const AVATAR_COLORS = ["#7C3AED", "#2563EB", "#047857", "#B45309", "#BE123C", "#0891B2", "#6D28D9"];
 const avatarColor = (s: string) => AVATAR_COLORS[s.charCodeAt(0) % AVATAR_COLORS.length];
@@ -100,7 +101,7 @@ function QueuePageContent() {
     applyMemoParam();
   }, [memoParam]);
 
-  const tierMemos = memos.filter((m) => matchesTier(m.currentStep, tier));
+  const tierMemos = memos.filter((m) => matchesTier(m.currentStep, tier, m.customRoute));
 
   const filtered = tierMemos.filter((m) => {
     const matchTab = activeTab === "all" || m.status === activeTab;
@@ -513,7 +514,7 @@ function QueuePageContent() {
                                   }`}
                                 >
                                   {isMd ? <IconCrown size={11} /> : <IconUsers size={11} />}
-                                  {memo.currentStep}
+                                  {describeCustomStepShort(memo.currentStep, memo.customRoute)}
                                 </span>
                               </td>
                             )}

@@ -4,6 +4,7 @@ import {
   buildCustomStepKey,
   customStepRole,
   describeCustomStep,
+  describeCustomStepShort,
   findCustomApprover,
   isCustomRoute,
   isCustomStepKey,
@@ -131,5 +132,16 @@ describe("display helpers", () => {
 
   it("returns a non-token step unchanged", () => {
     expect(describeCustomStep("General Manager", null)).toBe("General Manager");
+  });
+
+  it("describeCustomStepShort gives just the person's name for compact cells", () => {
+    const { approvers } = buildCustomRoute(people);
+    expect(describeCustomStepShort("person:1#42", approvers)).toBe("สมชาย ใจดี");
+    expect(describeCustomStepShort("person:3#9", approvers)).toBe("วิทย์ ตระกูลงาม");
+  });
+
+  it("describeCustomStepShort falls back positionally and passes level labels through", () => {
+    expect(describeCustomStepShort("person:4#88", null)).toBe("ผู้อนุมัติลำดับที่ 4");
+    expect(describeCustomStepShort("General Manager", null)).toBe("General Manager");
   });
 });
