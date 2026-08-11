@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { MemoRecord } from "@/lib/approval";
 import { IconCheck, IconPen, IconReturn, IconX } from "@/components/icons";
 import { describeCustomStepShort, isCustomRoute } from "@/lib/custom-route";
+import { mdReviewGateStep } from "@/lib/workflow-rules";
 import {
   canApproveMemo,
   canRejectMemo,
@@ -74,14 +75,13 @@ export function DrawerFooter({
   // Selectable return-destination options: steps in the route from the first up to
   // (and including) the current step — Q2 forbids picking a step ahead of the actor.
   // Q1 caps an md-review memo so it cannot resume past the gate step (gate-bypass
-  // guard). The gate is "Manager / Top Section" on a level route and the first
-  // person on a custom route — mirroring mdReviewGateStep() in workflow-rules.ts,
-  // which is what the server actually enforces.
+  // guard). The gate step comes from mdReviewGateStep() itself — the same function the
+  // server enforces — rather than a second copy of the rule that can drift from it.
   const route = memo.selectedRoute ?? [];
   const currentStepIndex = route.indexOf(memo.currentStep);
   let maxReturnIndex = currentStepIndex >= 0 ? currentStepIndex : route.length - 1;
   if (memo.requiresMdReview) {
-    const gateIndex = isCustomRoute(route) ? 0 : route.indexOf("Manager / Top Section");
+    const gateIndex = route.indexOf(mdReviewGateStep(route));
     if (gateIndex >= 0) maxReturnIndex = Math.min(maxReturnIndex, gateIndex);
   }
   const returnStepOptions = route.slice(0, maxReturnIndex + 1);

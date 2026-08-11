@@ -251,6 +251,39 @@ describe("memoReducer — ADVANCE_STEP", () => {
     expect(next[0].mdReviewResumeStep).toBe("Managing Director");
     expect(next[0].status).toBe("pending");
   });
+
+  // The optimistic reducer must agree with the server about WHERE the MD review gate
+  // sits, or the drawer shows the memo moving to the next approver while the DB has it
+  // parked at MD Review. On a custom route the gate is the first person picked
+  // (mdReviewGateStep in workflow-rules.ts), not the literal "Manager / Top Section".
+  describe("MD review gate on a custom route", () => {
+    const custom = buildCustomRoute([
+      { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+      { userId: 7, name: "สุภาพร เจริญสุข", approvalLevel: "General Manager", department: "PD" },
+    ]);
+
+    const customMemo: MemoRecord = {
+      ...seedMemos[0],
+      status: "pending",
+      selectedRoute: custom.route,
+      customRoute: custom.approvers,
+      currentStep: custom.route[0],
+      requiresMdReview: true,
+    };
+
+    it("parks at MD Review when the first picked person approves", () => {
+      const next = memoReducer([customMemo], { type: "ADVANCE_STEP", id: customMemo.id });
+      expect(next[0].currentStep).toBe("Managing Director");
+      expect(next[0].mdReviewStatus).toBe("pending");
+      expect(next[0].mdReviewResumeStep).toBe(custom.route[1]);
+    });
+
+    it("does not re-trigger the gate at a later step in the route", () => {
+      const atSecond: MemoRecord = { ...customMemo, currentStep: custom.route[1], mdReviewStatus: "acknowledged_no_objection" };
+      const next = memoReducer([atSecond], { type: "ADVANCE_STEP", id: atSecond.id });
+      expect(next[0].status).toBe("approved");
+    });
+  });
 });
 
 describe("memoReducer — REVIEW_MEMO", () => {

@@ -194,7 +194,11 @@ export type WorkflowActionRow = {
 //   - custom route : the first person the requester picked — the equivalent
 //                    "first check completed" point (Q22: the gate stays, only the
 //                    choice of approvers is free)
-function mdReviewGateStep(selectedRouteJson: unknown): string {
+// Exported because the client mirrors this decision optimistically (memo-store's
+// ADVANCE_STEP, the drawer's return-destination cap). A second hand-written copy of
+// the rule drifts from the server and the UI then shows a memo advancing while the DB
+// has it parked at MD Review.
+export function mdReviewGateStep(selectedRouteJson: unknown): string {
   const route = parseRouteJson(selectedRouteJson);
   if (route && isCustomRoute(route)) return route[0];
   return "Manager / Top Section";

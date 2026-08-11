@@ -7,6 +7,8 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import type { CustomApprover } from "./custom-route";
+// Pure rules module (no DB imports) — safe to pull into this client component.
+import { mdReviewGateStep } from "./workflow-rules";
 import { memoToDbSeedRow } from "./db-seed";
 import { memoPersistErrorMessage } from "./memo-persist-error";
 import { showErrorToast } from "./toast";
@@ -167,8 +169,11 @@ export function memoReducer(state: MemoRecord[], action: Action): MemoRecord[] {
         const idx = route ? route.indexOf(m.currentStep) : -1;
         const isLastOrMissing = !route || route.length === 0 || idx === -1 || idx === route.length - 1;
 
+        // Gate step = "Manager / Top Section" on a level route, the first person picked
+        // on a custom one. Must match the server (mdReviewGateStep) or the optimistic
+        // update advances the memo while the DB parks it at MD Review.
         const needsReviewStash =
-          m.currentStep === "Manager / Top Section" &&
+          m.currentStep === mdReviewGateStep(route ?? null) &&
           m.requiresMdReview === true &&
           m.mdReviewStatus == null;
         if (needsReviewStash) {
