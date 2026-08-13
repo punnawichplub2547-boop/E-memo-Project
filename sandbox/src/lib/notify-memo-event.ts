@@ -18,7 +18,7 @@ import {
   resolveMemoCcRecipients,
   resolveReadRecipientLabels,
 } from "./notification-recipients";
-import { sendTelegramMessage, buildInlineKeyboard, sendTelegramPhoto } from "./telegram/client";
+import { sendTelegramMessage, buildInlineKeyboard, sendTelegramPhoto, escHtml } from "./telegram/client";
 import { createApproveActionToken, createReviewActionToken, type ReviewTokenActionType } from "./telegram/actions";
 import { getEmailConfig, sendEmailMessage } from "./email/client";
 import { wrapEmailHtml, wrapEmailText } from "./email/template";
@@ -136,8 +136,24 @@ type NotifyNoteDelivery = {
   emailHtml: string;
   emailAttachments: EmailAttachment[];
   telegramPhotos: { content: Buffer; filename: string }[];
+  telegramHtml: string;
   inAppText: string;
 };
+
+// Pure: the note's text as it will be appended to a Telegram message
+// (sendMessage uses parse_mode: "HTML"). escHtml is mandatory here — an
+// unescaped "<" in the note would make Telegram reject the whole message.
+// Line breaks are left as literal "\n" (not "<br>") because Telegram's HTML
+// mode already renders "\n" as a line break, matching how the rest of this
+// file's Telegram bodies (buildMemoNotificationHtml) are composed. The
+// "เรื่องเพิ่มเติม" heading matches the label buildNotifyNoteText uses for the
+// email/in-app channels, so the note reads the same across all three.
+// Empty when the note has no text — never a dangling heading with nothing
+// under it (images, if any, arrive separately as their own photo messages).
+export function buildNotifyNoteTelegramHtml(note: Pick<NotifyNote, "text">): string {
+  if (note.text.length === 0) return "";
+  return `<b>เรื่องเพิ่มเติม</b>\n${escHtml(note.text)}`;
+}
 
 // รวบ I/O ของ short note ไว้ที่เดียว: อ่าน DB → อ่านไฟล์รูป → (ถ้าติ๊กไว้) สร้าง Excel
 // ทำครั้งเดียวต่อ 1 event แล้วใช้ซ้ำกับผู้รับทุกคน ไม่ใช่อ่านใหม่ต่อคน
@@ -172,6 +188,7 @@ async function loadNotifyNoteDelivery(memo: MemoRow): Promise<NotifyNoteDelivery
       content: entry.content,
       filename: entry.image.originalName,
     })),
+    telegramHtml: buildNotifyNoteTelegramHtml(note),
     inAppText: buildNotifyNoteText(note),
   };
 }
@@ -310,6 +327,9 @@ async function notifyApprovers(
   const title = buildMemoNotificationTitle(notifType, memo.memo_no);
   // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
   const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
+  // telegram: ต่อท้าย tgHtml ด้วยข้อความ note ที่ escape แล้ว (parse_mode: "HTML");
+  // รูปส่งแยกเป็นข้อความถัดไปหลังข้อความหลัก ไม่ผสมในนี้
+  const tgHtmlWithNote = note?.telegramHtml ? `${tgHtml}\n\n${note.telegramHtml}` : tgHtml;
   for (const recipientUserId of recipientIds) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId, type: notifType,
@@ -326,10 +346,10 @@ async function notifyApprovers(
         }
         const rows = [buttons.slice(0, 2), buttons.slice(2), [{ text: "เปิดใน E-Memo", url: queueUrl }]]
           .filter((row) => row.length > 0);
-        await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard(rows));
+        await sendAndTrack(pool, notifId, chatId, tgHtmlWithNote, buildInlineKeyboard(rows));
       } else {
         const { tokenDbId } = await createApproveActionToken(memo.id, recipientUserId, chatId, pool);
-        await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[
+        await sendAndTrack(pool, notifId, chatId, tgHtmlWithNote, buildInlineKeyboard([[
           { text: "✅ อนุมัติ", callback_data: `approve:${tokenDbId}` },
           { text: "เปิดใน E-Memo", url: queueUrl },
         ]]));
@@ -381,6 +401,9 @@ async function notifyWatchers(
     const title = buildMemoNotificationTitle(type, memo.memo_no);
     // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
     const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
+    // telegram: ต่อท้าย tgHtml ด้วยข้อความ note ที่ escape แล้ว (parse_mode: "HTML");
+    // รูปส่งแยกเป็นข้อความถัดไปหลังข้อความหลัก ไม่ผสมในนี้
+    const tgHtmlWithNote = note?.telegramHtml ? `${tgHtml}\n\n${note.telegramHtml}` : tgHtml;
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type,
       title, body: bodyWithNote, actionUrl: queuePath,
@@ -395,7 +418,7 @@ async function notifyWatchers(
         note?.emailAttachments);
     }
     if (chatId) {
-      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+      await sendAndTrack(pool, notifId, chatId, tgHtmlWithNote, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
       // Q20: Telegram แตกเป็นหลายข้อความได้ — ข้อความหลักไปก่อน แล้วรูปตามทีละใบ
       for (const photo of note?.telegramPhotos ?? []) {
         await sendTelegramPhoto(chatId, photo.content, photo.filename);
@@ -429,6 +452,9 @@ async function notifyReadRecipients(
   const title = buildMemoNotificationTitle("memo_pending_read", memo.memo_no);
   // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
   const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
+  // telegram: ต่อท้าย tgHtml ด้วยข้อความ note ที่ escape แล้ว (parse_mode: "HTML");
+  // รูปส่งแยกเป็นข้อความถัดไปหลังข้อความหลัก ไม่ผสมในนี้
+  const tgHtmlWithNote = note?.telegramHtml ? `${tgHtml}\n\n${note.telegramHtml}` : tgHtml;
   for (const userId of recipients) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type: "memo_pending_read",
@@ -444,7 +470,7 @@ async function notifyReadRecipients(
     }
     const chatId = chatIds.get(userId);
     if (chatId) {
-      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+      await sendAndTrack(pool, notifId, chatId, tgHtmlWithNote, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
       // Q20: Telegram แตกเป็นหลายข้อความได้ — ข้อความหลักไปก่อน แล้วรูปตามทีละใบ
       for (const photo of note?.telegramPhotos ?? []) {
         await sendTelegramPhoto(chatId, photo.content, photo.filename);

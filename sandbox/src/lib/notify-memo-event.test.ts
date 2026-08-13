@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { buildMdReviewButtonPlan, buildMemoNotificationContext, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack, shouldSendNotifyNote } from "./notify-memo-event";
+import { buildMdReviewButtonPlan, buildMemoNotificationContext, buildNotifyNoteTelegramHtml, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack, shouldSendNotifyNote } from "./notify-memo-event";
 import { buildMemoNotificationHtml, buildMemoNotificationText } from "./notifications";
 import { buildCustomRoute } from "./custom-route";
 
@@ -279,6 +279,25 @@ describe("shouldSendNotifyNote", () => {
   it("does not send on a submitted event of a later revision", () => {
     // ป้องกันเคสที่ revision ถูกส่งผ่าน path ที่ยิง event "submitted"
     expect(shouldSendNotifyNote("submitted", 2)).toBe(false);
+  });
+});
+
+describe("buildNotifyNoteTelegramHtml", () => {
+  it("includes the note text, HTML-escaped for Telegram's parse_mode: \"HTML\"", () => {
+    const html = buildNotifyNoteTelegramHtml({ text: "<script>ด่วน & ขอภายในวันนี้</script>" });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;ด่วน &amp; ขอภายในวันนี้&lt;/script&gt;");
+  });
+
+  it("labels the note distinctly and preserves literal line breaks (Telegram HTML mode renders \\n, not <br>)", () => {
+    const html = buildNotifyNoteTelegramHtml({ text: "line1\nline2" });
+    expect(html).toContain("เรื่องเพิ่มเติม");
+    expect(html).toContain("line1\nline2");
+    expect(html).not.toContain("<br>");
+  });
+
+  it("is empty when the note has no text (no dangling heading, even if images exist)", () => {
+    expect(buildNotifyNoteTelegramHtml({ text: "" })).toBe("");
   });
 });
 
