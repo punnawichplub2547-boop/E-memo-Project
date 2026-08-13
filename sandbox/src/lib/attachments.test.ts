@@ -14,6 +14,29 @@ describe("attachment helpers", () => {
     expect(sanitizeAttachmentFileName("  weird   name (final).xlsx  ")).toBe("weird-name-final.xlsx");
   });
 
+  it("preserves Thai combining marks (vowels and tone marks)", () => {
+    // Thai uses Unicode combining marks for vowels (ั ิ ี ึ ู) and tone marks (่ ้ ๊ ๋)
+    // These are Unicode category Mn (Mark, nonspacing) and must be preserved, not split by dashes.
+    // Before the fix, "รูป" (ro-ru + vowel-u + pa) → "ร-ป" (splitting on the combining mark).
+    expect(sanitizeAttachmentFileName("รูป ประกอบ.png")).toBe("รูป-ประกอบ.png");
+    expect(sanitizeAttachmentFileName("ไฟล์ 2024 ที่มี ระดับเสียง่่.txt")).toBe("ไฟล์-2024-ที่มี-ระดับเสียง่่.txt");
+    // Test individual Thai combining marks stay with their base character
+    expect(sanitizeAttachmentFileName("กั.pdf")).toBe("กั.pdf"); // ga + combining-a
+    expect(sanitizeAttachmentFileName("ระดับ์.txt")).toBe("ระดับ์.txt"); // db + base + combining-cancellation
+  });
+
+  it("preserves path traversal guarantees even with combining marks in input", () => {
+    // Path traversal defenses must hold regardless of combining marks: no `/`, `\`, NUL, `.`, `..`, leading/trailing dot/dash
+    const result = sanitizeAttachmentFileName("../รูป/ประกอบ.png");
+    expect(result).not.toContain("/");
+    expect(result).not.toContain("\\");
+    expect(result).not.toContain("\0");
+    expect(result).not.toBe(".");
+    expect(result).not.toBe("..");
+    expect(!result.startsWith(".") && !result.startsWith("-")).toBe(true);
+    expect(!result.endsWith(".") && !result.endsWith("-")).toBe(true);
+  });
+
   it("falls back to attachment when sanitized filename is empty", () => {
     expect(sanitizeAttachmentFileName("////")).toBe("attachment");
   });
