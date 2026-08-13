@@ -49,6 +49,43 @@ export async function sendTelegramMessage(
   }
 }
 
+// sendPhoto ที่แนบไฟล์จริงต้องเป็น multipart/form-data — telegramPost() ที่ส่ง JSON
+// ใช้ไม่ได้ และการส่งเป็น URL ก็ไม่ได้เพราะรูปของ short note อยู่หลัง auth ของระบบ
+export async function sendTelegramPhoto(
+  chatId: bigint | number,
+  photo: Buffer,
+  filename: string,
+  options?: { caption?: string },
+): Promise<TelegramMessage | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    console.error("[telegram] sendPhoto skipped: TELEGRAM_BOT_TOKEN is not configured");
+    return null;
+  }
+  try {
+    const form = new FormData();
+    form.append("chat_id", chatId.toString());
+    if (options?.caption) {
+      form.append("caption", options.caption);
+      form.append("parse_mode", "HTML");
+    }
+    form.append("photo", new Blob([new Uint8Array(photo)]), filename);
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: "POST", body: form });
+    const data = (await res.json()) as {
+      ok: boolean; result?: TelegramMessage; error_code?: number; description?: string;
+    };
+    if (data.ok) return data.result ?? null;
+    console.error(
+      `[telegram] sendPhoto rejected (error_code=${data.error_code ?? "?"}): ${data.description ?? "no description"}`,
+    );
+    return null;
+  } catch (err) {
+    console.error("[telegram] sendPhoto failed:", err);
+    return null;
+  }
+}
+
 export async function answerCallbackQuery(
   callbackQueryId: string,
   text?: string,

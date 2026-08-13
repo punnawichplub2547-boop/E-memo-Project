@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { answerCallbackQuery, buildInlineKeyboard, sendTelegramMessage } from "./client";
+import { answerCallbackQuery, buildInlineKeyboard, sendTelegramMessage, sendTelegramPhoto } from "./client";
 
 beforeEach(() => { vi.stubEnv("TELEGRAM_BOT_TOKEN", "123:TEST"); });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
@@ -82,5 +82,55 @@ describe("answerCallbackQuery", () => {
     await expect(answerCallbackQuery("id", "text")).resolves.toBeUndefined();
     expect(errSpy).toHaveBeenCalledTimes(1);
     expect(errSpy.mock.calls[0].map(String).join(" ")).toContain("[telegram]");
+  });
+});
+
+describe("sendTelegramPhoto", () => {
+  it("posts multipart form data to sendPhoto — JSON cannot carry a file", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 }),
+    );
+    const result = await sendTelegramPhoto(123n, Buffer.from([1, 2, 3]), "a.png");
+    expect(result).toEqual({ message_id: 7 });
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.telegram.org/bot123:TEST/sendPhoto");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("chat_id")).toBe("123");
+  });
+
+  it("attaches caption and parse_mode when a caption is provided", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, result: { message_id: 8 } }), { status: 200 }),
+    );
+    await sendTelegramPhoto(1n, Buffer.from([1]), "a.png", { caption: "hello" });
+    const [, init] = spy.mock.calls[0] as [string, RequestInit];
+    const form = init.body as FormData;
+    expect(form.get("caption")).toBe("hello");
+    expect(form.get("parse_mode")).toBe("HTML");
+  });
+
+  it("returns null and logs when Telegram rejects the photo", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ ok: false, error_code: 400, description: "PHOTO_INVALID_DIMENSIONS" }),
+        { status: 200 },
+      ),
+    );
+    await expect(sendTelegramPhoto(1n, Buffer.from([1]), "a.png")).resolves.toBeNull();
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const logged = errSpy.mock.calls[0].map(String).join(" ");
+    expect(logged).toContain("[telegram]");
+    expect(logged).toContain("PHOTO_INVALID_DIMENSIONS");
+  });
+
+  it("returns null when the network throws", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    await expect(sendTelegramPhoto(1n, Buffer.from([1]), "a.png")).resolves.toBeNull();
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const logged = errSpy.mock.calls[0].map(String).join(" ");
+    expect(logged).toContain("[telegram]");
+    expect(logged).toContain("offline");
   });
 });
