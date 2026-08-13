@@ -117,6 +117,17 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     isRevisionMode ? (reviseMemo!.priceAdjustmentReason ?? "") : ""
   );
 
+  // ── Notification short note (V2 §3, Q13/Q14) ──
+  // Deliberately NOT wired into applyBulkData/snapshotFormData below. This belongs to
+  // *this one submission's notification*, not to the memo's reusable content: saving it
+  // into a template, or letting a loaded template / AI draft / PDF prefill silently
+  // overwrite it, would both be wrong. Do not "fix" this omission — it is intentional.
+  // Also not part of revision-mode prefill: a resubmit does not send a new note
+  // notification (Q16), so there is nothing meaningful to carry forward.
+  const [notifyNote, setNotifyNote] = useState("");
+  const [notifyNoteImageFiles, setNotifyNoteImageFiles] = useState<File[]>([]);
+  const [notifyAttachExcel, setNotifyAttachExcel] = useState(false);
+
   // ── Routing fields — always default to fresh recommendation (user decision) ──
   // The per-person route is the exception: a revision reopens on whichever tab the
   // memo was submitted from, with the same people, so resubmitting does not
@@ -416,6 +427,9 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     selectedVendorReason, setSelectedVendorReason,
     requestItems, setRequestItems,
     priceAdjustmentReason, setPriceAdjustmentReason,
+    notifyNote, setNotifyNote,
+    notifyNoteImageFiles, setNotifyNoteImageFiles,
+    notifyAttachExcel, setNotifyAttachExcel,
     chosenApprover, setChosenApprover,
     skipGmStep, setSkipGmStep,
     routeOverrideReason, setRouteOverrideReason,

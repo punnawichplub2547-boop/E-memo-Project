@@ -10,6 +10,7 @@ import {
 } from "@/components/icons";
 import { StepDot } from "./_components/StepDot";
 import { AttachmentsCard } from "./_components/AttachmentsCard";
+import { NotifyNoteCard } from "./_components/NotifyNoteCard";
 import { ClosingRemarkCard } from "./_components/ClosingRemarkCard";
 import { RequestItemsCard } from "./_components/RequestItemsCard";
 import { BudgetCard } from "./_components/BudgetCard";
@@ -61,6 +62,9 @@ function CreatePageContent() {
     priceComparisons, selectedVendorReason, setSelectedVendorReason,
     requestItems,
     priceAdjustmentReason, setPriceAdjustmentReason,
+    notifyNote, setNotifyNote,
+    notifyNoteImageFiles, setNotifyNoteImageFiles,
+    notifyAttachExcel, setNotifyAttachExcel,
     setChosenApprover,
     skipGmStep, setSkipGmStep,
     routeOverrideReason, setRouteOverrideReason,
@@ -110,6 +114,7 @@ function CreatePageContent() {
 
   const {
     attachmentFiles, attachmentError, isSubmitting, isPreviewingExcel,
+    notifyNoteError,
     addAttachmentFiles, removeAttachmentFile, handleSubmit, handlePreviewExcel,
   } = useMemoSubmit(formFields, { user, dispatch, router });
 
@@ -511,6 +516,21 @@ function CreatePageContent() {
               )}
 
             </div>
+
+            {/* Notification short note — own submission's notification only, not
+                memo content. Not offered on revision: a resubmit does not send a
+                new note notification (Q16), so there is nothing to carry here. */}
+            {!isRevisionMode && (
+              <NotifyNoteCard
+                note={notifyNote}
+                onNoteChange={setNotifyNote}
+                images={notifyNoteImageFiles}
+                onImagesChange={setNotifyNoteImageFiles}
+                attachExcel={notifyAttachExcel}
+                onAttachExcelChange={setNotifyAttachExcel}
+                uploadError={notifyNoteError}
+              />
+            )}
 
             {/* Price Comparison — premium full-width financial decision card */}
             <PriceComparisonCard

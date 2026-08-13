@@ -23,6 +23,7 @@ import type {
   RequestItem,
 } from "./approval";
 import { buildCustomRoute } from "./custom-route";
+import type { NotifyNoteImage } from "./notify-note";
 
 /** The slice of the create form this needs. `MemoFormFieldsResult` satisfies it
  *  structurally, so the hook can be passed straight in. */
@@ -51,6 +52,10 @@ export type MemoDraftFields = {
   showDeptMonthly: boolean;
   deptMonthlyOverBudgetTotal: number;
   orderedReadRecipients: string[];
+  /** Short note delivered with the first submit notification only (V2 §3, Q13/Q14).
+   *  Never read back from the DB into the form — see notify-note.ts. */
+  notifyNote?: string;
+  notifyAttachExcel?: boolean;
   recommendation: {
     recommendedFinalApprover: ApprovalLevel;
     notifyMD: boolean;
@@ -86,13 +91,15 @@ export type MemoDraftOptions = {
   /** Display-formatted stamp; used for both createdAt and updatedAt. */
   timestamp: string;
   attachments?: MemoAttachment[];
+  /** Uploaded via POST /api/notify-note-images before this is called — see useMemoSubmit. */
+  notifyNoteImages?: NotifyNoteImage[];
 };
 
 export function buildMemoDraftRecord(
   fields: MemoDraftFields,
   options: MemoDraftOptions,
 ): MemoRecord {
-  const { id, requester, status, timestamp, attachments } = options;
+  const { id, requester, status, timestamp, attachments, notifyNoteImages } = options;
 
   // Read actions are the acknowledgement queue. A draft has not been sent to
   // anyone, so nobody owes it an acknowledgement yet.
@@ -162,5 +169,9 @@ export function buildMemoDraftRecord(
     cycleHours: 0,
     createdAt: timestamp,
     updatedAt: timestamp,
+    // ส่งไปกับการแจ้งเตือนครั้งแรกเท่านั้น ไม่ถูกอ่านกลับมาจาก DB (Q14)
+    notifyNote: fields.notifyNote?.trim() || undefined,
+    notifyNoteImages,
+    notifyAttachExcel: fields.notifyAttachExcel || undefined,
   };
 }

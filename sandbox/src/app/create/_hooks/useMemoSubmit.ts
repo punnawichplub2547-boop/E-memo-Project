@@ -7,6 +7,7 @@ import { isAllowedAttachmentFile, MAX_ATTACHMENT_BYTES } from "@/lib/attachments
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { generateMemoId } from "@/lib/memo-id";
 import { buildMemoDraftRecord } from "@/lib/build-memo-draft-record";
+import type { NotifyNoteImage } from "@/lib/notify-note";
 import { buildCustomRoute } from "@/lib/custom-route";
 import { validateMemoFormForApproval } from "@/lib/validate-memo-form";
 import { showErrorToast } from "@/lib/toast";
@@ -30,6 +31,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     effectiveIsDeadStock, showDeptMonthly, deptMonthlyOverBudgetTotal, orderedReadRecipients,
     recommendation, routeReview, selectedRoute, cleanOverrideReason, canSubmitPending,
     routeSource, customRoutePeople,
+    notifyNoteImageFiles,
   } = fields;
 
   // Which route this submission carries. The custom tab wins only when it is
@@ -43,6 +45,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
 
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [notifyNoteError, setNotifyNoteError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewingExcel, setIsPreviewingExcel] = useState(false);
 
@@ -133,6 +136,22 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     return body.attachments.length > 0 ? body.attachments : undefined;
   };
 
+  /** Same shape as uploadSelectedAttachments, for the note's own image slot
+   *  (storage/notify-notes/<memoId>, not storage/attachments — see Task 3). */
+  const uploadNotifyNoteImages = async (memoId: string): Promise<NotifyNoteImage[] | undefined> => {
+    if (notifyNoteImageFiles.length === 0) return undefined;
+    const formData = new FormData();
+    formData.append("memoId", memoId);
+    for (const file of notifyNoteImageFiles) formData.append("files", file);
+    const response = await fetch("/api/notify-note-images", { method: "POST", body: formData });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "อัปโหลดรูปไม่สำเร็จ" }));
+      throw new Error(String(body.error ?? "อัปโหลดรูปไม่สำเร็จ"));
+    }
+    const body = await response.json() as { images: NotifyNoteImage[] };
+    return body.images.length > 0 ? body.images : undefined;
+  };
+
   const handleSubmit = async (status: "draft" | "pending") => {
     if (status === "draft" && isRevisionMode) return; // Save Draft is not available in revision mode
     if (isSubmitting) return;
@@ -161,6 +180,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     const stamp = formatTimestamp(now);
     setIsSubmitting(true);
     setAttachmentError(null);
+    setNotifyNoteError(null);
 
     if (isRevisionMode) {
       // Dispatch SUBMIT_REVISION — applies new content to the existing memo and increments revision.
@@ -213,10 +233,23 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     const id = generateMemoId(now);
     const createdTimestamp = formatTimestamp(now);
     let attachments: MemoAttachment[] | undefined;
+    let notifyNoteImages: NotifyNoteImage[] | undefined;
+    // Both uploads happen before the memo is dispatched: a memo whose note refers to
+    // images nobody will ever see (because the upload silently failed) is worse than
+    // no memo yet. attachmentsUploaded tracks which of the two calls threw, so the
+    // right card gets the error message instead of a generic one.
+    let attachmentsUploaded = false;
     try {
       attachments = await uploadSelectedAttachments(id);
+      attachmentsUploaded = true;
+      notifyNoteImages = await uploadNotifyNoteImages(id);
     } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : "Unable to upload attachments");
+      const message = error instanceof Error ? error.message : "Unable to upload attachments";
+      if (attachmentsUploaded) {
+        setNotifyNoteError(message);
+      } else {
+        setAttachmentError(message);
+      }
       setIsSubmitting(false);
       return;
     }
@@ -228,6 +261,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
         status,
         timestamp: createdTimestamp,
         attachments,
+        notifyNoteImages,
       }),
     });
     router.push(status === "pending" ? "/queue" : "/");
@@ -235,6 +269,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
 
   return {
     attachmentFiles, attachmentError, isSubmitting, isPreviewingExcel,
+    notifyNoteError,
     addAttachmentFiles, removeAttachmentFile, handleSubmit, handlePreviewExcel,
   };
 }

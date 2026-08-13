@@ -30,6 +30,9 @@ function makeFields(overrides: Partial<MemoFormFieldsResult> = {}): MemoFormFiel
     budgetPlan: 0,
     budgetUsed: 0,
     requestItems: [{ id: "1", name: "กระดาษ", unit: "รีม", qty: 1, unitPrice: 1000 }],
+    notifyNote: "",
+    notifyNoteImageFiles: [],
+    notifyAttachExcel: false,
     priceComparisons: [{ id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "ไม่สามารถต่อรองราคาได้", isSelected: true }],
     selectedVendor: { id: "1", vendorName: "ACME", offeredPrice: 1000, discount: 0, vatEnabled: false, netPrice: 1000, remark: "ไม่สามารถต่อรองราคาได้", isSelected: true },
     selectedNotLowest: false,
@@ -219,6 +222,77 @@ describe("useMemoSubmit", () => {
       })
     );
     expect(push).toHaveBeenCalledWith("/");
+  });
+});
+
+describe("useMemoSubmit — notification short note", () => {
+  it("uploads the note images and carries the note into ADD_MEMO", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ images: [{ id: "1", originalName: "a.png", storedName: "u-a.png", size: 5, mimeType: "image/png" }] }),
+    }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const fields = makeFields({
+      notifyNote: "ด่วน ขอภายในวันนี้",
+      notifyNoteImageFiles: [new File([new Uint8Array(5)], "a.png", { type: "image/png" })],
+      notifyAttachExcel: true,
+    });
+    const dispatch = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(fields, {
+        user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+        dispatch,
+        router: { push: vi.fn() } as never,
+      })
+    );
+
+    await act(async () => { await result.current.handleSubmit("pending"); });
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/notify-note-images");
+    const added = dispatch.mock.calls.find((c) => c[0].type === "ADD_MEMO")![0];
+    expect(added.memo.notifyNote).toBe("ด่วน ขอภายในวันนี้");
+    expect(added.memo.notifyNoteImages).toHaveLength(1);
+    expect(added.memo.notifyAttachExcel).toBe(true);
+  });
+
+  it("does not call the upload route when there are no images", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const fields = makeFields({ notifyNote: "ข้อความล้วน", notifyNoteImageFiles: [] });
+    const dispatch = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(fields, {
+        user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+        dispatch,
+        router: { push: vi.fn() } as never,
+      })
+    );
+
+    await act(async () => { await result.current.handleSubmit("pending"); });
+
+    const calledUpload = fetchMock.mock.calls.some((c) => String(c[0]).includes("notify-note-images"));
+    expect(calledUpload).toBe(false);
+  });
+
+  it("blocks the submit when the note image upload fails — the note must not be lost silently", async () => {
+    global.fetch = vi.fn(async () => ({ ok: false, json: async () => ({ error: "too big" }) })) as unknown as typeof fetch;
+    const fields = makeFields({
+      notifyNote: "ด่วน",
+      notifyNoteImageFiles: [new File([new Uint8Array(5)], "a.png", { type: "image/png" })],
+    });
+    const dispatch = vi.fn();
+    const { result } = renderHook(() =>
+      useMemoSubmit(fields, {
+        user: { id: "u1", name: "สมชาย ใจดี", department: "IT", roleLabel: "Requester", roles: ["requester"] },
+        dispatch,
+        router: { push: vi.fn() } as never,
+      })
+    );
+
+    await act(async () => { await result.current.handleSubmit("pending"); });
+
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });
 
