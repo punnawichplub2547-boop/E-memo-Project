@@ -96,6 +96,16 @@ describe("sendTelegramPhoto", () => {
     expect(url).toBe("https://api.telegram.org/bot123:TEST/sendPhoto");
     expect(init.body).toBeInstanceOf(FormData);
     expect((init.body as FormData).get("chat_id")).toBe("123");
+
+    // The whole point of this function is that a real file part reaches Telegram —
+    // assert the "photo" part is an actual Blob/File carrying the right bytes and
+    // filename, not just that some value exists under that key.
+    const photoPart = (init.body as FormData).get("photo");
+    expect(photoPart).toBeInstanceOf(Blob);
+    const blob = photoPart as unknown as File;
+    expect(blob.name).toBe("a.png");
+    expect(blob.size).toBe(3);
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
   });
 
   it("attaches caption and parse_mode when a caption is provided", async () => {
