@@ -55,8 +55,11 @@ describe("loadNotifyNote", () => {
   });
 
   it("survives a legacy database that predates the columns", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pool = { query: vi.fn(async () => { throw Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }); }) } as never;
     expect(await loadNotifyNote(pool, 1)).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 
@@ -72,8 +75,11 @@ describe("readNotifyNoteImageBuffers", () => {
   });
 
   it("skips an unreadable file instead of sinking the whole notification", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     readFile.mockRejectedValue(new Error("ENOENT"));
     expect(await readNotifyNoteImageBuffers("EM-2026-2026-0001", [image])).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("skips a storedName that tries to escape the folder", async () => {
