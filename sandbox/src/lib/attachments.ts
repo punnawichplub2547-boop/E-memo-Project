@@ -16,6 +16,7 @@ export function sanitizeAttachmentFileName(name: string): string {
   const sanitized = baseName
     .trim()
     .normalize("NFC")
+    // \p{L} = letters, \p{M} = combining marks (Thai vowels/tone marks), \p{N} = numbers
     .replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "-")
     .replace(/-+/g, "-")
     .replace(/-\./g, ".")

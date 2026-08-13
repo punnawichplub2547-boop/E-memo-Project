@@ -34,6 +34,17 @@ function extensionOf(name: string): string {
   return idx === -1 ? "" : name.slice(idx + 1).toLowerCase();
 }
 
+export function inferNotifyNoteImageMimeType(name: string, detectedType: string): string {
+  // Use detected type if present and valid
+  if (detectedType && ALLOWED_IMAGE_MIME_TYPES.has(detectedType)) return detectedType;
+  // Infer from extension if type is empty or invalid
+  const ext = extensionOf(name);
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  // Fallback to the detected type even if empty (validation already passed)
+  return detectedType;
+}
+
 export function isAllowedNotifyNoteImage(name: string, mimeType: string): boolean {
   if (!ALLOWED_IMAGE_EXTENSIONS.has(extensionOf(name))) return false;
   // mimeType ว่างเกิดได้จากเบราว์เซอร์บางตัว — ยอมรับได้เพราะนามสกุลผ่านแล้ว

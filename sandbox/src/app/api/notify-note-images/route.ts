@@ -4,7 +4,7 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeAttachmentFileName, isSafeAttachmentSegment } from "@/lib/attachments";
 import { getActiveSessionUserFromToken, COOKIE_NAME } from "@/lib/auth";
-import { validateNotifyNoteImageFiles, type NotifyNoteImage } from "@/lib/notify-note";
+import { validateNotifyNoteImageFiles, type NotifyNoteImage, inferNotifyNoteImageMimeType } from "@/lib/notify-note";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         originalName,
         storedName,
         size: file.size,
-        mimeType: file.type || "image/png",
+        mimeType: inferNotifyNoteImageMimeType(originalName, file.type),
       });
     }
 

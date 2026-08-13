@@ -74,4 +74,20 @@ describe("POST /api/notify-note-images", () => {
     expect(response.status).toBe(400);
     expect(writeFile).not.toHaveBeenCalled();
   });
+
+  it("returns empty images array when no files are uploaded", async () => {
+    const response = await POST(request([]));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.images).toEqual([]);
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it("infers JPEG MIME type from .jpg extension when browser omits type", async () => {
+    const jpegNoType = new File([new Uint8Array(10)], "photo.jpg", { type: "" });
+    const response = await POST(request([jpegNoType]));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.images[0].mimeType).toBe("image/jpeg");
+  });
 });
