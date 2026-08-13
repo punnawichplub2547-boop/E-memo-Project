@@ -16,7 +16,7 @@ export function sanitizeAttachmentFileName(name: string): string {
   const sanitized = baseName
     .trim()
     .normalize("NFC")
-    .replace(/[^\p{L}\p{N}._-]+/gu, "-")
+    .replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "-")
     .replace(/-+/g, "-")
     .replace(/-\./g, ".")
     .replace(/^[._-]+|[._-]+$/g, "");
