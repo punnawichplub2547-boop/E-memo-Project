@@ -18,10 +18,20 @@ import {
   resolveMemoCcRecipients,
   resolveReadRecipientLabels,
 } from "./notification-recipients";
-import { sendTelegramMessage, buildInlineKeyboard } from "./telegram/client";
+import { sendTelegramMessage, buildInlineKeyboard, sendTelegramPhoto } from "./telegram/client";
 import { createApproveActionToken, createReviewActionToken, type ReviewTokenActionType } from "./telegram/actions";
 import { getEmailConfig, sendEmailMessage } from "./email/client";
 import { wrapEmailHtml, wrapEmailText } from "./email/template";
+import { loadNotifyNote, readNotifyNoteImageBuffers } from "./notify-note-store";
+import {
+  buildNotifyNoteText,
+  buildNotifyNoteHtml,
+  buildNotifyNoteEmailAttachments,
+} from "./email/notify-note-section";
+import { memoToExcelBuffer } from "./export/memo-excel";
+import { loadMemoForExport } from "./export/load-memo-export";
+import type { NotifyNote } from "./notify-note";
+import type { EmailAttachment } from "./email/client";
 import type { RowDataPacket } from "mysql2";
 
 type MemoRow = RowDataPacket & {
@@ -39,6 +49,12 @@ type EmailRow = RowDataPacket & { id: number; email: string };
 type SendEmailFn = typeof sendEmailMessage;
 
 export type MemoEventType = "submitted" | "resubmitted" | "advanced" | "returned" | "rejected";
+
+// Pure: short note ถูกส่งครั้งเดียวตอนส่งเมโมครั้งแรกเท่านั้น (Q16). เช็ค revisionNo
+// ด้วยเพราะ note ผูกกับ "การส่งครั้งแรก" ไม่ใช่กับ event ชื่อ submitted เฉยๆ
+export function shouldSendNotifyNote(eventType: MemoEventType, revisionNo: number): boolean {
+  return eventType === "submitted" && revisionNo <= 1;
+}
 
 // Pure: who should receive a watcher (FYI) notification for an event.
 // excludeIds removes recipients already handled by a different channel (e.g. the
@@ -113,6 +129,51 @@ async function getMemo(memoNo: string): Promise<MemoRow | null> {
     [memoNo],
   );
   return rows[0] ?? null;
+}
+
+type NotifyNoteDelivery = {
+  emailText: string;
+  emailHtml: string;
+  emailAttachments: EmailAttachment[];
+  telegramPhotos: { content: Buffer; filename: string }[];
+  inAppText: string;
+};
+
+// รวบ I/O ของ short note ไว้ที่เดียว: อ่าน DB → อ่านไฟล์รูป → (ถ้าติ๊กไว้) สร้าง Excel
+// ทำครั้งเดียวต่อ 1 event แล้วใช้ซ้ำกับผู้รับทุกคน ไม่ใช่อ่านใหม่ต่อคน
+async function loadNotifyNoteDelivery(memo: MemoRow): Promise<NotifyNoteDelivery | null> {
+  const pool = getDbPool();
+  const note: NotifyNote | null = await loadNotifyNote(pool, memo.id);
+  if (!note) return null;
+
+  const loadedImages = await readNotifyNoteImageBuffers(memo.memo_no, note.images);
+  const emailAttachments = buildNotifyNoteEmailAttachments(loadedImages);
+
+  // Q17: แนบ Excel เฉพาะเมื่อผู้สร้างติ๊กเอง · Q17b: อีเมลเท่านั้น ไม่ส่งเข้า Telegram
+  if (note.attachExcel) {
+    try {
+      const loaded = await loadMemoForExport(memo.memo_no, pool);
+      if (loaded) {
+        const buffer = await memoToExcelBuffer(loaded.memo, loaded.signatures);
+        const safeName = memo.memo_no.replace(/[^A-Za-z0-9_-]/g, "_");
+        emailAttachments.push({ filename: `memo-${safeName}.xlsx`, content: buffer });
+      }
+    } catch (err) {
+      // ไฟล์แนบพลาดได้ แต่การแจ้งเตือนต้องออก
+      console.error("[loadNotifyNoteDelivery] excel attachment failed:", err);
+    }
+  }
+
+  return {
+    emailText: buildNotifyNoteText(note),
+    emailHtml: buildNotifyNoteHtml(note, loadedImages.map((entry) => entry.image)),
+    emailAttachments,
+    telegramPhotos: loadedImages.map((entry) => ({
+      content: entry.content,
+      filename: entry.image.originalName,
+    })),
+    inAppText: buildNotifyNoteText(note),
+  };
 }
 
 // Pure: the payload every outbound channel (in-app bell, Telegram, email) renders.
@@ -195,9 +256,10 @@ export async function sendEmailAndTrack(
   text: string,
   html?: string,
   sendEmail: SendEmailFn = sendEmailMessage,
+  attachments?: EmailAttachment[],
 ) {
   await createEmailDelivery(pool, notifId);
-  const sent = await sendEmail({ to, subject, text, html });
+  const sent = await sendEmail({ to, subject, text, html, ...(attachments?.length ? { attachments } : {}) });
   await markDeliveryStatus(pool, notifId, "email", sent ? "sent" : "failed", {
     providerId: sent?.messageId,
   });
@@ -226,7 +288,13 @@ const BUTTON_LABELS: Record<ReviewTokenActionType, string> = {
 // Actionable: notify the approvers at the memo's current step, with an approve button.
 // Returns the approver user ids so the caller can exclude them from the watcher fan-out.
 // actorUserId is excluded from the recipients — see excludeActorFromRecipients.
-async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: string, actorUserId: number | null): Promise<number[]> {
+async function notifyApprovers(
+  memo: MemoRow,
+  queuePath: string,
+  queueUrl: string,
+  actorUserId: number | null,
+  note?: NotifyNoteDelivery | null,
+): Promise<number[]> {
   const pool = getDbPool();
   const allRecipientIds = await resolveApprovalStepRecipients(memo.current_step, memo.department_name, pool);
   const recipientIds = excludeActorFromRecipients(allRecipientIds, actorUserId);
@@ -240,10 +308,12 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
   const body = buildMemoNotificationText(notifType, ctx);
   const tgHtml = buildMemoNotificationHtml(notifType, ctx);
   const title = buildMemoNotificationTitle(notifType, memo.memo_no);
+  // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
+  const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
   for (const recipientUserId of recipientIds) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId, type: notifType,
-      title, body, actionUrl: queuePath,
+      title, body: bodyWithNote, actionUrl: queuePath,
     });
     const chatId = chatIds.get(recipientUserId);
     if (chatId) {
@@ -264,12 +334,18 @@ async function notifyApprovers(memo: MemoRow, queuePath: string, queueUrl: strin
           { text: "เปิดใน E-Memo", url: queueUrl },
         ]]));
       }
+      // Q20: Telegram แตกเป็นหลายข้อความได้ — ข้อความหลักไปก่อน แล้วรูปตามทีละใบ
+      for (const photo of note?.telegramPhotos ?? []) {
+        await sendTelegramPhoto(chatId, photo.content, photo.filename);
+      }
     }
     const email = emails.get(recipientUserId);
     if (email) {
       await sendEmailAndTrack(pool, notifId, email, title,
-        wrapEmailText(addOpenLinkText(body, queueUrl)),
-        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
+        wrapEmailText(addOpenLinkText(note?.emailText ? `${body}\n\n${note.emailText}` : body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl) + (note?.emailHtml ?? ""), { heading: title }),
+        sendEmailMessage,
+        note?.emailAttachments);
     }
   }
   return recipientIds;
@@ -287,6 +363,7 @@ async function notifyWatchers(
   queuePath: string,
   queueUrl: string,
   excludeIds: number[] = [],
+  note?: NotifyNoteDelivery | null,
 ): Promise<void> {
   const pool = getDbPool();
   const requesterId = await resolveRequesterRecipient(memo.requester_name, memo.requester_user_id, pool);
@@ -302,18 +379,28 @@ async function notifyWatchers(
     const body = buildMemoNotificationText(type, ctx);
     const tgHtml = buildMemoNotificationHtml(type, ctx);
     const title = buildMemoNotificationTitle(type, memo.memo_no);
+    // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
+    const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type,
-      title, body, actionUrl: queuePath,
+      title, body: bodyWithNote, actionUrl: queuePath,
     });
     const chatId = chatIds.get(userId);
     const email = emails.get(userId);
     if (email) {
       await sendEmailAndTrack(pool, notifId, email, title,
-        wrapEmailText(addOpenLinkText(body, queueUrl)),
-        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
+        wrapEmailText(addOpenLinkText(note?.emailText ? `${body}\n\n${note.emailText}` : body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl) + (note?.emailHtml ?? ""), { heading: title }),
+        sendEmailMessage,
+        note?.emailAttachments);
     }
-    if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+    if (chatId) {
+      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+      // Q20: Telegram แตกเป็นหลายข้อความได้ — ข้อความหลักไปก่อน แล้วรูปตามทีละใบ
+      for (const photo of note?.telegramPhotos ?? []) {
+        await sendTelegramPhoto(chatId, photo.content, photo.filename);
+      }
+    }
   }
 }
 
@@ -325,6 +412,7 @@ async function notifyReadRecipients(
   queuePath: string,
   queueUrl: string,
   actorUserId: number | null,
+  note?: NotifyNoteDelivery | null,
 ): Promise<void> {
   const pool = getDbPool();
   const labels = await getPendingReadLabels(pool, memo.id, memo.revision_no);
@@ -339,19 +427,29 @@ async function notifyReadRecipients(
   const body = buildMemoNotificationText("memo_pending_read", ctx);
   const tgHtml = buildMemoNotificationHtml("memo_pending_read", ctx);
   const title = buildMemoNotificationTitle("memo_pending_read", memo.memo_no);
+  // in-app: ต่อท้าย body ด้วยข้อความ note (ไม่มีรูป — กระดิ่งเป็นข้อความล้วน)
+  const bodyWithNote = note?.inAppText ? `${body}\n\n${note.inAppText}` : body;
   for (const userId of recipients) {
     const notifId = await createNotification(pool, {
       memoId: memo.id, recipientUserId: userId, type: "memo_pending_read",
-      title, body, actionUrl: queuePath,
+      title, body: bodyWithNote, actionUrl: queuePath,
     });
     const email = emails.get(userId);
     if (email) {
       await sendEmailAndTrack(pool, notifId, email, title,
-        wrapEmailText(addOpenLinkText(body, queueUrl)),
-        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl), { heading: title }));
+        wrapEmailText(addOpenLinkText(note?.emailText ? `${body}\n\n${note.emailText}` : body, queueUrl)),
+        wrapEmailHtml(addOpenLinkHtml(tgHtml, queueUrl) + (note?.emailHtml ?? ""), { heading: title }),
+        sendEmailMessage,
+        note?.emailAttachments);
     }
     const chatId = chatIds.get(userId);
-    if (chatId) await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+    if (chatId) {
+      await sendAndTrack(pool, notifId, chatId, tgHtml, buildInlineKeyboard([[{ text: "เปิดใน E-Memo", url: queueUrl }]]));
+      // Q20: Telegram แตกเป็นหลายข้อความได้ — ข้อความหลักไปก่อน แล้วรูปตามทีละใบ
+      for (const photo of note?.telegramPhotos ?? []) {
+        await sendTelegramPhoto(chatId, photo.content, photo.filename);
+      }
+    }
   }
 }
 
@@ -370,9 +468,19 @@ export async function notifyMemoEvent(
     const statusUpdate = { requesterType: "memo_status_update", ccType: "memo_status_update" };
 
     if (eventType === "submitted") {
-      const approverIds = await notifyApprovers(memo, queuePath, queueUrl, actorUserId);
-      await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl, approverIds);
-      await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId);
+      // Defensive: loadNotifyNoteDelivery's own sub-calls already swallow their
+      // expected failure modes (DB error, unreadable image, Excel export throw),
+      // but a note failure must never sink the whole event via the outer catch —
+      // that would silently skip the approver/watcher/read notifications too.
+      const note = shouldSendNotifyNote(eventType, memo.revision_no)
+        ? await loadNotifyNoteDelivery(memo).catch((err: unknown) => {
+            console.error("[notifyMemoEvent] note delivery failed:", err);
+            return null;
+          })
+        : null;
+      const approverIds = await notifyApprovers(memo, queuePath, queueUrl, actorUserId, note);
+      await notifyWatchers(memo, { requesterType: "memo_submitted", ccType: "memo_cc" }, actorUserId, false, queuePath, queueUrl, approverIds, note);
+      await notifyReadRecipients(memo, queuePath, queueUrl, actorUserId, note);
       return;
     }
     if (eventType === "resubmitted") {

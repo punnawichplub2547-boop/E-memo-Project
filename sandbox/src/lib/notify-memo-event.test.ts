@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "mysql2/promise";
-import { buildMdReviewButtonPlan, buildMemoNotificationContext, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack } from "./notify-memo-event";
+import { buildMdReviewButtonPlan, buildMemoNotificationContext, computeReadNotifyRecipients, computeWatcherRecipients, excludeActorFromRecipients, getChatIds, getPendingReadLabels, getUserEmails, sendEmailAndTrack, shouldSendNotifyNote } from "./notify-memo-event";
 import { buildMemoNotificationHtml, buildMemoNotificationText } from "./notifications";
 import { buildCustomRoute } from "./custom-route";
 
@@ -262,6 +262,23 @@ describe("buildMemoNotificationContext", () => {
       title: "ขอซื้อวัตถุดิบ",
       requesterName: "ผู้ขอ ทดสอบ",
     });
+  });
+});
+
+describe("shouldSendNotifyNote", () => {
+  it("sends only on the first submission (Q16)", () => {
+    expect(shouldSendNotifyNote("submitted", 1)).toBe(true);
+  });
+
+  it("never sends again on any later event", () => {
+    for (const event of ["resubmitted", "advanced", "returned", "rejected"] as const) {
+      expect(shouldSendNotifyNote(event, 1)).toBe(false);
+    }
+  });
+
+  it("does not send on a submitted event of a later revision", () => {
+    // ป้องกันเคสที่ revision ถูกส่งผ่าน path ที่ยิง event "submitted"
+    expect(shouldSendNotifyNote("submitted", 2)).toBe(false);
   });
 });
 
