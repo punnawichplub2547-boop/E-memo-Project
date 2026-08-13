@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import type { MemoSeedRow } from "@/lib/db-seed";
 
 vi.mock("@/lib/auth", () => ({
   getActiveSessionUserFromToken: vi.fn(),
@@ -12,7 +11,7 @@ vi.mock("@/lib/custom-route-server", () => ({ resolveCustomRouteFromRequest: vi.
 vi.mock("@/lib/db-users", () => ({ departmentHasActiveSupervisor: vi.fn() }));
 vi.mock("@/lib/notify-memo-event", () => ({ notifyMemoEvent: vi.fn() }));
 
-import { POST } from "./route";
+import { POST, memoRowParams } from "./route";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
@@ -128,25 +127,92 @@ describe("POST /api/memos custom route refusal", () => {
 
 // ป้องกันบั๊กคลาสที่โปรเจกต์นี้เจอซ้ำ: เพิ่มคอลัมน์ใน INSERT แต่ลืมเพิ่มใน memoRowParams
 // (หรือกลับกัน) แล้วค่าเลื่อนคอลัมน์กันทั้งแถวโดยไม่มีเทสต์ตัวไหนแดง
+//
+// This is a BEHAVIOURAL test: it calls the real memoRowParams() and checks its
+// output, not the source text of route.ts (a source-text/regex test breaks on
+// reformatting and never actually exercises the code). FIXTURE_ROW below is
+// written in exactly the field order MemoSeedRow declares (src/lib/db-seed.ts),
+// which is also the column order the INSERT statement writes them in — every
+// field gets its own distinctive sentinel value so a one-position shift (a
+// column added to the INSERT/params but its neighbour's value now lands one
+// slot over) fails loudly and points at exactly which value moved.
 describe("POST /api/memos INSERT wiring", () => {
-  const source = readFileSync(path.join(process.cwd(), "src/app/api/memos/route.ts"), "utf8");
+  const FIXTURE_ROW: MemoSeedRow = {
+    memo_no: "sentinel:memo_no",
+    title: "sentinel:title",
+    requester_name: "sentinel:requester_name",
+    requester_user_id: 101,
+    department_name: "sentinel:department_name",
+    category: "sentinel:category",
+    item_subcategory_id: 102,
+    item_subcategory_label: "sentinel:item_subcategory_label",
+    amount: 103,
+    budget_status: "sentinel:budget_status",
+    account_code: "sentinel:account_code",
+    budget_plan: 104,
+    budget_used: 105,
+    description: "sentinel:description",
+    closing_remark: "sentinel:closing_remark",
+    notify_note: "sentinel:notify_note",
+    notify_note_images_json: "sentinel:notify_note_images_json",
+    notify_attach_excel: 106,
+    status: "sentinel:status",
+    workflow_state: "sentinel:workflow_state",
+    current_step: "sentinel:current_step",
+    cycle_hours: 107,
+    recommended_final_approver: "sentinel:recommended_final_approver",
+    recommended_route_json: "sentinel:recommended_route_json",
+    selected_route_json: "sentinel:selected_route_json",
+    custom_route_json: "sentinel:custom_route_json",
+    route_mode: "sentinel:route_mode",
+    route_override_reason: "sentinel:route_override_reason",
+    notify_md: true,
+    requires_md_review: false,
+    md_review_status: "sentinel:md_review_status",
+    md_review_resume_step: "sentinel:md_review_resume_step",
+    md_review_comment: "sentinel:md_review_comment",
+    md_review_acted_by: "sentinel:md_review_acted_by",
+    md_review_acted_at: "sentinel:md_review_acted_at",
+    is_price_adjustment: true,
+    follows_production_plan: false,
+    is_dead_stock: true,
+    dept_monthly_over_budget_total: 108,
+    return_reason: "sentinel:return_reason",
+    reject_reason: "sentinel:reject_reason",
+    reject_disposition: "sentinel:reject_disposition",
+    revision_no: 109,
+    revision_submitted_at: "sentinel:revision_submitted_at",
+    revision_note: "sentinel:revision_note",
+    price_comparisons_json: "sentinel:price_comparisons_json",
+    selected_vendor_id: "sentinel:selected_vendor_id",
+    selected_vendor_reason: "sentinel:selected_vendor_reason",
+    price_adjustment_reason: "sentinel:price_adjustment_reason",
+    request_items_json: "sentinel:request_items_json",
+    read_recipients_json: "sentinel:read_recipients_json",
+    attachments_json: "sentinel:attachments_json",
+    created_at: "sentinel:created_at",
+    updated_at: "sentinel:updated_at",
+  };
+  // Object key order is insertion order for string keys — this is the same
+  // order FIXTURE_ROW is declared in above, kept in lockstep with MemoSeedRow.
+  const EXPECTED_COLUMN_ORDER = Object.keys(FIXTURE_ROW) as (keyof MemoSeedRow)[];
 
-  it("has one placeholder per column and one param per placeholder", () => {
-    const columns = /INSERT INTO memos \(([\s\S]*?)\) VALUES \(([\s\S]*?)\)/.exec(source);
-    expect(columns).not.toBeNull();
-    const columnCount = columns![1].split(",").filter((c) => c.trim().length > 0).length;
-    const placeholderCount = (columns![2].match(/\?/g) ?? []).length;
-    expect(placeholderCount).toBe(columnCount);
-
-    const params = /function memoRowParams\(row: MemoSeedRow\) \{\s*return \[([\s\S]*?)\];/.exec(source);
-    expect(params).not.toBeNull();
-    const paramCount = params![1].split(",").filter((p) => p.trim().length > 0).length;
-    expect(paramCount).toBe(columnCount);
+  it("returns exactly one param per MemoSeedRow field, in column order", () => {
+    const params = memoRowParams(FIXTURE_ROW);
+    expect(params).toHaveLength(EXPECTED_COLUMN_ORDER.length);
+    EXPECTED_COLUMN_ORDER.forEach((key, index) => {
+      expect(params[index], `params[${index}] should be row.${key}`).toBe(FIXTURE_ROW[key]);
+    });
   });
 
-  it("carries the three short-note columns", () => {
-    for (const column of ["notify_note", "notify_note_images_json", "notify_attach_excel"]) {
-      expect(source).toContain(column);
-    }
+  it("places the 3 short-note params immediately after closing_remark, unshifted", () => {
+    const params = memoRowParams(FIXTURE_ROW);
+    const closingRemarkIndex = EXPECTED_COLUMN_ORDER.indexOf("closing_remark");
+
+    expect(params[closingRemarkIndex]).toBe("sentinel:closing_remark");
+    expect(params[closingRemarkIndex + 1]).toBe("sentinel:notify_note");
+    expect(params[closingRemarkIndex + 2]).toBe("sentinel:notify_note_images_json");
+    expect(params[closingRemarkIndex + 3]).toBe(106); // notify_attach_excel
+    expect(params[closingRemarkIndex + 4]).toBe("sentinel:status"); // next real column, unshifted
   });
 });

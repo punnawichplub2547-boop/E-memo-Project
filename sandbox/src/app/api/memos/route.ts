@@ -259,7 +259,10 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
   return result.insertId;
 }
 
-function memoRowParams(row: MemoSeedRow) {
+// Exported so route.test.ts can assert against real behaviour (call the function,
+// inspect its output) instead of regex-matching the SQL/source text — a
+// source-text test breaks on reformatting and never actually exercises this code.
+export function memoRowParams(row: MemoSeedRow) {
   return [
     row.memo_no,
     row.title,
