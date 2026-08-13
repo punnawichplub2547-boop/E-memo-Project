@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 vi.mock("@/lib/auth", () => ({
   getActiveSessionUserFromToken: vi.fn(),
@@ -121,5 +123,30 @@ describe("POST /api/memos custom route refusal", () => {
 
     expect(res.status).not.toBe(400);
     expect(vi.mocked(departmentHasActiveSupervisor)).toHaveBeenCalled();
+  });
+});
+
+// ป้องกันบั๊กคลาสที่โปรเจกต์นี้เจอซ้ำ: เพิ่มคอลัมน์ใน INSERT แต่ลืมเพิ่มใน memoRowParams
+// (หรือกลับกัน) แล้วค่าเลื่อนคอลัมน์กันทั้งแถวโดยไม่มีเทสต์ตัวไหนแดง
+describe("POST /api/memos INSERT wiring", () => {
+  const source = readFileSync(path.join(process.cwd(), "src/app/api/memos/route.ts"), "utf8");
+
+  it("has one placeholder per column and one param per placeholder", () => {
+    const columns = /INSERT INTO memos \(([\s\S]*?)\) VALUES \(([\s\S]*?)\)/.exec(source);
+    expect(columns).not.toBeNull();
+    const columnCount = columns![1].split(",").filter((c) => c.trim().length > 0).length;
+    const placeholderCount = (columns![2].match(/\?/g) ?? []).length;
+    expect(placeholderCount).toBe(columnCount);
+
+    const params = /function memoRowParams\(row: MemoSeedRow\) \{\s*return \[([\s\S]*?)\];/.exec(source);
+    expect(params).not.toBeNull();
+    const paramCount = params![1].split(",").filter((p) => p.trim().length > 0).length;
+    expect(paramCount).toBe(columnCount);
+  });
+
+  it("carries the three short-note columns", () => {
+    for (const column of ["notify_note", "notify_note_images_json", "notify_attach_excel"]) {
+      expect(source).toContain(column);
+    }
   });
 });

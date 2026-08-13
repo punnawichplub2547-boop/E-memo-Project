@@ -22,6 +22,14 @@ CREATE TABLE IF NOT EXISTS memos (
   budget_used                     DECIMAL(15,2) NULL,
   description                     TEXT          NULL,
 
+  -- NOTE: closing_remark itself is added only via migration
+  -- (db/migrations/2026-06-10-add-closing-remark.sql), not baked into this init
+  -- schema — same pre-existing gap for requester_user_id and the md_review_*
+  -- columns. These 3 notify_* columns follow that same later-migration position.
+  notify_note                     TEXT          NULL,
+  notify_note_images_json         JSON          NULL,
+  notify_attach_excel             TINYINT(1)    NOT NULL DEFAULT 0,
+
   status                          VARCHAR(50)   NOT NULL DEFAULT 'draft',
   workflow_state                  VARCHAR(80)   NULL,
   current_step                    VARCHAR(100)  NOT NULL,

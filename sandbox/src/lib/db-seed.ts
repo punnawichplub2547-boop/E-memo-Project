@@ -18,6 +18,9 @@ export type MemoSeedRow = {
   budget_used: Nullable<number>;
   description: Nullable<string>;
   closing_remark: Nullable<string>;
+  notify_note: Nullable<string>;
+  notify_note_images_json: Nullable<string>;
+  notify_attach_excel: number;
   status: string;
   workflow_state: Nullable<string>;
   current_step: string;
@@ -139,6 +142,9 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     budget_used: memo.budgetUsed ?? null,
     description: memo.description ?? null,
     closing_remark: memo.closingRemark ?? null,
+    notify_note: memo.notifyNote?.trim() ? memo.notifyNote.trim() : null,
+    notify_note_images_json: stringifyJson(memo.notifyNoteImages),
+    notify_attach_excel: memo.notifyAttachExcel ? 1 : 0,
     status: memo.status,
     workflow_state: memo.workflowState ?? inferWorkflowState(memo.status),
     current_step: memo.currentStep,

@@ -1,4 +1,5 @@
 import type { CustomApprover, CustomStepKey } from "./custom-route";
+import type { NotifyNoteImage } from "./notify-note";
 
 export type { CustomApprover };
 
@@ -218,6 +219,12 @@ export type MemoRecord = {
   revisions?: MemoRevision[];
   description?: string;
   closingRemark?: string;
+  /** V2 §3: ข้อความ (+รูป) ที่ส่งไปกับการแจ้งเตือนตอนส่งครั้งแรกเท่านั้น
+   *  ไม่ขึ้นในตัวเมโมและไม่ขึ้นในฟอร์ม F-DC-006 (Q14) — จึงไม่ถูกอ่านกลับมาโดย
+   *  serializeMemoRecord() และมีค่าเฉพาะบน record ที่ client เพิ่งสร้างเท่านั้น */
+  notifyNote?: string;
+  notifyNoteImages?: NotifyNoteImage[];
+  notifyAttachExcel?: boolean;
   budgetStatus?: BudgetStatus;
   accountCode?: string;
   budgetPlan?: number;

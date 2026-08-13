@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { seedMemos } from "./approval";
+import { seedMemos, type MemoRecord } from "./approval";
 import { buildCustomRoute } from "./custom-route";
 import { assertSeedAllowed, buildSeedWorkflowAction, memoToDbSeedRow, toMysqlUtcDateTime } from "./db-seed";
 
@@ -104,5 +104,35 @@ describe("DB seed helpers", () => {
     const withCustom = memoToDbSeedRow({ ...seedMemos[0], customRoute: approvers });
     expect(withCustom.custom_route_json).toBe(JSON.stringify(approvers));
     expect(memoToDbSeedRow(seedMemos[0]).custom_route_json).toBeNull();
+  });
+});
+
+describe("memoToDbSeedRow — notification short note (V2 §3)", () => {
+  const base: MemoRecord = {
+    id: "EM-2026-2026-0001", title: "ขอซื้อยาง", requester: "สมชาย ขายความจริง",
+    department: "IT", category: "general-purchase", amount: 100,
+    status: "pending", currentStep: "Manager / Top Section",
+    cycleHours: 0, createdAt: "01 Jan 2026 09:00", updatedAt: "01 Jan 2026 09:00",
+  };
+
+  it("writes the note, its images and the Excel flag", () => {
+    const row = memoToDbSeedRow({
+      ...base,
+      notifyNote: "ด่วน ขอภายในวันนี้",
+      notifyNoteImages: [
+        { id: "1", originalName: "a.png", storedName: "u-a.png", size: 10, mimeType: "image/png" },
+      ],
+      notifyAttachExcel: true,
+    });
+    expect(row.notify_note).toBe("ด่วน ขอภายในวันนี้");
+    expect(JSON.parse(String(row.notify_note_images_json))).toHaveLength(1);
+    expect(row.notify_attach_excel).toBe(1);
+  });
+
+  it("leaves the columns null/0 when there is no note", () => {
+    const row = memoToDbSeedRow(base);
+    expect(row.notify_note).toBeNull();
+    expect(row.notify_note_images_json).toBeNull();
+    expect(row.notify_attach_excel).toBe(0);
   });
 });
