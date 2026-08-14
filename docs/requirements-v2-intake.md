@@ -85,6 +85,36 @@ DB `selected_route_json`, queue drawer/timeline, Excel export, audit log
 - ยังต้อง escape ข้อความผู้ใช้ก่อนใส่ลง HTML ของอีเมล และก่อนส่งเข้า Telegram (`parse_mode: "HTML"`)
   แม้จะเป็นข้อความธรรมดาก็ตาม
 
+### ✅ ลงมือแล้ว — พิสูจน์ end-to-end 2026-08-14
+
+**ที่เก็บของ:** 3 คอลัมน์ใหม่บน `memos` (`notify_note`, `notify_note_images_json`, `notify_attach_excel`)
+migration `db/migrations/2026-08-13-add-memo-notify-note.sql` · รูปเก็บที่ `storage/notify-notes/<memoNo>/<uuid>-<ชื่อไฟล์>`
+**แยกจาก `storage/attachments/` โดยตั้งใจ** เพื่อไม่ให้รูปไปโผล่ในหัวข้อ "ไฟล์แนบ" ของเมโม (Q14)
+
+**Q14 การันตีเชิงโครงสร้าง ไม่ใช่ด้วยวินัยคนเขียน UI:** `serializeMemoRecord()` (`db-memos.ts`) และ
+`src/lib/export/*` ทั้งโฟลเดอร์ **ไม่อ้างถึง 3 คอลัมน์นี้เลย** ⇒ ต่อให้เผลอเขียน UI ผิด note ก็ขึ้นในเมโม/Excel ไม่ได้
+ยืนยันจริงแล้ว: `loadMemoForExport()` คืน object ที่ **ไม่มี key `notifyNote` ด้วยซ้ำ**
+
+| ข้อ | ผลการพิสูจน์กับคอนเทนเนอร์ + DB จริง |
+|---|---|
+| Q13 | ✅ การ์ด "เรื่องเพิ่มเติม / Notification note" บน `/create` แยกจาก description/closingRemark |
+| Q14 | ✅ ไม่โผล่ใน `/queue` drawer · `GET /api/memos` ไม่ส่งฟิลด์ `notify*` ออกมาเลย · อ่านเซลล์ .xlsx ครบ 361 เซลล์ ไม่มีข้อความ note |
+| Q15 | ✅ เข้า fan-out ปกติ (แจ้งเตือนในระบบ + อีเมล) |
+| Q16 | ✅ ส่งครั้งเดียวตอน submit ครั้งแรก — เหตุการณ์ `resubmitted` (revision 2) ไม่มี note ซ้ำ |
+| Q17 | ✅ `notify_attach_excel=1` เมื่อผู้สร้างติ๊กเอง |
+| Q17b | ⚠️ **ยังไม่ได้ยืนยันสด** — ผู้รับที่ผูก Telegram ไม่ตรงกับผู้รับ note ในรอบทดสอบ และ Telegram ล้มด้วยเหตุ `APP_PUBLIC_BASE_URL=http://localhost` (ปัญหาเดิมที่รู้อยู่แล้ว) · **การันตีจากโค้ด:** ไม่มี `sendDocument` อยู่ในโปรเจกต์เลย และ Excel ถูก push เข้า `emailAttachments` เท่านั้น (`notify-memo-event.ts:175`) ส่วนฝั่ง Telegram วนแค่ `telegramPhotos` ที่สร้างจากรูปล้วน ⇒ ไม่มีเส้นทางโค้ดที่ส่งไฟล์ Excel เข้า Telegram ได้ |
+| Q18 | ✅ จำกัด 3 รูป / รวม 10 MB / PNG-JPG (validate ทั้ง client และ server) |
+| Q19 | ✅ escape ก่อนลง HTML อีเมล (มีเทสต์ XSS) |
+| Q20 | ✅ Telegram ส่งข้อความก่อน แล้วตามด้วยรูปทีละใบ |
+
+**ภาษาไทยไม่เพี้ยน:** ตรวจด้วย HEX จาก DB → 165 bytes / 57 อักขระ ตรงกับที่พิมพ์แบบ case-sensitive
+รวมสระ วรรณยุกต์ และเลขไทย (ต้องตรวจแบบนี้ เพราะ PowerShell console แปลงไทยเป็น `?`)
+
+⚠️ **ข้อจำกัดที่รู้ตัว:** `compose.yaml` mount named volume ให้แค่ `/app/storage/attachments`
+⇒ `storage/notify-notes/` อยู่ใน layer ของคอนเทนเนอร์และ **หายทุกครั้งที่ rebuild** ในทางปฏิบัติไม่กระทบ
+เพราะรูปถูกอ่านไปส่งภายในไม่กี่วินาทีหลังอัปโหลดแล้วไม่มีใครอ่านอีก (และโค้ดข้ามรูปที่อ่านไม่ได้
+โดยไม่ล้มการแจ้งเตือนทั้งก้อน) แต่ถ้า deploy ตอนมีคนเปิดฟอร์มค้าง รูปจะหายเงียบ — ยังไม่ตัดสินใจว่าจะ mount เพิ่มหรือรับสภาพ
+
 ---
 
 ## ✅ คำถามรอบ 2 — ตอบแล้ว 2026-08-07
