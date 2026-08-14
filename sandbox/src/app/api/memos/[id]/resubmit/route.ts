@@ -7,6 +7,7 @@ import { COOKIE_NAME } from "@/lib/auth-jwt";
 import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { notifyMemoEvent } from "@/lib/notify-memo-event";
 import { isMemoOwner } from "@/lib/memo-ownership";
+import { parseRouteJson } from "@/lib/workflow-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ type MemoIdRow = RowDataPacket & {
   status: string;
   reject_disposition: string | null;
   revision_no: number;
-  selected_route_json: string;
+  // JSON column: mysql2 returns the parsed value (string[]), not the raw text.
+  selected_route_json: unknown;
   requires_md_review: number | boolean;
   return_to_step: string | null;
 };
@@ -80,7 +82,11 @@ export async function POST(
     // Supervisor step is already in selected_route_json. Honor the approver's chosen
     // return destination (return_to_step) when it is still a member of the route;
     // otherwise restart from the first step.
-    const selectedRoute = JSON.parse(memo.selected_route_json || "[]") as string[];
+    // `selected_route_json` is a MySQL JSON column, so mysql2 already hands back a
+    // parsed array. JSON.parse-ing it a second time coerced the array to a plain
+    // string ("Manager / Top Section") and threw, turning every quick resubmit into
+    // a 500. parseRouteJson accepts both shapes and is the single tested reader.
+    const selectedRoute = parseRouteJson(memo.selected_route_json) ?? [];
     const returnToStep = memo.return_to_step;
     body.nextCurrentStep =
       returnToStep && selectedRoute.includes(returnToStep)
