@@ -29,3 +29,7 @@ CLAUDE.md
 Form.jpg
 Hrworkflow.jpg
 การอนุมัติวงเงิน- Rev 23-5-2025.pdf
+# เอกสารเมโมจริงของบริษัท (ใบเสนอราคา ราคา ชื่อ supplier ชื่อพนักงาน) ใช้เป็นหลักฐาน
+# ประกอบ requirement V3 เท่านั้น — ห้าม commit ขึ้น GitHub เด็ดขาด สรุปที่แกะได้อยู่ใน
+# docs/requirements-v3-freeform-memo-form.md ซึ่ง track ได้เพราะไม่มีข้อมูลจริงติดไป
+MEMOexample/
