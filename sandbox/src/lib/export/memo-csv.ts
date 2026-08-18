@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
 // is wrapped in double-quotes, and each internal double-quote is doubled.
 export function csvCell(value: string | number | null | undefined): string {
   const s = safeSpreadsheetText(value);
-  if (/[",\n]/.test(s)) {
+  if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;

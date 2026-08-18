@@ -45,6 +45,10 @@ describe("csvCell", () => {
     expect(csvCell("line1\nline2")).toBe('"line1\nline2"');
   });
 
+  it("quotes fields containing carriage returns in the middle", () => {
+    expect(csvCell("abc\rdef")).toBe('"abc\rdef"');
+  });
+
   it("neutralises a formula so a spreadsheet cannot execute it", () => {
     expect(csvCell('=HYPERLINK("http://evil")')).toBe(`"'=HYPERLINK(""http://evil"")"`);
   });
