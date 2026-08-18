@@ -44,6 +44,10 @@ describe("csvCell", () => {
   it("quotes fields containing newlines", () => {
     expect(csvCell("line1\nline2")).toBe('"line1\nline2"');
   });
+
+  it("neutralises a formula so a spreadsheet cannot execute it", () => {
+    expect(csvCell('=HYPERLINK("http://evil")')).toBe(`"'=HYPERLINK(""http://evil"")"`);
+  });
 });
 
 describe("memosToCsv", () => {

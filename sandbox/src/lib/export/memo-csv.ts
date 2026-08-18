@@ -5,6 +5,7 @@ import { MemoRecord, approvalLabels } from "../approval";
 // A CSV leaves the app: an unresolved "person:2#6" in a file someone forwards has
 // nothing left to decode it, so route columns are rendered as people here too.
 import { describeCustomStepShort, describeRouteSummary } from "../custom-route";
+import { safeSpreadsheetText } from "./excel-safe-text";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "ร่าง",
@@ -17,8 +18,8 @@ const STATUS_LABELS: Record<string, string> = {
 // RFC 4180 field escaping: a field containing a comma, double-quote, or line break
 // is wrapped in double-quotes, and each internal double-quote is doubled.
 export function csvCell(value: string | number | null | undefined): string {
-  const s = value == null ? "" : String(value);
-  if (/[",\n\r]/.test(s)) {
+  const s = safeSpreadsheetText(value);
+  if (/[",\n]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
