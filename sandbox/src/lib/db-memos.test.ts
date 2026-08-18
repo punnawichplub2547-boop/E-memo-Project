@@ -452,3 +452,85 @@ describe("custom route persistence", () => {
     expect(serializeMemoRecord(row as never, [], []).customRoute).toBeUndefined();
   });
 });
+
+describe("form mode and body blocks (V3)", () => {
+  // Mirrors baseMemoRow() above (kept local to that describe block); this fixture
+  // adds the two V3 columns instead. Values are shaped the way mysql2 actually
+  // returns them (a pre-parsed array for JSON columns), never as a JSON string —
+  // a string fixture here would hide a double-JSON.parse bug (see db_memos.ts's
+  // parseBodyBlocksJson doc comment / global CLAUDE.md's resubmit incident).
+  const baseRow = {
+    id: 99,
+    memo_no: "EM-20260817-FORMMODE",
+    title: "Form mode memo",
+    requester_name: "Requester",
+    department_name: "HR&GA",
+    category: "general-purchase",
+    amount: "9200.00",
+    budget_status: null,
+    account_code: null,
+    budget_plan: null,
+    budget_used: null,
+    description: null,
+    status: "pending",
+    workflow_state: "Issued",
+    current_step: "Manager / Top Section",
+    cycle_hours: null,
+    recommended_final_approver: null,
+    recommended_route_json: null,
+    selected_route_json: null,
+    custom_route_json: null,
+    route_mode: null,
+    route_override_reason: null,
+    notify_md: 0 as const,
+    is_price_adjustment: 0 as const,
+    follows_production_plan: 0 as const,
+    is_dead_stock: 0 as const,
+    dept_monthly_over_budget_total: null,
+    return_reason: null,
+    reject_reason: null,
+    reject_disposition: null,
+    revision_no: 0,
+    revision_submitted_at: null,
+    revision_note: null,
+    price_comparisons_json: null,
+    selected_vendor_id: null,
+    selected_vendor_reason: null,
+    price_adjustment_reason: null,
+    request_items_json: null,
+    read_recipients_json: null,
+    created_at: new Date("2026-08-17T10:00:00.000Z"),
+    updated_at: new Date("2026-08-17T10:00:00.000Z"),
+  };
+
+  it("reads the form mode and body blocks back", () => {
+    const memo = serializeMemoRecord(
+      {
+        ...baseRow,
+        form_mode: "freeform",
+        body_blocks_json: [{ id: "b1", type: "paragraph", text: "เนื้อหา" }],
+      } as never,
+      [],
+    );
+    expect(memo.formMode).toBe("freeform");
+    expect(memo.bodyBlocks).toEqual([{ id: "b1", type: "paragraph", text: "เนื้อหา" }]);
+  });
+
+  it("treats a legacy row with no form mode as a standard memo", () => {
+    const memo = serializeMemoRecord(
+      { ...baseRow, form_mode: undefined, body_blocks_json: null } as never,
+      [],
+    );
+    expect(memo.formMode).toBe("standard");
+    expect(memo.bodyBlocks).toBeUndefined();
+  });
+
+  it("keeps an empty block list distinguishable from a standard memo", () => {
+    const memo = serializeMemoRecord(
+      { ...baseRow, form_mode: "freeform", body_blocks_json: [] } as never,
+      [],
+    );
+    expect(memo.formMode).toBe("freeform");
+    expect(memo.bodyBlocks).toEqual([]);
+  });
+});

@@ -55,6 +55,8 @@ export type MemoSeedRow = {
   request_items_json: Nullable<string>;
   read_recipients_json: Nullable<string>;
   attachments_json: Nullable<string>;
+  form_mode: "standard" | "freeform";
+  body_blocks_json: Nullable<string>;
   created_at: string;
   updated_at: string;
 };
@@ -179,6 +181,10 @@ export function memoToDbSeedRow(memo: MemoRecord): MemoSeedRow {
     request_items_json: stringifyJson(memo.requestItems),
     read_recipients_json: stringifyJson(memo.readRecipients),
     attachments_json: stringifyJson(memo.attachments),
+    form_mode: memo.formMode ?? "standard",
+    // Not stringifyJson: that helper collapses an empty array to null, which would
+    // make a freeform draft with zero blocks indistinguishable from a standard memo.
+    body_blocks_json: memo.bodyBlocks ? JSON.stringify(memo.bodyBlocks) : null,
     created_at: toMysqlUtcDateTime(memo.createdAt),
     updated_at: toMysqlUtcDateTime(memo.updatedAt),
   };

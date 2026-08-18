@@ -1,5 +1,6 @@
 import type { CustomApprover, CustomStepKey } from "./custom-route";
 import type { NotifyNoteImage } from "./notify-note";
+import type { MemoBodyBlock, MemoFormMode } from "./memo-body-blocks";
 
 export type { CustomApprover };
 
@@ -173,6 +174,9 @@ export type MemoSnapshot = {
   mdReviewComment?: string;
   mdReviewActedBy?: string;
   mdReviewActedAt?: string;
+  /** V3: freeform-body memo form. Undefined/"standard" = the regular fixed-field form. */
+  formMode?: MemoFormMode;
+  bodyBlocks?: MemoBodyBlock[];
 };
 
 export type MemoRevision = {
@@ -252,6 +256,11 @@ export type MemoRecord = {
   /** Soft-delete marker. Undefined = active; a display timestamp = voided/archived by admin.
    *  Voided memos are filtered out of all active views but kept in the DB for audit + restore. */
   deletedAt?: string;
+  /** V3: freeform-body memo form. Undefined/"standard" = the regular fixed-field form.
+   *  form_mode is the source of truth in the DB — never inferred from bodyBlocks
+   *  presence/emptiness (see parseBodyBlocksJson in db-memos.ts). */
+  formMode?: MemoFormMode;
+  bodyBlocks?: MemoBodyBlock[];
 };
 
 const managerLimit = 10000;

@@ -18,6 +18,7 @@ import type {
   RequestItem,
   WorkflowState,
 } from "./approval";
+import type { MemoBodyBlock } from "./memo-body-blocks";
 
 type DbDate = string | Date;
 type DbBoolean = boolean | 0 | 1;
@@ -82,6 +83,9 @@ export type MemoDbRow = {
   updated_at: DbDate;
   // Optional: absent on legacy DBs that predate the soft-delete migration.
   deleted_at?: DbDate | null;
+  // Optional: absent on legacy DBs that predate the V3 freeform-form migration.
+  form_mode?: "standard" | "freeform" | null;
+  body_blocks_json?: DbJson;
 };
 
 export type ReadActionDbRow = {
@@ -161,6 +165,8 @@ export function serializeMemoRecord(
     createdAt: toBangkokDisplayTimestamp(row.created_at),
     updatedAt: toBangkokDisplayTimestamp(row.updated_at),
     deletedAt: row.deleted_at ? toBangkokDisplayTimestamp(row.deleted_at) : undefined,
+    formMode: row.form_mode ?? "standard",
+    bodyBlocks: parseBodyBlocksJson(row.body_blocks_json),
   };
 }
 
@@ -267,6 +273,28 @@ function parseJsonArray<T>(value: DbJson): T[] | undefined {
   if (Array.isArray(value)) return value as T[];
   const parsed = JSON.parse(value);
   return Array.isArray(parsed) && parsed.length > 0 ? parsed as T[] : undefined;
+}
+
+function safeJsonParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Unlike parseJsonArray, this preserves an empty array instead of collapsing it
+ * to undefined — a freeform memo saved as a draft before any block is added must
+ * stay distinguishable from a standard-form memo (form_mode is the real signal;
+ * this only decodes the JSON payload). mysql2 already parses JSON columns, so
+ * `value` is normally an array already; the string branch covers the rare row
+ * shape it does not pre-parse (e.g. some fixtures/drivers).
+ */
+export function parseBodyBlocksJson(value: unknown): MemoBodyBlock[] | undefined {
+  if (value === null || value === undefined) return undefined;
+  const parsed = typeof value === "string" ? safeJsonParse(value) : value;
+  return Array.isArray(parsed) ? (parsed as MemoBodyBlock[]) : undefined;
 }
 
 function parseJsonObject<T>(value: DbJsonObject): T {
