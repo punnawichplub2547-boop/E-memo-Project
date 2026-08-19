@@ -1,6 +1,8 @@
 import type { CustomApprover, CustomStepKey } from "./custom-route";
 import type { NotifyNoteImage } from "./notify-note";
 import type { MemoBodyBlock, MemoFormMode } from "./memo-body-blocks";
+import type { MemoRevision } from "./memo-revision";
+import type { RequestItem, MemoAttachment } from "./memo-line-items";
 
 export type { CustomApprover };
 
@@ -117,22 +119,8 @@ export function needsNonNegotiableRemark(
   return Boolean(row.isSelected) && (row.offeredPrice ?? 0) > 0 && (row.discount ?? 0) <= 0;
 }
 
-export type RequestItem = {
-  id: string;
-  name: string;
-  unit: string;
-  qty: number;
-  unitPrice: number;
-};
-
-export type MemoAttachment = {
-  id: string;
-  originalName: string;
-  storedName: string;
-  size: number;
-  mimeType: string;
-  uploadedAt: string;
-};
+// Pure types, split out to ./memo-line-items to keep this file under its line-count guardrail.
+export type { RequestItem, MemoAttachment };
 
 export type RevisionSource = "initial" | "return" | "rejection-allowed";
 
@@ -179,15 +167,8 @@ export type MemoSnapshot = {
   bodyBlocks?: MemoBodyBlock[];
 };
 
-export type MemoRevision = {
-  revisionNo: number;
-  source: RevisionSource;
-  returnReason?: string;
-  rejectReason?: string;
-  revisionNote?: string;
-  submittedAt: string;
-  snapshot: MemoSnapshot;
-};
+// Pure type, split out to ./memo-revision to keep this file under its line-count guardrail.
+export type { MemoRevision };
 
 export type MemoRecord = {
   id: string;
@@ -256,9 +237,8 @@ export type MemoRecord = {
   /** Soft-delete marker. Undefined = active; a display timestamp = voided/archived by admin.
    *  Voided memos are filtered out of all active views but kept in the DB for audit + restore. */
   deletedAt?: string;
-  /** V3: freeform-body memo form. Undefined/"standard" = the regular fixed-field form.
-   *  form_mode is the source of truth in the DB — never inferred from bodyBlocks
-   *  presence/emptiness (see parseBodyBlocksJson in db-memos.ts). */
+  /** V3 form: form_mode is the DB source of truth, never inferred from bodyBlocks
+   *  presence/emptiness — see parseBodyBlocksJson in db-memos.ts. */
   formMode?: MemoFormMode;
   bodyBlocks?: MemoBodyBlock[];
 };
