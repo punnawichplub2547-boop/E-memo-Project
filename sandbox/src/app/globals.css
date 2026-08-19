@@ -1459,6 +1459,87 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   margin: 0;
 }
 
+/* ===== Free-form memo body blocks (BlockEditorCard) ===== */
+.em-block-editor {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.em-card-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+
+.em-block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.em-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.em-block-kind {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--primary);
+  border: 1px solid var(--primary-soft);
+}
+.em-block-tools { display: flex; align-items: center; gap: 4px; }
+.em-block-tools .em-btn:disabled,
+.em-block-table-actions .em-btn:disabled,
+.em-block-add .em-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.em-block-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line-2);
+}
+
+.em-block-table { display: flex; flex-direction: column; gap: 10px; }
+.em-block-table-scroll {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.em-block-table .em-table { min-width: 480px; width: 100%; }
+.em-block-table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.em-block-kv { display: flex; flex-direction: column; gap: 8px; }
+.em-block-kv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.em-hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.em-hint-warn {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border: 1px solid rgba(180,83,9,0.22);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0;
+}
+
 /* ===== Misc ===== */
 .em-row { display: flex; align-items: center; gap: 10px; }
 .em-col { display: flex; flex-direction: column; gap: 10px; }
