@@ -40,13 +40,7 @@ export async function POST(
 
   let connection: PoolConnection | null = null;
   try {
-    // Deliberately widened past SubmitRevisionBody: form_mode is locked once a memo is
-    // created (Q5), so an older client that never sends these two fields must still work —
-    // they fall back to the memo's existing form_mode/body_blocks_json below.
-    const body = (await request.json()) as SubmitRevisionBody & {
-      formMode?: unknown;
-      bodyBlocks?: unknown;
-    };
+    const body = (await request.json()) as SubmitRevisionBody;
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -147,6 +141,14 @@ export async function POST(
     // become real UPDATE writes below (memoUpdate.price_comparisons_json / .request_items_json),
     // overriding whatever the client's nextMemoRow snapshot happened to carry — otherwise a
     // removed system block would leave orphaned data no UI shows again.
+    //
+    // The form mode itself is locked to the memo's stored form_mode (Q5) — a revision
+    // can never switch a memo between standard and free-form, enforced by
+    // existingFormMode below. There is no fallback to the stored blocks for a
+    // free-form memo: body.bodyBlocks ?? null means an existing free-form memo that
+    // omits bodyBlocks on this revision gets a hard 400 from the resolver ("bodyBlocks
+    // ต้องเป็น array"), not a silent carry-forward of whatever it had before. The
+    // client must resend its full block set on every free-form revision.
     const hasCustomRoute = custom.status === "ok" && custom.approvers.length > 0;
     const bodyBlocks = resolveBodyBlocksFromRequest({
       formMode: body.formMode ?? memo.form_mode ?? "standard",

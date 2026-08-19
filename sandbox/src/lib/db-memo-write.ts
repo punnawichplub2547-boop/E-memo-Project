@@ -522,6 +522,14 @@ export type SubmitRevisionBody = {
   // handler re-resolves it against the users table (custom-route-server.ts) and
   // never trusts the shape or the names the client attached.
   customRoute?: unknown;
+  // V3 free-form body: separate from nextMemoRow's pre-serialized form_mode/
+  // body_blocks_json — these are the client's raw, untrusted claim. The route
+  // handler re-validates both against the memo's stored (locked) form_mode via
+  // resolveBodyBlocksFromRequest (memo-body-blocks-server.ts) and never trusts
+  // this shape directly. A free-form memo must resend its blocks on every
+  // revision — omitting them is a hard 400, not a fallback to the stored blocks.
+  formMode?: unknown;
+  bodyBlocks?: unknown;
 };
 
 export type SubmitRevisionPayload = {

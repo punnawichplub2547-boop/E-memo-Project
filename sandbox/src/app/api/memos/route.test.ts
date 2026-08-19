@@ -268,21 +268,34 @@ describe("POST /api/memos INSERT wiring", () => {
 // it returns, refuses what it rejects, and turns its clear* flags into real nulled
 // DB columns rather than silently discarding them.
 describe("POST /api/memos free-form body blocks", () => {
-  it("stores the form mode and blocks a free-form memo submits", async () => {
+  // Pins three things at once: (1) the value actually bound at the form_mode/
+  // body_blocks_json slots is the resolver's SANITIZED output, not the raw client
+  // body — the block carries an unknown key that must not survive; (2) the two new
+  // columns' positional alignment between the SQL and memoRowParams(), the same way
+  // the clearing test below pins price_comparisons_json's position; (3) the trailing
+  // created_at/updated_at slots are still intact after the new pair.
+  it("stores the sanitized blocks and form mode at their exact params slots", async () => {
     vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue(CUSTOM_ROUTE_OK as never);
     mockSuccessfulInsert();
 
     const res = await POST(postMemo({
       ...validFreeformPayload,
       formMode: "freeform",
-      bodyBlocks: [{ id: "b1", type: "paragraph", text: "เนื้อหาอิสระ" }],
+      bodyBlocks: [{ id: "b1", type: "paragraph", text: "x", secretPayload: "z" }],
     }));
 
     expect(res.status).toBe(201);
     const insert = execute.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO memos"));
     expect(insert).toBeDefined();
-    expect(String(insert![0])).toContain("form_mode");
-    expect(String(insert![0])).toContain("body_blocks_json");
+    const params = insert![1] as unknown[];
+    const columns = String(insert![0]).slice(0, String(insert![0]).indexOf("VALUES")).split(",");
+    const formModeIndex = columns.findIndex((c) => c.includes("form_mode"));
+    const bodyBlocksIndex = columns.findIndex((c) => c.includes("body_blocks_json"));
+
+    expect(params[formModeIndex]).toBe("freeform");
+    expect(params[bodyBlocksIndex]).toBe(
+      JSON.stringify([{ id: "b1", type: "paragraph", text: "x" }])
+    );
   });
 
   it("refuses a free-form memo that did not pick its own approvers", async () => {
