@@ -1072,11 +1072,17 @@ describe("memoReducer — SUBMIT_REVISION with a free-form body (V3, carried rul
     expect(next.bodyBlocks).toEqual(editedBlocks);
   });
 
-  // Would fail if the reducer wrote `action.bodyBlocks ?? m.bodyBlocks`: a memo
-  // whose blocks were deliberately cleared (e.g. switched back to "standard")
-  // must not silently revert to its old blocks — see the warning comment next
-  // to this case in memo-reducer.ts.
-  it("clears formMode/bodyBlocks when the revision switches back to standard", () => {
+  // formMode is locked server-side for the life of a memo
+  // (resolveBodyFormFromRequest / memo-body-blocks-server.ts), so a revision
+  // can never actually switch a memo back to "standard" — the reachable
+  // clearing case is a free-form memo whose user deleted every block on this
+  // revision. This is a *reachable-path* regression check, not the
+  // discriminating one: `[] ?? m.bodyBlocks` still evaluates to `[]` because
+  // an empty array is not nullish, so this test passes identically whether
+  // the reducer writes `action.bodyBlocks` or `action.bodyBlocks ??
+  // m.bodyBlocks`. See the test below for the assertion that actually catches
+  // the `??`-fallback bug.
+  it("clears bodyBlocks when a free-form memo's blocks are deleted on this revision", () => {
     const [next] = memoReducer([freeformBase], {
       type: "SUBMIT_REVISION",
       id: freeformBase.id,
@@ -1085,11 +1091,38 @@ describe("memoReducer — SUBMIT_REVISION with a free-form body (V3, carried rul
       department: "IT",
       amount: 5000,
       selectedRoute: ["Manager / Top Section"],
-      formMode: "standard",
+      formMode: "freeform",
       bodyBlocks: [],
       updatedAt: "10 Aug 2026 10:00",
     });
-    expect(next.formMode).toBe("standard");
+    expect(next.formMode).toBe("freeform");
     expect(next.bodyBlocks).toEqual([]);
+  });
+
+  // The discriminating case, mirrored from the customRoute suite above
+  // (":572-581" — omits the key entirely and asserts undefined, which
+  // genuinely fails under `?? m.customRoute`). Omitting formMode/bodyBlocks
+  // from the action is not a scenario the real UI produces today, but it is
+  // exactly the shape `??` treats differently from a direct assignment:
+  // `undefined ?? m.bodyBlocks` resolves to the OLD blocks, which a naive
+  // `[]`-based test cannot detect. This is what actually proves
+  // action.formMode/action.bodyBlocks are authoritative rather than a
+  // fallback.
+  it("does not inherit the old memo's blocks when the action omits formMode/bodyBlocks", () => {
+    const [next] = memoReducer([freeformBase], {
+      type: "SUBMIT_REVISION",
+      id: freeformBase.id,
+      title: "Updated Title",
+      category: "general-purchase",
+      department: "IT",
+      amount: 5000,
+      selectedRoute: ["Manager / Top Section"],
+      updatedAt: "10 Aug 2026 10:00",
+      // formMode/bodyBlocks deliberately absent from this action.
+    });
+    expect(next.formMode).toBeUndefined();
+    expect(next.bodyBlocks).toBeUndefined();
+    // The snapshot is the history and must keep what the live record dropped.
+    expect(next.revisions?.[0].snapshot.bodyBlocks).toEqual(freeformBase.bodyBlocks);
   });
 });

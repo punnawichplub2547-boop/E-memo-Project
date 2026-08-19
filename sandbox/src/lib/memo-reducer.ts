@@ -340,11 +340,16 @@ export function memoReducer(state: MemoRecord[], action: MemoAction): MemoRecord
           notifyMD: action.notifyMD,
           requiresMdReview: action.requiresMdReview,
           // Not `?? m.bodyBlocks`/`?? m.formMode`: the same reasoning as
-          // customRoute above, but the stakes are worse here. A revision that
-          // deliberately cleared its blocks (e.g. switched back to "standard")
-          // would silently reinherit the old memo's blocks if this fell back to
-          // m.bodyBlocks — a memo the user emptied would still carry stale
-          // content forward. action.formMode/action.bodyBlocks are authoritative.
+          // customRoute above, but the stakes are worse here. formMode is
+          // locked for the life of a memo (resolveBodyBlocksFromRequest on the
+          // server), so the reachable case isn't "switches back to standard" —
+          // it's a free-form memo whose user deleted every block on this
+          // revision (bodyBlocks: []). `[] ?? m.bodyBlocks` would still
+          // evaluate to `[]` (empty array is not nullish) for a naive test,
+          // but a hand-written `?? m.bodyBlocks` fallback would still be wrong
+          // whenever the client omits the key outright (e.g. a bug upstream) —
+          // it would silently reinherit the old memo's blocks instead of
+          // failing loudly. action.formMode/action.bodyBlocks are authoritative.
           formMode: action.formMode,
           bodyBlocks: action.bodyBlocks,
           // Workflow reset (same as RESUBMIT_MEMO):
