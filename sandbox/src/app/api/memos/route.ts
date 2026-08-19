@@ -18,6 +18,7 @@ import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
 import { findForgedCustomStep } from "@/lib/custom-route";
+import { resolveBodyBlocksFromRequest } from "@/lib/memo-body-blocks-server";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,23 @@ export async function POST(request: NextRequest) {
       clientMemo.recommendedRoute = supervised.recommendedRoute;
     }
 
+    // V3 free-form body: the only trust boundary for form_mode/bodyBlocks. Resolves and
+    // sanitizes what the client sent, and instructs the caller to null out whichever of
+    // price_comparisons_json/request_items_json no longer has a system block pointing at
+    // it — otherwise that data would survive as an orphan no UI ever shows again.
+    const bodyBlocks = resolveBodyBlocksFromRequest({
+      formMode: clientMemo.formMode ?? "standard",
+      blocks: clientMemo.bodyBlocks ?? null,
+      hasCustomRoute: Boolean(clientMemo.customRoute?.length),
+    });
+    if (bodyBlocks.status === "invalid") {
+      return NextResponse.json({ error: bodyBlocks.reason }, { status: 400 });
+    }
+    clientMemo.formMode = bodyBlocks.formMode;
+    clientMemo.bodyBlocks = bodyBlocks.blocks ?? undefined;
+    if (bodyBlocks.clearPriceComparisons) clientMemo.priceComparisons = undefined;
+    if (bodyBlocks.clearRequestItems) clientMemo.requestItems = undefined;
+
     // Never trust the client for workflow/lifecycle state either — sanitizeNewMemoInput
     // is the trust boundary that forces status/current_step/workflow_state/revision_no/
     // timestamps server-side so a memo cannot be created already "approved".
@@ -198,6 +216,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       revision_no, revision_submitted_at, revision_note,
       price_comparisons_json, selected_vendor_id, selected_vendor_reason, price_adjustment_reason,
       request_items_json, read_recipients_json, attachments_json,
+      form_mode, body_blocks_json,
       created_at, updated_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?,
@@ -213,6 +232,7 @@ async function insertMemo(connection: PoolConnection, memo: MemoRecord): Promise
       ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?,
+      ?, ?,
       ?, ?
     )`,
     memoRowParams(row)
@@ -316,6 +336,8 @@ export function memoRowParams(row: MemoSeedRow) {
     row.request_items_json,
     row.read_recipients_json,
     row.attachments_json,
+    row.form_mode,
+    row.body_blocks_json,
     row.created_at,
     row.updated_at,
   ];

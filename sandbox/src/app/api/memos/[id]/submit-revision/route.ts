@@ -13,6 +13,8 @@ import { departmentHasActiveSupervisor } from "@/lib/db-users";
 import { applySupervisorRouting } from "@/lib/supervisor-routing";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
 import { findForgedCustomStep } from "@/lib/custom-route";
+import { resolveBodyBlocksFromRequest } from "@/lib/memo-body-blocks-server";
+import type { MemoFormMode } from "@/lib/memo-body-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ type MemoIdRow = RowDataPacket & {
   reject_disposition: string | null;
   revision_no: number;
   return_to_step: string | null;
+  form_mode: MemoFormMode | null;
 };
 
 export async function POST(
@@ -37,13 +40,19 @@ export async function POST(
 
   let connection: PoolConnection | null = null;
   try {
-    const body = (await request.json()) as SubmitRevisionBody;
+    // Deliberately widened past SubmitRevisionBody: form_mode is locked once a memo is
+    // created (Q5), so an older client that never sends these two fields must still work —
+    // they fall back to the memo's existing form_mode/body_blocks_json below.
+    const body = (await request.json()) as SubmitRevisionBody & {
+      formMode?: unknown;
+      bodyBlocks?: unknown;
+    };
     const pool = getDbPool();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [rows] = await connection.execute<MemoIdRow[]>(
-      "SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, return_to_step FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
+      "SELECT id, requester_name, requester_user_id, status, reject_disposition, revision_no, return_to_step, form_mode FROM memos WHERE memo_no = ? AND deleted_at IS NULL FOR UPDATE",
       [memoNo]
     );
 
@@ -132,6 +141,28 @@ export async function POST(
       memoUpdate.recommended_route_json = supervised.recommendedRoute.length ? JSON.stringify(supervised.recommendedRoute) : null;
     }
 
+    // V3 free-form body: same trust boundary as POST /api/memos. hasCustomRoute mirrors
+    // the resolved route, not the raw request — a genuine per-person route only exists
+    // when the resolver actually rebuilt one from the users table. The clear* flags
+    // become real UPDATE writes below (memoUpdate.price_comparisons_json / .request_items_json),
+    // overriding whatever the client's nextMemoRow snapshot happened to carry — otherwise a
+    // removed system block would leave orphaned data no UI shows again.
+    const hasCustomRoute = custom.status === "ok" && custom.approvers.length > 0;
+    const bodyBlocks = resolveBodyBlocksFromRequest({
+      formMode: body.formMode ?? memo.form_mode ?? "standard",
+      blocks: body.bodyBlocks ?? null,
+      hasCustomRoute,
+      existingFormMode: (memo.form_mode ?? "standard") as MemoFormMode,
+    });
+    if (bodyBlocks.status === "invalid") {
+      await connection.rollback();
+      return NextResponse.json({ error: bodyBlocks.reason }, { status: 400 });
+    }
+    memoUpdate.form_mode = bodyBlocks.formMode;
+    memoUpdate.body_blocks_json = bodyBlocks.blocks === null ? null : JSON.stringify(bodyBlocks.blocks);
+    if (bodyBlocks.clearPriceComparisons) memoUpdate.price_comparisons_json = null;
+    if (bodyBlocks.clearRequestItems) memoUpdate.request_items_json = null;
+
     // Server-derive current_step. Honor the approver's chosen return destination
     // (return_to_step) when it is still a member of the route; otherwise restart from
     // the first step. Never trust the client to redirect approval notifications.
@@ -204,6 +235,8 @@ export async function POST(
          price_adjustment_reason = ?,
          request_items_json = ?,
          read_recipients_json = ?,
+         form_mode = ?,
+         body_blocks_json = ?,
          md_review_status = ?,
          md_review_resume_step = ?,
          md_review_comment = ?,
@@ -265,7 +298,7 @@ export async function POST(
   }
 }
 
-// All 42 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
+// All 44 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
 // minus the immutable identity fields: memo_no, requester_name, requester_user_id, created_at.
 // Append memoDbId last for the WHERE id = ? clause.
 function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
@@ -309,6 +342,8 @@ function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
     row.price_adjustment_reason,
     row.request_items_json,
     row.read_recipients_json,
+    row.form_mode,
+    row.body_blocks_json,
     row.md_review_status,
     row.md_review_resume_step,
     row.md_review_comment,

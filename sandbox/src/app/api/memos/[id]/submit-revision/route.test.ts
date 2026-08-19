@@ -29,6 +29,7 @@ const MEMO_ROW = {
   reject_disposition: null,
   revision_no: 1,
   return_to_step: null,
+  form_mode: "standard",
 };
 
 const execute = vi.fn();
@@ -72,7 +73,7 @@ function makeMemo(overrides: Partial<MemoRecord> = {}): MemoRecord {
   };
 }
 
-function postRevision(memo: MemoRecord, customRoute?: unknown): NextRequest {
+function postRevision(memo: MemoRecord, customRoute?: unknown, extra: Record<string, unknown> = {}): NextRequest {
   return new NextRequest("http://localhost/api/memos/EM-2026-011/submit-revision", {
     method: "POST",
     body: JSON.stringify({
@@ -87,6 +88,7 @@ function postRevision(memo: MemoRecord, customRoute?: unknown): NextRequest {
       readRecipients: [],
       actorName: null,
       customRoute,
+      ...extra,
     }),
     headers: { "content-type": "application/json", cookie: "em-session=token" },
   });
@@ -172,5 +174,58 @@ describe("POST /api/memos/[id]/submit-revision forged custom route tokens", () =
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("สมชาย ใจดี");
     expect(commit).not.toHaveBeenCalled();
+  });
+});
+
+// V3 free-form memo body: resolveBodyBlocksFromRequest (Task 6) is the trust boundary;
+// this route must lock the form mode across a revision (Q5) and turn the resolver's
+// clear* flags into a real UPDATE, not merely read them.
+describe("POST /api/memos/[id]/submit-revision free-form body blocks", () => {
+  it("refuses to switch a standard memo to free-form on resubmit", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue({ status: "none" } as never);
+
+    const res = await POST(
+      postRevision(
+        makeMemo({ selectedRoute: ["General Manager"], recommendedRoute: ["General Manager"] }),
+        undefined,
+        { formMode: "freeform", bodyBlocks: [] },
+      ),
+      { params },
+    );
+
+    expect(res.status).toBe(400);
+    expect(commit).not.toHaveBeenCalled();
+    expect(rollback).toHaveBeenCalled();
+  });
+
+  it("clears the price data on a revision when the price block was removed", async () => {
+    execute.mockResolvedValue([[{ ...MEMO_ROW, form_mode: "freeform" }], undefined]);
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue({
+      status: "ok",
+      route: ["person:1#42"],
+      approvers: [{ stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: null, department: "IT" }],
+    } as never);
+
+    const memo = makeMemo({
+      selectedRoute: ["person:1#42"],
+      priceComparisons: [
+        { id: "pc1", vendorName: "A", offeredPrice: 100, discount: 0, netPrice: 100, isSelected: true },
+      ],
+    });
+    const res = await POST(
+      postRevision(memo, [{ userId: 42 }], {
+        formMode: "freeform",
+        bodyBlocks: [{ id: "b1", type: "paragraph", text: "x" }],
+      }),
+      { params },
+    );
+
+    expect(res.status).toBe(200);
+    const update = execute.mock.calls.find(([sql]) => String(sql).includes("UPDATE memos SET"));
+    expect(update).toBeDefined();
+    const sql = String(update![0]);
+    const updateParams = update![1] as unknown[];
+    const index = sql.slice(0, sql.indexOf("WHERE")).split(",").findIndex((c) => c.includes("price_comparisons_json"));
+    expect(updateParams[index]).toBeNull();
   });
 });

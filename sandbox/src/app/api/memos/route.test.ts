@@ -16,6 +16,7 @@ import { getActiveSessionUserFromToken } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
 import { resolveCustomRouteFromRequest } from "@/lib/custom-route-server";
 import { departmentHasActiveSupervisor } from "@/lib/db-users";
+import { notifyMemoEvent } from "@/lib/notify-memo-event";
 
 const SESSION = { userId: 7, firstName: "ปุณณวิช", lastName: "ภูประเสริฐ", roles: ["requester"], department: "IT" };
 
@@ -32,7 +33,50 @@ beforeEach(() => {
   vi.mocked(getActiveSessionUserFromToken).mockResolvedValue(SESSION as never);
   vi.mocked(getDbPool).mockReturnValue({} as never);
   vi.mocked(departmentHasActiveSupervisor).mockResolvedValue(false as never);
+  vi.mocked(notifyMemoEvent).mockResolvedValue(undefined as never);
 });
+
+// Shared connection.execute mock for tests that need POST to reach the real INSERT —
+// most tests in this file stop earlier (getDbPool() returns {} so pool.getConnection
+// throws), but the free-form body-block tests below must inspect the actual INSERT
+// SQL/params, so they need a full, successful DB round trip.
+const execute = vi.fn();
+function mockSuccessfulInsert() {
+  execute.mockResolvedValue([{ insertId: 55 }, undefined]);
+  const connection = {
+    execute,
+    beginTransaction: vi.fn(),
+    commit: vi.fn().mockResolvedValue(undefined),
+    rollback: vi.fn().mockResolvedValue(undefined),
+    release: vi.fn(),
+  };
+  vi.mocked(getDbPool).mockReturnValue({ getConnection: vi.fn().mockResolvedValue(connection) } as never);
+  return connection;
+}
+
+const CUSTOM_ROUTE_OK = {
+  status: "ok",
+  route: ["person:1#42"],
+  approvers: [{ stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: null, department: "IT" }],
+};
+
+const validFreeformPayload = {
+  status: "pending",
+  title: "บันทึกอิสระ",
+  department: "IT",
+  category: "general-purchase",
+  amount: 1000,
+  customRoute: [{ userId: 42 }],
+};
+
+const validPayloadWithBook1Route = {
+  status: "pending",
+  title: "ขอซื้อวัสดุสำนักงาน",
+  department: "IT",
+  category: "general-purchase",
+  amount: 1000,
+  selectedRoute: ["General Manager"],
+};
 
 // The resolver refuses a custom route naming someone who is no longer active,
 // because silently falling back would send the document down a completely
@@ -190,6 +234,8 @@ describe("POST /api/memos INSERT wiring", () => {
     request_items_json: "sentinel:request_items_json",
     read_recipients_json: "sentinel:read_recipients_json",
     attachments_json: "sentinel:attachments_json",
+    form_mode: "freeform",
+    body_blocks_json: "sentinel:body_blocks_json",
     created_at: "sentinel:created_at",
     updated_at: "sentinel:updated_at",
   };
@@ -214,5 +260,80 @@ describe("POST /api/memos INSERT wiring", () => {
     expect(params[closingRemarkIndex + 2]).toBe("sentinel:notify_note_images_json");
     expect(params[closingRemarkIndex + 3]).toBe(106); // notify_attach_excel
     expect(params[closingRemarkIndex + 4]).toBe("sentinel:status"); // next real column, unshifted
+  });
+});
+
+// V3 free-form memo body: resolveBodyBlocksFromRequest is the trust boundary
+// (Task 6). These tests prove POST /api/memos actually wires it in — persists what
+// it returns, refuses what it rejects, and turns its clear* flags into real nulled
+// DB columns rather than silently discarding them.
+describe("POST /api/memos free-form body blocks", () => {
+  it("stores the form mode and blocks a free-form memo submits", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue(CUSTOM_ROUTE_OK as never);
+    mockSuccessfulInsert();
+
+    const res = await POST(postMemo({
+      ...validFreeformPayload,
+      formMode: "freeform",
+      bodyBlocks: [{ id: "b1", type: "paragraph", text: "เนื้อหาอิสระ" }],
+    }));
+
+    expect(res.status).toBe(201);
+    const insert = execute.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO memos"));
+    expect(insert).toBeDefined();
+    expect(String(insert![0])).toContain("form_mode");
+    expect(String(insert![0])).toContain("body_blocks_json");
+  });
+
+  it("refuses a free-form memo that did not pick its own approvers", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue({ status: "none" } as never);
+
+    const res = await POST(postMemo({
+      ...validPayloadWithBook1Route,
+      formMode: "freeform",
+      bodyBlocks: [],
+    }));
+
+    expect(res.status).toBe(400);
+    // The rejection must not fall through to a partial write.
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("clears the price data when the price block was removed", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue(CUSTOM_ROUTE_OK as never);
+    mockSuccessfulInsert();
+
+    const res = await POST(postMemo({
+      ...validFreeformPayload,
+      formMode: "freeform",
+      bodyBlocks: [{ id: "b1", type: "paragraph", text: "x" }],
+      priceComparisons: [{ vendor: "A", price: 100 }],
+    }));
+
+    expect(res.status).toBe(201);
+    const insert = execute.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO memos"));
+    const params = insert![1] as unknown[];
+    const sql = String(insert![0]);
+    const index = sql.slice(0, sql.indexOf("VALUES")).split(",").findIndex((c) => c.includes("price_comparisons_json"));
+    expect(params[index]).toBeNull();
+  });
+
+  it("keeps the price data when a system block still points at it", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue(CUSTOM_ROUTE_OK as never);
+    mockSuccessfulInsert();
+
+    const res = await POST(postMemo({
+      ...validFreeformPayload,
+      formMode: "freeform",
+      bodyBlocks: [{ id: "s1", type: "system", ref: "priceComparison" }],
+      priceComparisons: [{ vendor: "A", price: 100 }],
+    }));
+
+    expect(res.status).toBe(201);
+    const insert = execute.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO memos"));
+    const params = insert![1] as unknown[];
+    const sql = String(insert![0]);
+    const index = sql.slice(0, sql.indexOf("VALUES")).split(",").findIndex((c) => c.includes("price_comparisons_json"));
+    expect(params[index]).not.toBeNull();
   });
 });
