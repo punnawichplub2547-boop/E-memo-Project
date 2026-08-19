@@ -24,6 +24,7 @@ import type {
 } from "./approval";
 import { buildCustomRoute } from "./custom-route";
 import type { NotifyNoteImage } from "./notify-note";
+import type { MemoBodyBlock, MemoFormMode } from "./memo-body-blocks";
 
 /** The slice of the create form this needs. `MemoFormFieldsResult` satisfies it
  *  structurally, so the hook can be passed straight in. */
@@ -78,6 +79,15 @@ export type MemoDraftFields = {
     approvalLevel: string | null;
     department: string | null;
   }>;
+  /** V3 free-form body. `useMemoFormFields` returns the whole `useBodyBlocks()`
+   *  hook under this key (setters included) — this narrower shape is what
+   *  buildMemoDraftRecord actually reads, and the hook result is structurally
+   *  assignable to it (extra properties on the hook are fine). Undefined, or
+   *  formMode "standard", means the regular fixed-field form. */
+  bodyBlocks?: {
+    formMode: MemoFormMode;
+    blocks: MemoBodyBlock[];
+  };
 };
 
 export type MemoDraftOptions = {
@@ -173,5 +183,10 @@ export function buildMemoDraftRecord(
     notifyNote: fields.notifyNote?.trim() || undefined,
     notifyNoteImages,
     notifyAttachExcel: fields.notifyAttachExcel || undefined,
+    // Undefined stays undefined (not "standard") when the form field never
+    // wired up bodyBlocks at all — same optional-chaining rule the rest of
+    // this function uses for every other optional field.
+    formMode: fields.bodyBlocks?.formMode,
+    bodyBlocks: fields.bodyBlocks?.blocks,
   };
 }

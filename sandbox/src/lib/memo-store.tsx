@@ -333,6 +333,14 @@ async function persistSubmitRevisionMemo(
     // absence as "Book1 route" and clears custom_route_json, which would quietly
     // convert a per-person memo back to a level route on every resubmit.
     customRoute: next.customRoute?.map((a) => ({ userId: a.userId })),
+    // V3 free-form body: also not neutral to omit. The route handler treats a
+    // missing formMode/bodyBlocks as "resend your blocks" for a free-form memo
+    // and hard-400s rather than falling back to what is already stored (see
+    // SubmitRevisionBody's comment in db-memo-write.ts) — so this must always
+    // carry the reducer's already-applied next.formMode/next.bodyBlocks, same
+    // as customRoute above.
+    formMode: next.formMode,
+    bodyBlocks: next.bodyBlocks,
   };
   try {
     const response = await fetch(`/api/memos/${encodeURIComponent(memoId)}/submit-revision`, {

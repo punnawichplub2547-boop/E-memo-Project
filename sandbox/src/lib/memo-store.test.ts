@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildMemoSnapshot, memoReducer } from "./memo-store";
 import { seedMemos, type MemoRecord } from "./approval";
 import { buildCustomRoute } from "./custom-route";
+import type { MemoBodyBlock } from "./memo-body-blocks";
 
 describe("memoReducer — HYDRATE_MEMOS", () => {
   it("accepts an empty DB result instead of falling back to seed memos", () => {
@@ -1027,5 +1028,68 @@ describe("memoReducer — SUBMIT_REVISION with a custom route", () => {
     expect(next.customRoute).toBeUndefined();
     expect(next.currentStep).toBe("Manager / Top Section");
     expect(next.revisions?.[0].snapshot.customRoute).toBeUndefined();
+  });
+});
+
+describe("memoReducer — SUBMIT_REVISION with a free-form body (V3, carried ruling)", () => {
+  const freeformBase: MemoRecord = {
+    id: "EM-2026-FREEFORM",
+    title: "Original Title",
+    requester: "Test User",
+    department: "IT",
+    category: "general-purchase",
+    amount: 5000,
+    status: "returned",
+    currentStep: "Manager / Top Section",
+    selectedRoute: ["Manager / Top Section", "General Manager"],
+    returnReason: "เอกสารไม่ครบ",
+    formMode: "freeform",
+    bodyBlocks: [{ id: "blk-1", type: "paragraph", text: "เนื้อหาเดิม" }],
+    cycleHours: 0,
+    createdAt: "01 Jun 2026 10:00",
+    updatedAt: "02 Jun 2026 14:00",
+  };
+
+  const editedBlocks: MemoBodyBlock[] = [
+    { id: "blk-2", type: "paragraph", text: "เนื้อหาที่แก้ไข" },
+    { id: "blk-3", type: "keyValue", pairs: [{ key: "หัวข้อ", value: "ค่า" }] },
+  ];
+
+  it("carries the edited formMode/bodyBlocks through the revision", () => {
+    const [next] = memoReducer([freeformBase], {
+      type: "SUBMIT_REVISION",
+      id: freeformBase.id,
+      title: "Updated Title",
+      category: "general-purchase",
+      department: "IT",
+      amount: 5000,
+      selectedRoute: ["Manager / Top Section"],
+      formMode: "freeform",
+      bodyBlocks: editedBlocks,
+      updatedAt: "10 Aug 2026 10:00",
+    });
+    expect(next.formMode).toBe("freeform");
+    expect(next.bodyBlocks).toEqual(editedBlocks);
+  });
+
+  // Would fail if the reducer wrote `action.bodyBlocks ?? m.bodyBlocks`: a memo
+  // whose blocks were deliberately cleared (e.g. switched back to "standard")
+  // must not silently revert to its old blocks — see the warning comment next
+  // to this case in memo-reducer.ts.
+  it("clears formMode/bodyBlocks when the revision switches back to standard", () => {
+    const [next] = memoReducer([freeformBase], {
+      type: "SUBMIT_REVISION",
+      id: freeformBase.id,
+      title: "Updated Title",
+      category: "general-purchase",
+      department: "IT",
+      amount: 5000,
+      selectedRoute: ["Manager / Top Section"],
+      formMode: "standard",
+      bodyBlocks: [],
+      updatedAt: "10 Aug 2026 10:00",
+    });
+    expect(next.formMode).toBe("standard");
+    expect(next.bodyBlocks).toEqual([]);
   });
 });

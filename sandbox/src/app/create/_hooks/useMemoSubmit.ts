@@ -32,6 +32,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     recommendation, routeReview, selectedRoute, cleanOverrideReason, canSubmitPending,
     routeSource, customRoutePeople,
     notifyNoteImageFiles,
+    bodyBlocks,
   } = fields;
 
   // Which route this submission carries. The custom tab wins only when it is
@@ -223,6 +224,11 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
         routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
         notifyMD: recommendation.notifyMD,
         requiresMdReview: recommendation.requiresMdReview,
+        // V3 free-form body: sent every time, same as customRoute above — a
+        // free-form memo must resend its blocks on every revision (see the
+        // server-side comment in db-memo-write.ts's SubmitRevisionBody).
+        formMode: bodyBlocks.formMode,
+        bodyBlocks: bodyBlocks.blocks,
         updatedAt: stamp,
       });
       router.push("/queue");

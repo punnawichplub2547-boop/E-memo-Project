@@ -20,7 +20,9 @@ import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-inp
 import { newClientRowId } from "@/lib/client-row-id";
 import { canResubmitMemo, prototypeUserAuthId, PrototypeUser } from "@/lib/prototype-users";
 import type { ItemSubcategory } from "@/lib/item-subcategories";
+import type { MemoBodyBlock, MemoFormMode } from "@/lib/memo-body-blocks";
 import { useCustomRoute } from "./useCustomRoute";
+import { useBodyBlocks } from "./useBodyBlocks";
 
 function getEffectiveRequestQty(qty: number) {
   return qty > 0 ? qty : 1;
@@ -148,6 +150,13 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     // which simply disables the self-pick warning.
     currentUserId: prototypeUserAuthId(user),
   });
+
+  // V3 free-form body — same revision-seeding pattern as customRoute above.
+  const bodyBlocks = useBodyBlocks(
+    isRevisionMode
+      ? { formMode: reviseMemo!.formMode ?? "standard", blocks: reviseMemo!.bodyBlocks ?? [] }
+      : undefined
+  );
 
   const [chosenApprover, setChosenApprover] = useState<ApprovalLevel | null>(null);
   const [skipGmStep, setSkipGmStep] = useState(false);
@@ -380,6 +389,8 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     }
     if (data.priceAdjustmentReason) setPriceAdjustmentReason(data.priceAdjustmentReason as string);
     if (data.readRecipients) setReadRecipients(data.readRecipients as string[]);
+    if (data.formMode) bodyBlocks.setFormMode(data.formMode as MemoFormMode);
+    if (Array.isArray(data.bodyBlocks)) bodyBlocks.setBlocks(data.bodyBlocks as MemoBodyBlock[]);
   };
 
   const snapshotFormData = () => ({
@@ -402,6 +413,8 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     requestItems,
     priceAdjustmentReason,
     readRecipients,
+    formMode: bodyBlocks.formMode,
+    bodyBlocks: bodyBlocks.blocks,
   });
 
   return {
@@ -457,6 +470,7 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     selectedVendorVatAmount,
     cleanVendorReason,
     canSubmitPending,
+    bodyBlocks,
     customRoute,
     routeSource: customRoute.routeSource,
     customRoutePeople: customRoute.people,

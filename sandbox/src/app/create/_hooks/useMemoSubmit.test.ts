@@ -50,6 +50,7 @@ function makeFields(overrides: Partial<MemoFormFieldsResult> = {}): MemoFormFiel
     cleanOverrideReason: "",
     firstCheckingStep: "Manager / Top Section",
     canSubmitPending: true,
+    bodyBlocks: { formMode: "standard", blocks: [] },
     // Unused-by-useMemoSubmit fields still required by the type; harmless placeholders.
     ...overrides,
   } as unknown as MemoFormFieldsResult;

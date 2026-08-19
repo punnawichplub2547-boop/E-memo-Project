@@ -4,6 +4,7 @@ import {
   MemoRevision, MemoSnapshot, RevisionSource,
 } from "./approval";
 import type { CustomApprover } from "./custom-route";
+import type { MemoBodyBlock, MemoFormMode } from "./memo-body-blocks";
 // Pure rules module (no DB imports) — safe to pull into this client component.
 import { mdReviewGateStep } from "./workflow-rules";
 
@@ -64,6 +65,11 @@ export type MemoAction =
       notifyMD?: boolean;
       requiresMdReview?: boolean;
       revisionNote?: string;
+      /** V3 free-form body for this revision. Authoritative like customRoute above:
+       *  undefined/"standard" means the revision uses the regular fixed-field form,
+       *  which is how a memo switches back out of freeform mode. */
+      formMode?: MemoFormMode;
+      bodyBlocks?: MemoBodyBlock[];
       updatedAt?: string;
     }
   | { type: "DELETE_MEMO"; id: string; deletedAt: string }
@@ -106,6 +112,8 @@ export function buildMemoSnapshot(m: MemoRecord): MemoSnapshot {
     routeMode: m.routeMode,
     routeOverrideReason: m.routeOverrideReason,
     notifyMD: m.notifyMD,
+    formMode: m.formMode,
+    bodyBlocks: m.bodyBlocks,
   };
 }
 
@@ -331,6 +339,14 @@ export function memoReducer(state: MemoRecord[], action: MemoAction): MemoRecord
           routeOverrideReason: action.routeOverrideReason,
           notifyMD: action.notifyMD,
           requiresMdReview: action.requiresMdReview,
+          // Not `?? m.bodyBlocks`/`?? m.formMode`: the same reasoning as
+          // customRoute above, but the stakes are worse here. A revision that
+          // deliberately cleared its blocks (e.g. switched back to "standard")
+          // would silently reinherit the old memo's blocks if this fell back to
+          // m.bodyBlocks — a memo the user emptied would still carry stale
+          // content forward. action.formMode/action.bodyBlocks are authoritative.
+          formMode: action.formMode,
+          bodyBlocks: action.bodyBlocks,
           // Workflow reset (same as RESUBMIT_MEMO):
           status: "pending" as const,
           // Falling back to the memo's own first step (not straight to Manager)
