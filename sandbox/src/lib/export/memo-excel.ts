@@ -7,6 +7,8 @@ import type { ApprovalLevel, ApprovalStepKey, MemoRecord } from "../approval";
 import { approvalLabels, computePriceRowTotals } from "../approval";
 import { describeCustomStep } from "../custom-route";
 import { buildCustomSignatureSlots, type SignatureSlot } from "./memo-signature-slots";
+import { safeSpreadsheetText } from "./excel-safe-text";
+import { spanColumns, FORM_COL_WIDTHS } from "./span-columns";
 
 export type MemoSignature = {
   // Either a Book1 approval level or a custom route's person token — the same
@@ -17,7 +19,11 @@ export type MemoSignature = {
 };
 
 const THAI_FONT = "Tahoma";
-const TOTAL_COLS = 12;
+// C1 (Ruling 4, Task 4 review): column widths used to be declared a second time here
+// (`colWidths`, independently of span-columns.ts's FORM_COL_WIDTHS) with no import linking
+// the two — they happened to still match, but nothing would catch a future edit to only one
+// copy. FORM_COL_WIDTHS is now the single source; TOTAL_COLS derives from it.
+const TOTAL_COLS = FORM_COL_WIDTHS.length;
 
 // Row-major layout of the form's 24 "To:" checkboxes (3 columns x 8 rows), top-to-bottom
 // then left-to-right, matching Form.jpg exactly. MD/SGM/GM are approval-role boxes with no
@@ -151,6 +157,200 @@ function findSignature(signatures: MemoSignature[], stepLabel: ApprovalLevel): M
   return matches[matches.length - 1];
 }
 
+// ---- Request items table (Task 11 Step 3: extracted verbatim from the pre-existing inline
+// code, no behavior change — "keeps a standard memo's layout unchanged" depends on this). ----
+function renderItemsTable(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: number): number {
+  let r = startRow;
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 6, r, "รายการ");
+  headerCell(ws, 7, 7, r, "หน่วย");
+  headerCell(ws, 8, 8, r, "จำนวน");
+  headerCell(ws, 9, 10, r, "ราคา/หน่วย");
+  headerCell(ws, 11, 12, r, "รวมเป็นเงิน");
+  r++;
+
+  const items = memo.requestItems ?? [];
+  let itemSubtotal = 0;
+  if (items.length === 0) {
+    setRange(ws, 1, 1, r, 1, { align: "center" });
+    setRange(ws, 2, 6, r, "(ไม่มีรายการ)", {});
+    setRange(ws, 7, 7, r, "-", { align: "center" });
+    setRange(ws, 8, 8, r, "-", { align: "center" });
+    setRange(ws, 9, 10, r, "-", { align: "center" });
+    setRange(ws, 11, 12, r, money(memo.amount), { align: "right" }).numFmt = "#,##0.00";
+    itemSubtotal = money(memo.amount);
+    r++;
+  } else {
+    items.forEach((item, i) => {
+      const total = item.qty * item.unitPrice;
+      itemSubtotal += total;
+      setRange(ws, 1, 1, r, i + 1, { align: "center" });
+      setRange(ws, 2, 6, r, item.name, { wrap: true });
+      fitRowHeight(ws, r, item.name, 2, 6, { minHeight: 16 });
+      setRange(ws, 7, 7, r, item.unit, { align: "center" });
+      setRange(ws, 8, 8, r, item.qty, { align: "center" });
+      setRange(ws, 9, 10, r, money(item.unitPrice), { align: "right" }).numFmt = "#,##0.00";
+      setRange(ws, 11, 12, r, money(total), { align: "right" }).numFmt = "#,##0.00";
+      r++;
+    });
+  }
+
+  setRange(ws, 1, 9, r, "รวมเป็นเงิน", { align: "right", border: false });
+  setRange(ws, 10, 12, r, money(itemSubtotal), { align: "right" }).numFmt = "#,##0.00"; r++;
+  setRange(ws, 1, 9, r, "ส่วนลด (ถ้ามี)", { align: "right", border: false });
+  setRange(ws, 10, 12, r, 0, { align: "right" }).numFmt = "#,##0.00"; r++;
+  setRange(ws, 1, 9, r, "ภาษีมูลค่าเพิ่ม VAT 7%", { align: "right", border: false });
+  setRange(ws, 10, 12, r, 0, { align: "right" }).numFmt = "#,##0.00"; r++;
+  setRange(ws, 1, 9, r, "รวมเป็นเงินทั้งสิ้น", { align: "right", bold: true, border: false });
+  setRange(ws, 10, 12, r, money(itemSubtotal), { align: "right", bold: true }).numFmt = "#,##0.00"; r++;
+  return r;
+}
+
+// ---- Budget table — not a block in either mode (design spec §6.1: "บล็อกงบ → ปิดท้าย →
+// ช่องเซ็น ← ไม่เปลี่ยน"), so it is its own function shared by both the standard and
+// free-form branches of buildMemoExcelWorkbook rather than being duplicated in each. ----
+function renderBudgetTable(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: number): number {
+  let r = startRow;
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 4, r, "รายการ");
+  headerCell(ws, 5, 6, r, "Budget Plan 2025");
+  headerCell(ws, 7, 8, r, "Budget ที่ใช้ไป");
+  headerCell(ws, 9, 10, r, "Budget ที่ขอใช้");
+  headerCell(ws, 11, 12, r, "Budget คงเหลือ");
+  r++;
+  const budgetPlan = memo.budgetPlan;
+  const budgetUsed = memo.budgetUsed ?? 0;
+  const remaining = budgetPlan !== undefined ? budgetPlan - budgetUsed - memo.amount : undefined;
+  setRange(ws, 1, 1, r, 1, { align: "center" });
+  setRange(ws, 2, 4, r, memo.title, { wrap: true, valign: "top" });
+  fitRowHeight(ws, r, memo.title, 2, 4, { minHeight: 16 });
+  setRange(ws, 5, 6, r, budgetPlan !== undefined ? money(budgetPlan) : "-", { align: "right" });
+  setRange(ws, 7, 8, r, money(budgetUsed), { align: "right" });
+  setRange(ws, 9, 10, r, money(memo.amount), { align: "right" });
+  setRange(ws, 11, 12, r, remaining !== undefined ? money(remaining) : "-", { align: "right" });
+  r++;
+  return r;
+}
+
+// ---- Price comparison table (Task 11 Step 3: extracted verbatim, no behavior change). ----
+function renderPriceTable(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: number): number {
+  let r = startRow;
+  headerCell(ws, 1, 1, r, "ลำดับ");
+  headerCell(ws, 2, 5, r, "ผู้ให้บริการ");
+  headerCell(ws, 6, 7, r, "ราคาเสนอ");
+  headerCell(ws, 8, 9, r, "ส่วนลด (ถ้ามี)");
+  headerCell(ws, 10, 11, r, "รวมราคาขาย/บริการทั้งสิ้น");
+  headerCell(ws, 12, 12, r, "หมายเหตุ");
+  r++;
+  const vendors = memo.priceComparisons ?? [];
+  const vendorRowCount = Math.max(vendors.length, 3);
+  for (let i = 0; i < vendorRowCount; i++) {
+    const v = vendors[i];
+    setRange(ws, 1, 1, r, i + 1, { align: "center" });
+    if (v) {
+      const { netPrice } = computePriceRowTotals(v);
+      const selected = v.isSelected ? " (เลือกใช้บริการ)" : "";
+      const vendorLabel = `${v.vendorName}${selected}`;
+      setRange(ws, 2, 5, r, vendorLabel, { bold: !!v.isSelected, wrap: true, valign: "top" });
+      setRange(ws, 6, 7, r, money(v.offeredPrice), { align: "right" });
+      setRange(ws, 8, 9, r, money(v.discount), { align: "right" });
+      setRange(ws, 10, 11, r, money(netPrice), { align: "right" });
+      setRange(ws, 12, 12, r, v.remark ?? "", { wrap: true, valign: "top" });
+      fitRowHeight(ws, r, vendorLabel, 2, 5, { minHeight: 16 });
+      fitRowHeight(ws, r, v.remark ?? "", 12, 12, { minHeight: 16 });
+    } else {
+      setRange(ws, 2, 5, r, "", {});
+      setRange(ws, 6, 7, r, "", {});
+      setRange(ws, 8, 9, r, "", {});
+      setRange(ws, 10, 11, r, "", {});
+      setRange(ws, 12, 12, r, "", {});
+    }
+    r++;
+  }
+  return r;
+}
+
+// Row height must never exceed Excel's ~409 point ceiling (fitRowHeight has no cap of its
+// own — see its doc comment). At the form's full 12-column width a 1200-char Thai chunk
+// estimates to ~384pt (24 lines × 16pt), leaving headroom; verified empirically by the
+// "cuts pure Thai text… at exactly the 1200-char boundary" and "…no row exceeds…" tests
+// below, not by trusting this number in isolation (C3#2).
+const MAX_PARAGRAPH_CHARS = 1200;
+
+/**
+ * Splits `text` into chunks no longer than `size`, preferring to cut at a space.
+ * C3#1: Thai is written with no spaces between words, so `lastIndexOf(" ", size)` returns
+ * -1 for pure-Thai input and every chunk lands exactly at the `size` boundary — confirmed
+ * intentional/acceptable and proven with a dedicated Thai-only test rather than assumed.
+ */
+function chunkText(text: string, size: number): string[] {
+  if (text.length <= size) return [text];
+  const chunks: string[] = [];
+  let rest = text;
+  while (rest.length > size) {
+    const cut = rest.lastIndexOf(" ", size);
+    const at = cut > size * 0.5 ? cut : size;
+    chunks.push(rest.slice(0, at));
+    rest = rest.slice(at).trimStart();
+  }
+  if (rest.length > 0) chunks.push(rest);
+  return chunks;
+}
+
+// ---- Free-form body: draws each block in the order the requester arranged them (design
+// spec §6.2). `system` blocks are pointers, not a copy of the data (§4.4) — they call the
+// same renderItemsTable/renderPriceTable used by standard mode, so the underlying
+// price/request-item data (and its VAT math, selected-vendor flag, etc.) never needs a
+// second implementation. Every free-typed string goes through safeSpreadsheetText() —
+// unlike the fixed standard-mode tables, this surface lets the requester type into
+// arbitrarily many cells, so formula injection (§7.1) is a real risk here.
+function renderBodyBlocks(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: number): number {
+  let r = startRow;
+  for (const block of memo.bodyBlocks ?? []) {
+    switch (block.type) {
+      case "paragraph": {
+        for (const chunk of chunkText(block.text, MAX_PARAGRAPH_CHARS)) {
+          const text = safeSpreadsheetText(chunk);
+          setRange(ws, 1, TOTAL_COLS, r, text, { wrap: true });
+          fitRowHeight(ws, r, text, 1, TOTAL_COLS, { minHeight: 16 });
+          r++;
+        }
+        break;
+      }
+      case "table": {
+        const spans = spanColumns(block.headers.length);
+        block.headers.forEach((header, i) =>
+          headerCell(ws, spans[i][0], spans[i][1], r, safeSpreadsheetText(header))
+        );
+        r++;
+        for (const row of block.rows) {
+          row.forEach((cell, i) => {
+            const text = safeSpreadsheetText(cell);
+            setRange(ws, spans[i][0], spans[i][1], r, text, { wrap: true });
+            fitRowHeight(ws, r, text, spans[i][0], spans[i][1], { minHeight: 16 });
+          });
+          r++;
+        }
+        break;
+      }
+      case "keyValue": {
+        for (const pair of block.pairs) {
+          const value = safeSpreadsheetText(pair.value);
+          setRange(ws, 1, 3, r, safeSpreadsheetText(pair.key), { bold: true });
+          setRange(ws, 4, TOTAL_COLS, r, value, { wrap: true });
+          fitRowHeight(ws, r, value, 4, TOTAL_COLS, { minHeight: 16 });
+          r++;
+        }
+        break;
+      }
+      case "system":
+        r = block.ref === "priceComparison" ? renderPriceTable(ws, memo, r) : renderItemsTable(ws, memo, r);
+        break;
+    }
+  }
+  return r;
+}
+
 export async function buildMemoExcelWorkbook(
   memo: MemoRecord,
   signatures: MemoSignature[] = [],
@@ -169,8 +369,8 @@ export async function buildMemoExcelWorkbook(
   // default width and Thai text overflows. Every width here is deliberately != 9.
   // Layout: narrow index (col 1), wider left meta / item columns (2-3), money columns
   // on the right (9-12). Sum ~102 fits one A4 portrait page (pageSetup fitToWidth: 1).
-  const colWidths = [5, 10, 10, 8, 8, 8, 7.5, 7.5, 9.5, 9.5, 9.5, 9.5];
-  colWidths.forEach((w, i) => {
+  // Single source of truth: FORM_COL_WIDTHS (span-columns.ts) — see C1 above.
+  FORM_COL_WIDTHS.forEach((w, i) => {
     ws.getColumn(i + 1).width = w;
   });
 
@@ -243,104 +443,24 @@ export async function buildMemoExcelWorkbook(
   setRange(ws, 1, TOTAL_COLS, r, reasonText, { size: 10, wrap: true, valign: "top" });
   fitRowHeight(ws, r, reasonText, 1, TOTAL_COLS, { minHeight: 32 }); r++;
 
-  // ---- Request items table ----
-  headerCell(ws, 1, 1, r, "ลำดับ");
-  headerCell(ws, 2, 6, r, "รายการ");
-  headerCell(ws, 7, 7, r, "หน่วย");
-  headerCell(ws, 8, 8, r, "จำนวน");
-  headerCell(ws, 9, 10, r, "ราคา/หน่วย");
-  headerCell(ws, 11, 12, r, "รวมเป็นเงิน");
-  r++;
-
-  const items = memo.requestItems ?? [];
-  let itemSubtotal = 0;
-  if (items.length === 0) {
-    setRange(ws, 1, 1, r, 1, { align: "center" });
-    setRange(ws, 2, 6, r, "(ไม่มีรายการ)", {});
-    setRange(ws, 7, 7, r, "-", { align: "center" });
-    setRange(ws, 8, 8, r, "-", { align: "center" });
-    setRange(ws, 9, 10, r, "-", { align: "center" });
-    setRange(ws, 11, 12, r, money(memo.amount), { align: "right" }).numFmt = "#,##0.00";
-    itemSubtotal = money(memo.amount);
-    r++;
+  // ---- Body: free-form blocks in the order the requester arranged them, or the fixed
+  // request-items table. The budget table is never a block (design spec §6.1 — it "closes
+  // out" the body in both modes) so it always renders next, unconditionally. The price
+  // table only renders unconditionally in standard mode; in free-form mode it renders (at
+  // most once) wherever the requester placed a `system` block pointing at it — see
+  // renderBodyBlocks below. This is invariant C4: never print the items/price table twice.
+  if (memo.formMode === "freeform") {
+    r = renderBodyBlocks(ws, memo, r);
   } else {
-    items.forEach((item, i) => {
-      const total = item.qty * item.unitPrice;
-      itemSubtotal += total;
-      setRange(ws, 1, 1, r, i + 1, { align: "center" });
-      setRange(ws, 2, 6, r, item.name, { wrap: true });
-      fitRowHeight(ws, r, item.name, 2, 6, { minHeight: 16 });
-      setRange(ws, 7, 7, r, item.unit, { align: "center" });
-      setRange(ws, 8, 8, r, item.qty, { align: "center" });
-      setRange(ws, 9, 10, r, money(item.unitPrice), { align: "right" }).numFmt = "#,##0.00";
-      setRange(ws, 11, 12, r, money(total), { align: "right" }).numFmt = "#,##0.00";
-      r++;
-    });
+    r = renderItemsTable(ws, memo, r);
   }
 
-  setRange(ws, 1, 9, r, "รวมเป็นเงิน", { align: "right", border: false });
-  setRange(ws, 10, 12, r, money(itemSubtotal), { align: "right" }).numFmt = "#,##0.00"; r++;
-  setRange(ws, 1, 9, r, "ส่วนลด (ถ้ามี)", { align: "right", border: false });
-  setRange(ws, 10, 12, r, 0, { align: "right" }).numFmt = "#,##0.00"; r++;
-  setRange(ws, 1, 9, r, "ภาษีมูลค่าเพิ่ม VAT 7%", { align: "right", border: false });
-  setRange(ws, 10, 12, r, 0, { align: "right" }).numFmt = "#,##0.00"; r++;
-  setRange(ws, 1, 9, r, "รวมเป็นเงินทั้งสิ้น", { align: "right", bold: true, border: false });
-  setRange(ws, 10, 12, r, money(itemSubtotal), { align: "right", bold: true }).numFmt = "#,##0.00"; r++;
+  r++;
+  r = renderBudgetTable(ws, memo, r);
 
-  // ---- Budget table ----
-  r++;
-  headerCell(ws, 1, 1, r, "ลำดับ");
-  headerCell(ws, 2, 4, r, "รายการ");
-  headerCell(ws, 5, 6, r, "Budget Plan 2025");
-  headerCell(ws, 7, 8, r, "Budget ที่ใช้ไป");
-  headerCell(ws, 9, 10, r, "Budget ที่ขอใช้");
-  headerCell(ws, 11, 12, r, "Budget คงเหลือ");
-  r++;
-  const budgetPlan = memo.budgetPlan;
-  const budgetUsed = memo.budgetUsed ?? 0;
-  const remaining = budgetPlan !== undefined ? budgetPlan - budgetUsed - memo.amount : undefined;
-  setRange(ws, 1, 1, r, 1, { align: "center" });
-  setRange(ws, 2, 4, r, memo.title, { wrap: true, valign: "top" });
-  fitRowHeight(ws, r, memo.title, 2, 4, { minHeight: 16 });
-  setRange(ws, 5, 6, r, budgetPlan !== undefined ? money(budgetPlan) : "-", { align: "right" });
-  setRange(ws, 7, 8, r, money(budgetUsed), { align: "right" });
-  setRange(ws, 9, 10, r, money(memo.amount), { align: "right" });
-  setRange(ws, 11, 12, r, remaining !== undefined ? money(remaining) : "-", { align: "right" });
-  r++;
-
-  // ---- Price comparison table ----
-  r++;
-  headerCell(ws, 1, 1, r, "ลำดับ");
-  headerCell(ws, 2, 5, r, "ผู้ให้บริการ");
-  headerCell(ws, 6, 7, r, "ราคาเสนอ");
-  headerCell(ws, 8, 9, r, "ส่วนลด (ถ้ามี)");
-  headerCell(ws, 10, 11, r, "รวมราคาขาย/บริการทั้งสิ้น");
-  headerCell(ws, 12, 12, r, "หมายเหตุ");
-  r++;
-  const vendors = memo.priceComparisons ?? [];
-  const vendorRowCount = Math.max(vendors.length, 3);
-  for (let i = 0; i < vendorRowCount; i++) {
-    const v = vendors[i];
-    setRange(ws, 1, 1, r, i + 1, { align: "center" });
-    if (v) {
-      const { netPrice } = computePriceRowTotals(v);
-      const selected = v.isSelected ? " (เลือกใช้บริการ)" : "";
-      const vendorLabel = `${v.vendorName}${selected}`;
-      setRange(ws, 2, 5, r, vendorLabel, { bold: !!v.isSelected, wrap: true, valign: "top" });
-      setRange(ws, 6, 7, r, money(v.offeredPrice), { align: "right" });
-      setRange(ws, 8, 9, r, money(v.discount), { align: "right" });
-      setRange(ws, 10, 11, r, money(netPrice), { align: "right" });
-      setRange(ws, 12, 12, r, v.remark ?? "", { wrap: true, valign: "top" });
-      fitRowHeight(ws, r, vendorLabel, 2, 5, { minHeight: 16 });
-      fitRowHeight(ws, r, v.remark ?? "", 12, 12, { minHeight: 16 });
-    } else {
-      setRange(ws, 2, 5, r, "", {});
-      setRange(ws, 6, 7, r, "", {});
-      setRange(ws, 8, 9, r, "", {});
-      setRange(ws, 10, 11, r, "", {});
-      setRange(ws, 12, 12, r, "", {});
-    }
+  if (memo.formMode !== "freeform") {
     r++;
+    r = renderPriceTable(ws, memo, r);
   }
 
   // ---- Closing two-column block ----

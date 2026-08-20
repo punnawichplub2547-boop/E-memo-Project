@@ -305,3 +305,131 @@ describe("buildMemoExcelWorkbook — custom per-person signature block", () => {
     expect(text).not.toContain("มีผู้อนุมัติเพิ่มอีก");
   });
 });
+
+describe("buildMemoExcelWorkbook — free-form body blocks (Task 11)", () => {
+  // Every setRange() call here merges a column span, and ExcelJS's row.eachCell() visits
+  // every cell in a merge, not just the master — the non-master cells mirror the master's
+  // .value. Counting occurrences without filtering those out double/quadruple-counts a
+  // single printed value (a 4-wide merge reports the same string 4 times), which would make
+  // the "printed twice" tests below fail even when the sheet only has ONE real table. Skip
+  // ValueType.Merge cells so occurrence counts reflect printed cells, not merge width.
+  function sheetText(ws: ExcelJS.Worksheet): string {
+    const parts: string[] = [];
+    ws.eachRow((row) => row.eachCell((cell) => {
+      if (cell.type === ExcelJS.ValueType.Merge) return;
+      parts.push(String(cell.value ?? ""));
+    }));
+    return parts.join("\n");
+  }
+
+  it("prints the blocks in the order the requester arranged them", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [
+        { id: "1", type: "paragraph", text: "ย่อหน้าแรก" },
+        { id: "2", type: "table", headers: ["ผู้ขาย", "ราคา"], rows: [["ก", "100"]] },
+        { id: "3", type: "keyValue", pairs: [{ key: "Project", value: "ทดสอบ" }] },
+      ],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain("ย่อหน้าแรก");
+    expect(text).toContain("ผู้ขาย");
+    expect(text).toContain("Project");
+    expect(text.indexOf("ย่อหน้าแรก")).toBeLessThan(text.indexOf("ผู้ขาย"));
+    expect(text.indexOf("ผู้ขาย")).toBeLessThan(text.indexOf("Project"));
+  });
+
+  // Real PriceComparison shape (id/vendorName/offeredPrice/discount/netPrice/isSelected) —
+  // the brief's sample cast a `{vendor, price}` shape with `as never`, which is exactly the
+  // "cast instead of validate" pattern C2 warns about; using the real fields here means
+  // TypeScript would actually catch a shape drift instead of silently passing through a cast.
+  it("does not print the price table twice on a free-form memo", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "s", type: "system", ref: "priceComparison" }],
+      priceComparisons: [
+        { id: "v1", vendorName: "ผู้ขายเดียว", offeredPrice: 100, discount: 0, netPrice: 100, isSelected: false },
+      ],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text.split("ผู้ขายเดียว").length - 1).toBe(1);
+  });
+
+  it("does not print the request items table twice on a free-form memo", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "s", type: "system", ref: "requestItems" }],
+      requestItems: [{ id: "i1", name: "ของชิ้นเดียว", unit: "ชิ้น", qty: 1, unitPrice: 100 }],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text.split("ของชิ้นเดียว").length - 1).toBe(1);
+  });
+
+  it("splits a very long paragraph so no row exceeds Excel's height limit", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "1", type: "paragraph", text: "ก".repeat(5000) }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    ws.eachRow((row) => expect(row.height ?? 0).toBeLessThanOrEqual(409));
+  });
+
+  // C3#1: Thai text has no inter-word spaces, so chunkText's `lastIndexOf(" ", size)` always
+  // returns -1 for pure-Thai input and every cut lands exactly at `size`. This proves that
+  // behaviour directly (chunk lengths, not just "no row is too tall") instead of trusting the
+  // brief's claim that it is acceptable.
+  it("cuts pure Thai text (no spaces) at exactly the 1200-char boundary, not before", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "1", type: "paragraph", text: "ก".repeat(5000) }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    const chunks: string[] = [];
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        // Paragraph rows merge cols 1-12 into one cell; eachCell visits every mirrored
+        // cell in the merge (same artifact as the sheetText() helper above), so skip
+        // non-master merge cells or each chunk gets counted 12 times.
+        if (cell.type === ExcelJS.ValueType.Merge) return;
+        if (typeof cell.value === "string" && /^ก+$/.test(cell.value)) chunks.push(cell.value);
+      });
+    });
+    expect(chunks.map((c) => c.length)).toEqual([1200, 1200, 1200, 1200, 200]);
+  });
+
+  it("neutralises a formula typed into a table cell", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "t", type: "table", headers: ["ช่อง"], rows: [['=HYPERLINK("http://evil")']] }],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain(`'=HYPERLINK`);
+  });
+
+  it("neutralises a formula typed into a key-value pair", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "kv", type: "keyValue", pairs: [{ key: "=cmd", value: "+2+3" }] }],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain(`'=cmd`);
+    expect(text).toContain(`'+2+3`);
+  });
+
+  it("still renders the budget table on a free-form memo (fixed position, not a block)", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "1", type: "paragraph", text: "เนื้อหาอิสระ" }],
+      budgetPlan: 50000,
+      budgetUsed: 10000,
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain("Budget Plan 2025");
+  });
+
+  it("keeps a standard memo's layout unchanged", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ formMode: "standard" }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    expect(text).toContain("เนื่องจาก/เหตุผล");
+  });
+});
