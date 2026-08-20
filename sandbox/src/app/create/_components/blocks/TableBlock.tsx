@@ -1,6 +1,14 @@
 "use client";
 
-import { MAX_TABLE_COLUMNS, TABLE_COLUMN_WARN_AT } from "@/lib/memo-body-blocks";
+import {
+  MAX_TABLE_COLUMNS,
+  TABLE_COLUMN_WARN_AT,
+  setTableHeader,
+  setTableCell,
+  addTableColumn,
+  addTableRow,
+  removeTableRow,
+} from "@/lib/memo-body-blocks";
 
 type Props = {
   headers: string[];
@@ -9,23 +17,18 @@ type Props = {
 };
 
 export function TableBlock({ headers, rows, onChange }: Props) {
-  const setHeader = (i: number, value: string) =>
-    onChange({ headers: headers.map((h, idx) => (idx === i ? value : h)), rows });
+  const setHeader = (i: number, value: string) => onChange(setTableHeader(headers, rows, i, value));
 
-  const setCell = (r: number, c: number, value: string) =>
-    onChange({
-      headers,
-      rows: rows.map((row, ri) => (ri === r ? row.map((cell, ci) => (ci === c ? value : cell)) : row)),
-    });
+  const setCell = (r: number, c: number, value: string) => onChange(setTableCell(headers, rows, r, c, value));
 
   const addColumn = () => {
     if (headers.length >= MAX_TABLE_COLUMNS) return;
-    onChange({ headers: [...headers, ""], rows: rows.map((row) => [...row, ""]) });
+    onChange(addTableColumn(headers, rows));
   };
 
-  const addRow = () => onChange({ headers, rows: [...rows, headers.map(() => "")] });
+  const addRow = () => onChange(addTableRow(headers, rows));
 
-  const removeRow = (r: number) => onChange({ headers, rows: rows.filter((_, ri) => ri !== r) });
+  const removeRow = (r: number) => onChange(removeTableRow(headers, rows, r));
 
   return (
     <div className="em-block-table">

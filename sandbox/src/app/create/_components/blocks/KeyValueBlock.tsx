@@ -1,11 +1,11 @@
 "use client";
 
-type Pair = { key: string; value: string };
-type Props = { pairs: Pair[]; onChange: (pairs: Pair[]) => void };
+import { setKeyValuePair, type KeyValuePair } from "@/lib/memo-body-blocks";
+
+type Props = { pairs: KeyValuePair[]; onChange: (pairs: KeyValuePair[]) => void };
 
 export function KeyValueBlock({ pairs, onChange }: Props) {
-  const setPair = (i: number, patch: Partial<Pair>) =>
-    onChange(pairs.map((pair, idx) => (idx === i ? { ...pair, ...patch } : pair)));
+  const setPair = (i: number, patch: Partial<KeyValuePair>) => onChange(setKeyValuePair(pairs, i, patch));
 
   return (
     <div className="em-block-kv">

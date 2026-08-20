@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   moveBlock, removeBlock, hasSystemBlock, createBlock,
+  setTableHeader, setTableCell, addTableColumn, addTableRow, removeTableRow,
+  setKeyValuePair, MAX_TABLE_COLUMNS,
   type MemoBodyBlock,
 } from "./memo-body-blocks";
 
@@ -61,5 +63,114 @@ describe("createBlock", () => {
     const block = createBlock("system", "requestItems");
     if (block.type !== "system") throw new Error("expected a system block");
     expect(block.ref).toBe("requestItems");
+  });
+});
+
+describe("setTableHeader", () => {
+  it("renames only the targeted column", () => {
+    const headers = ["a", "b"];
+    const rows = [["1", "2"]];
+    const out = setTableHeader(headers, rows, 1, "b2");
+    expect(out.headers).toEqual(["a", "b2"]);
+    expect(out.rows).toBe(rows);
+  });
+
+  it("does not mutate the original headers array", () => {
+    const headers = ["a", "b"];
+    const rows = [["1", "2"]];
+    setTableHeader(headers, rows, 0, "changed");
+    expect(headers).toEqual(["a", "b"]);
+  });
+});
+
+describe("setTableCell", () => {
+  it("edits only the targeted cell", () => {
+    const headers = ["a", "b"];
+    const rows = [
+      ["1", "2"],
+      ["3", "4"],
+    ];
+    const out = setTableCell(headers, rows, 1, 0, "99");
+    expect(out.rows).toEqual([
+      ["1", "2"],
+      ["99", "4"],
+    ]);
+  });
+
+  it("does not mutate the original rows array or its row arrays", () => {
+    const headers = ["a", "b"];
+    const rows = [
+      ["1", "2"],
+      ["3", "4"],
+    ];
+    const snapshot = rows.map((row) => [...row]);
+    setTableCell(headers, rows, 0, 1, "changed");
+    expect(rows).toEqual(snapshot);
+  });
+});
+
+describe("addTableColumn", () => {
+  it("appends an empty header and syncs an empty cell into every existing row", () => {
+    const headers = ["a", "b"];
+    const rows = [
+      ["1", "2"],
+      ["3", "4"],
+      ["5", "6"],
+    ];
+    const out = addTableColumn(headers, rows);
+    expect(out.headers).toEqual(["a", "b", ""]);
+    expect(out.rows).toEqual([
+      ["1", "2", ""],
+      ["3", "4", ""],
+      ["5", "6", ""],
+    ]);
+  });
+
+  it("is a no-op at the MAX_TABLE_COLUMNS cap, returning the same references unchanged", () => {
+    const headers = Array.from({ length: MAX_TABLE_COLUMNS }, (_, i) => `h${i}`);
+    const rows = [headers.map(() => "")];
+    const out = addTableColumn(headers, rows);
+    expect(out.headers).toBe(headers);
+    expect(out.rows).toBe(rows);
+    expect(out.headers).toHaveLength(MAX_TABLE_COLUMNS);
+  });
+});
+
+describe("addTableRow", () => {
+  it("appends one empty row sized to the current column count", () => {
+    const headers = ["a", "b", "c"];
+    const rows = [["1", "2", "3"]];
+    const out = addTableRow(headers, rows);
+    expect(out.rows).toEqual([["1", "2", "3"], ["", "", ""]]);
+  });
+});
+
+describe("removeTableRow", () => {
+  it("removes exactly the targeted row", () => {
+    const headers = ["a"];
+    const rows = [["1"], ["2"], ["3"]];
+    const out = removeTableRow(headers, rows, 1);
+    expect(out.rows).toEqual([["1"], ["3"]]);
+  });
+});
+
+describe("setKeyValuePair", () => {
+  it("patches only the targeted pair, leaving the rest untouched", () => {
+    const pairs = [
+      { key: "a", value: "1" },
+      { key: "b", value: "2" },
+    ];
+    const out = setKeyValuePair(pairs, 1, { value: "99" });
+    expect(out).toEqual([
+      { key: "a", value: "1" },
+      { key: "b", value: "99" },
+    ]);
+    expect(out[0]).toBe(pairs[0]);
+  });
+
+  it("does not mutate the original pairs array", () => {
+    const pairs = [{ key: "a", value: "1" }];
+    setKeyValuePair(pairs, 0, { key: "changed" });
+    expect(pairs).toEqual([{ key: "a", value: "1" }]);
   });
 });

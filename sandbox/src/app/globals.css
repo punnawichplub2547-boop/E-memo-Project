@@ -1460,13 +1460,11 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 }
 
 /* ===== Free-form memo body blocks (BlockEditorCard) ===== */
-.em-block-editor {
-  padding: 20px;
+.em-block-editor .em-card-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.em-card-title { font-size: 14px; font-weight: 600; color: var(--ink); }
 
 .em-block {
   border: 1px solid var(--line);

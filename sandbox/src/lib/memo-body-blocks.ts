@@ -49,3 +49,62 @@ export function removeBlock(blocks: MemoBodyBlock[], id: string): MemoBodyBlock[
 export function hasSystemBlock(blocks: MemoBodyBlock[], ref: SystemBlockRef): boolean {
   return blocks.some((block) => block.type === "system" && block.ref === ref);
 }
+
+export type TableBlockValue = { headers: string[]; rows: string[][] };
+export type KeyValuePair = { key: string; value: string };
+
+/** Renames one column header. Pure — returns a new value, never mutates `headers`/`rows`. */
+export function setTableHeader(
+  headers: string[],
+  rows: string[][],
+  index: number,
+  value: string
+): TableBlockValue {
+  return { headers: headers.map((h, idx) => (idx === index ? value : h)), rows };
+}
+
+/** Edits one cell. Pure — returns a new value, never mutates `headers`/`rows`. */
+export function setTableCell(
+  headers: string[],
+  rows: string[][],
+  rowIndex: number,
+  colIndex: number,
+  value: string
+): TableBlockValue {
+  return {
+    headers,
+    rows: rows.map((row, ri) =>
+      ri === rowIndex ? row.map((cell, ci) => (ci === colIndex ? value : cell)) : row
+    ),
+  };
+}
+
+/**
+ * Adds one column, syncing the new empty cell into every existing row.
+ * At the `MAX_TABLE_COLUMNS` cap this is a no-op — returns the same
+ * `headers`/`rows` references unchanged, mirroring `moveBlock`'s
+ * out-of-range behavior.
+ */
+export function addTableColumn(headers: string[], rows: string[][]): TableBlockValue {
+  if (headers.length >= MAX_TABLE_COLUMNS) return { headers, rows };
+  return { headers: [...headers, ""], rows: rows.map((row) => [...row, ""]) };
+}
+
+/** Appends one empty row, sized to the current column count. Pure. */
+export function addTableRow(headers: string[], rows: string[][]): TableBlockValue {
+  return { headers, rows: [...rows, headers.map(() => "")] };
+}
+
+/** Removes one row by index. Pure — never mutates `rows`. */
+export function removeTableRow(headers: string[], rows: string[][], rowIndex: number): TableBlockValue {
+  return { headers, rows: rows.filter((_, ri) => ri !== rowIndex) };
+}
+
+/** Patches one key/value pair by index. Pure — never mutates `pairs`. */
+export function setKeyValuePair(
+  pairs: KeyValuePair[],
+  index: number,
+  patch: Partial<KeyValuePair>
+): KeyValuePair[] {
+  return pairs.map((pair, idx) => (idx === index ? { ...pair, ...patch } : pair));
+}
