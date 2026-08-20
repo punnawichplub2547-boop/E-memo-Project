@@ -1,6 +1,7 @@
 import { MAX_TABLE_COLUMNS } from "../memo-body-blocks";
 
-/** ความกว้างคอลัมน์ของฟอร์ม F-DC-006 — ต้องตรงกับ colWidths ใน memo-excel.ts */
+/** ความกว้างคอลัมน์ของฟอร์ม F-DC-006 — แหล่งเดียว (single source of truth); memo-excel.ts
+ *  import ค่านี้ไปใช้ตรงๆ (ไม่มีการประกาศ colWidths ซ้ำอีกที่นั่นแล้ว — Task 11 C1) */
 export const FORM_COL_WIDTHS = [5, 10, 10, 8, 8, 8, 7.5, 7.5, 9.5, 9.5, 9.5, 9.5];
 const TOTAL_COLS = FORM_COL_WIDTHS.length;
 const TOTAL_WIDTH = FORM_COL_WIDTHS.reduce((sum, w) => sum + w, 0); // 102

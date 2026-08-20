@@ -110,6 +110,16 @@ function rangeWidth(ws: ExcelJS.Worksheet, startCol: number, endCol: number): nu
   return w;
 }
 
+// Excel's own ceiling for a row's height, in points (Global Constraints: "ความสูงแถวห้ามเกิน
+// 409 point"). fitRowHeight is the single function that ever sets `ws.getRow(row).height` in
+// this file, so this is the invariant's one correct home (Ruling 16, Task 11 fix round 1) —
+// every caller (paragraph chunks, free-form table cells, key-value values, item names,
+// vendor remarks, the budget title, ...) is protected by one change instead of each caller
+// needing its own guard. The cap only bounds the *rendered row height* — the full text
+// always stays in the cell (visible in the formula bar / on manual row-resize); nothing here
+// truncates content, only how tall Excel is told to draw the row.
+const MAX_EXCEL_ROW_HEIGHT = 409;
+
 // ExcelJS does not auto-fit row height for wrapped text, so long Thai strings spill out of
 // their cell. Estimate the wrapped line count for `text` inside the merged range and grow the
 // row so nothing clips. We under-estimate chars-per-line on purpose (taller is safe, clipped
@@ -138,8 +148,8 @@ function fitRowHeight(
   for (const segment of str.split("\n")) {
     lines += Math.max(1, Math.ceil(segment.length / charsPerLine));
   }
-  const needed = Math.max(lines * lineHeight, opts.minHeight ?? lineHeight);
-  ws.getRow(row).height = Math.max(ws.getRow(row).height ?? 0, needed);
+  const needed = Math.min(Math.max(lines * lineHeight, opts.minHeight ?? lineHeight), MAX_EXCEL_ROW_HEIGHT);
+  ws.getRow(row).height = Math.min(Math.max(ws.getRow(row).height ?? 0, needed), MAX_EXCEL_ROW_HEIGHT);
 }
 
 // A bordered, shaded, centered table header. Long Thai headers (e.g. "รวมราคาขาย/บริการ
@@ -297,6 +307,22 @@ function chunkText(text: string, size: number): string[] {
   return chunks;
 }
 
+/**
+ * H1: shrinks `cells` to at most `spanCount` entries so it can always be zipped 1:1 with a
+ * `spanColumns()` result, even when the caller's data has more entries than spans has
+ * groups (spanColumns clamps at MAX_TABLE_COLUMNS). The overflow is folded into the last
+ * kept entry (joined with " / "), not dropped — no value the requester typed disappears
+ * from the exported file, it just shares a cell with its neighbours instead of crashing
+ * the export. A no-op (same array) when `cells.length <= spanCount`, which is every table
+ * the current server validator allows through.
+ */
+function collapseToSpanCount(cells: string[], spanCount: number): string[] {
+  if (cells.length <= spanCount || spanCount <= 0) return cells;
+  const kept = cells.slice(0, spanCount - 1);
+  const overflow = cells.slice(spanCount - 1).join(" / ");
+  return [...kept, overflow];
+}
+
 // ---- Free-form body: draws each block in the order the requester arranged them (design
 // spec §6.2). `system` blocks are pointers, not a copy of the data (§4.4) — they call the
 // same renderItemsTable/renderPriceTable used by standard mode, so the underlying
@@ -318,13 +344,26 @@ function renderBodyBlocks(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: num
         break;
       }
       case "table": {
+        // H1 (Task 11 fix round 1): spanColumns() clamps at MAX_TABLE_COLUMNS (8), so if
+        // block.headers (or an individual row — data can drift from headers independently)
+        // is ever longer than that, `spans` is shorter than the array being indexed and
+        // `spans[i]` is undefined past its end. The live write path
+        // (memo-body-blocks-server.ts) already rejects >8 headers before persist, but the
+        // export layer must not silently trust that upstream guarantee — a legacy row, a
+        // seed fixture, or a future validator refactor could still hand this function more
+        // columns than spans can address, and `spans[i][0]` would throw, 500-ing the whole
+        // export instead of degrading. Fold any overflow into the last visible column
+        // (joined with " / ") rather than truncating — every value the requester typed
+        // stays visible in the exported file, just consolidated into one cell.
         const spans = spanColumns(block.headers.length);
-        block.headers.forEach((header, i) =>
+        const headers = collapseToSpanCount(block.headers, spans.length);
+        headers.forEach((header, i) =>
           headerCell(ws, spans[i][0], spans[i][1], r, safeSpreadsheetText(header))
         );
         r++;
         for (const row of block.rows) {
-          row.forEach((cell, i) => {
+          const cells = collapseToSpanCount(row, spans.length);
+          cells.forEach((cell, i) => {
             const text = safeSpreadsheetText(cell);
             setRange(ws, spans[i][0], spans[i][1], r, text, { wrap: true });
             fitRowHeight(ws, r, text, spans[i][0], spans[i][1], { minHeight: 16 });

@@ -433,3 +433,97 @@ describe("buildMemoExcelWorkbook — free-form body blocks (Task 11)", () => {
     expect(text).toContain("เนื่องจาก/เหตุผล");
   });
 });
+
+describe("buildMemoExcelWorkbook — fix round 1 (H1/H2)", () => {
+  function sheetText(ws: ExcelJS.Worksheet): string {
+    const parts: string[] = [];
+    ws.eachRow((row) => row.eachCell((cell) => {
+      if (cell.type === ExcelJS.ValueType.Merge) return;
+      parts.push(String(cell.value ?? ""));
+    }));
+    return parts.join("\n");
+  }
+
+  // H1: spanColumns() clamps at MAX_TABLE_COLUMNS (8). The live write path
+  // (memo-body-blocks-server.ts) already rejects >8 headers before persist, but the export
+  // layer must not crash if that upstream guarantee is ever bypassed (legacy row, seed
+  // fixture, future validator refactor) — it must degrade, not 500 the whole export.
+  it("does not throw when a table block has more headers than spanColumns can address", async () => {
+    const headers = Array.from({ length: 10 }, (_, i) => `col${i + 1}`);
+    const rows = [Array.from({ length: 10 }, (_, i) => `v${i + 1}`)];
+    await expect(
+      buildMemoExcelWorkbook(makeMemo({
+        formMode: "freeform",
+        bodyBlocks: [{ id: "t", type: "table", headers, rows }],
+      }), [])
+    ).resolves.toBeTruthy();
+  });
+
+  it("folds overflow headers/cells into the last column instead of dropping them", async () => {
+    const headers = Array.from({ length: 10 }, (_, i) => `col${i + 1}`);
+    const rows = [Array.from({ length: 10 }, (_, i) => `v${i + 1}`)];
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "t", type: "table", headers, rows }],
+    }), []);
+    const text = sheetText(wb.getWorksheet("Memo")!);
+    // Every header and every value must still be visible somewhere — the overflow (cols
+    // 8-10, beyond spanColumns' 8-column clamp) is folded into the 8th cell, not dropped.
+    for (let i = 1; i <= 10; i++) {
+      expect(text).toContain(`col${i}`);
+      expect(text).toContain(`v${i}`);
+    }
+  });
+
+  // Same defense on a row alone (headers within bounds, one row longer than the header row —
+  // data can drift from headers independently of the headers.length check).
+  it("does not throw when a single row has more cells than the table's spans", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{
+        id: "t",
+        type: "table",
+        headers: ["A", "B"],
+        rows: [Array.from({ length: 9 }, (_, i) => `r${i + 1}`)],
+      }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expect(ws).toBeTruthy();
+  });
+
+  // H2: the 409pt ceiling must hold for every fitRowHeight caller, not just paragraph
+  // chunks — table cells and key-value values have no length gate anywhere in the pipeline
+  // (memo-body-blocks-server.ts only checks shape/column-count, never string length).
+  it("caps a very long table cell so its row never exceeds Excel's 409pt ceiling", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "t", type: "table", headers: ["A", "B"], rows: [["ก".repeat(5000), "x"]] }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    ws.eachRow((row) => expect(row.height ?? 0).toBeLessThanOrEqual(409));
+  });
+
+  it("caps a very long key-value value so its row never exceeds Excel's 409pt ceiling", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "kv", type: "keyValue", pairs: [{ key: "K", value: "ก".repeat(5000) }] }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    ws.eachRow((row) => expect(row.height ?? 0).toBeLessThanOrEqual(409));
+  });
+
+  it("does not truncate the cell text when the row height is capped", async () => {
+    const longText = "ก".repeat(5000);
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "t", type: "table", headers: ["A"], rows: [[longText]] }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    let found = "";
+    ws.eachRow((row) => row.eachCell((cell) => {
+      if (cell.type === ExcelJS.ValueType.Merge) return;
+      if (typeof cell.value === "string" && cell.value.length === 5000) found = cell.value;
+    }));
+    expect(found).toBe(longText);
+  });
+});
