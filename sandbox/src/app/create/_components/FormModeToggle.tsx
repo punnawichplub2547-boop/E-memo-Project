@@ -15,6 +15,16 @@ type Props = {
    *  warning must live here, next to the toggle, not inside the collapsible
    *  assistant panel where CustomRouteCard's own empty-state note lives. */
   customRoutePeopleCount: number;
+  /** True when the free-form custom route's final approver ranks below the
+   *  Book1 recommendation and no override reason has been given yet — the
+   *  reason field itself (CustomRouteReasonNote) lives on the "Approver
+   *  Routing" tab inside the same collapsible panel as the F2 case above, so
+   *  this needs the same always-visible treatment (fix round 2, G1). */
+  needsRouteOverrideReason: boolean;
+  /** Expands the assistant panel and switches it to the Approver Routing tab
+   *  — lets the G1 warning below tell the user where to go AND take them
+   *  there, instead of just naming a tab they still have to go find. */
+  onGoToRoutingTab: () => void;
   onChange: (mode: MemoFormMode) => void;
 };
 
@@ -24,7 +34,15 @@ type Props = {
  * because it owns real state of its own (the two-step inline confirm before
  * a mode switch that clears the free-form blocks — carry-in C3).
  */
-export function FormModeToggle({ formMode, blockCount, disabled, customRoutePeopleCount, onChange }: Props) {
+export function FormModeToggle({
+  formMode,
+  blockCount,
+  disabled,
+  customRoutePeopleCount,
+  needsRouteOverrideReason,
+  onGoToRoutingTab,
+  onChange,
+}: Props) {
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   const handlePick = (mode: MemoFormMode) => {
@@ -95,6 +113,16 @@ export function FormModeToggle({ formMode, blockCount, disabled, customRoutePeop
       {formMode === "freeform" && customRoutePeopleCount === 0 && (
         <div className="em-form-mode-lock-note">
           ฟอร์มอิสระต้องเลือกผู้อนุมัติเองอย่างน้อย 1 คน — บันทึกร่างหรือส่งขออนุมัติไม่ได้จนกว่าจะเลือก
+        </div>
+      )}
+      {formMode === "freeform" && needsRouteOverrideReason && (
+        <div className="em-form-mode-lock-note">
+          <span>
+            ผู้อนุมัติที่เลือกต่ำกว่าที่ Book1 แนะนำ — ต้องกรอกเหตุผลก่อนจึงจะส่งขออนุมัติได้
+          </span>
+          <button type="button" className="em-btn sm ghost" onClick={onGoToRoutingTab}>
+            ไปกรอกเหตุผลที่แท็บ &quot;เส้นทางอนุมัติ&quot;
+          </button>
         </div>
       )}
     </div>

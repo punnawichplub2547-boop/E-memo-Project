@@ -346,9 +346,13 @@ describe("useMemoFormFields — free-form custom route override reason (fix roun
 
     expect(result.current.freeformCustomRouteRequiresReason).toBe(true);
     expect(result.current.canSubmitPending).toBe(false);
+    // Task 10 fix round 2, G1: this is what drives FormModeToggle's warning —
+    // must be true exactly while the reason is required AND still empty.
+    expect(result.current.freeformRouteReasonMissing).toBe(true);
 
     act(() => { result.current.setRouteOverrideReason("MD มอบหมายให้ผู้จัดการอนุมัติแทนกรณีนี้"); });
     expect(result.current.canSubmitPending).toBe(true);
+    expect(result.current.freeformRouteReasonMissing).toBe(false);
   });
 
   it("does not demand a reason in free-form mode when the custom route's final approver meets or exceeds the recommendation", async () => {
@@ -365,6 +369,7 @@ describe("useMemoFormFields — free-form custom route override reason (fix roun
 
     expect(result.current.freeformCustomRouteRequiresReason).toBe(false);
     expect(result.current.canSubmitPending).toBe(true);
+    expect(result.current.freeformRouteReasonMissing).toBe(false);
   });
 
   it("does NOT apply the free-form reason gate on the standard form's custom tab (V2 behavior unchanged)", async () => {
@@ -383,5 +388,79 @@ describe("useMemoFormFields — free-form custom route override reason (fix roun
     expect(result.current.isFreeform).toBe(false);
     expect(result.current.freeformCustomRouteRequiresReason).toBe(false);
     expect(result.current.canSubmitPending).toBe(true);
+    expect(result.current.freeformRouteReasonMissing).toBe(false);
+  });
+});
+
+describe("useMemoFormFields — free-form template load / revision invariant (fix round 2, G2)", () => {
+  // G2: loading a template saved from free-form mode calls applyBulkData with
+  // formMode: "freeform" but never carried routeSource or customRoute people
+  // (snapshotFormData never wrote them into a template) — before this fix that
+  // landed on formMode "freeform" + routeSource "book1" + zero people, and
+  // canSubmitCustom is vacuously true whenever routeSource isn't "custom", so
+  // ส่งขออนุมัติ (Send to Approval) was reachable and would 400 after the
+  // client had already dispatched ADD_MEMO and navigated away (the same loss
+  // C1/C2/C3/F2 exist to prevent).
+
+  it("applyBulkData loading formMode: freeform forces routeSource to custom (closes the source of the gap)", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.routeSource).toBe("book1"); // sanity: starts on Book1, no people
+
+    // Mirrors exactly what loading a free-form template sends: formMode only,
+    // no routeSource/customRoute/people keys at all.
+    act(() => { result.current.applyBulkData({ formMode: "freeform" }); });
+
+    expect(result.current.isFreeform).toBe(true);
+    expect(result.current.routeSource).toBe("custom");
+  });
+
+  it("canSubmitPending stays false when formMode is freeform with zero people, even if routeSource never became custom (defense in depth, second layer)", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    // Bypasses applyBulkData's own fix on purpose, to prove the canSubmitPending
+    // gate blocks this combination independently of whichever path produced it —
+    // exactly the "an as-yet-unknown other entry point" case the ruling asked for.
+    act(() => { result.current.bodyBlocks.setFormMode("freeform"); });
+    expect(result.current.routeSource).toBe("book1"); // deliberately NOT forced to custom here
+
+    expect(result.current.isFreeform).toBe(true);
+    expect(result.current.customRoute.people).toHaveLength(0);
+    expect(result.current.canSubmitPending).toBe(false);
+  });
+
+  it("reopens a free-form revision with routeSource already on custom, prefilled with the original approvers", async () => {
+    // The server (memo-body-blocks-server.ts) refuses to persist ANY free-form
+    // memo — draft or pending — without a non-empty custom route, so any memo
+    // that reaches "returned"/"rejected+revision-allowed" with formMode
+    // "freeform" is guaranteed to already carry a non-empty customRoute. Traced
+    // db-memos.ts:136 (customRoute is always hydrated from custom_route_json
+    // for every read, unconditionally) and useMemoFormFields.ts's
+    // revisionCustomPeople/customRoute-seeding block, which derives
+    // initialSource "custom" purely from customRoute.length > 0 — independent
+    // of formMode. This test locks that in as a regression guard.
+    const memo = makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "b1", type: "paragraph", text: "เนื้อหา" }],
+      selectedRoute: ["person:1#42"],
+      customRoute: [
+        { stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+      ],
+    });
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [memo], reviseId: memo.id, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.isRevisionMode).toBe(true);
+    expect(result.current.isFreeform).toBe(true);
+    expect(result.current.routeSource).toBe("custom");
+    expect(result.current.customRoutePeople.map((p) => p.userId)).toEqual([42]);
   });
 });

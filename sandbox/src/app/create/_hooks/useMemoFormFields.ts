@@ -280,13 +280,31 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     isFreeform && customRoute.routeSource === "custom"
       ? requiresOverrideReasonForCustomRoute(recommendation.recommendedFinalApprover, customRoute.people)
       : false;
+  // Task 10 fix round 2, G1: the reason field this gate demands lives inside
+  // the collapsible assistant panel (CustomRouteReasonNote, on the "Approver
+  // Routing" tab) — whose collapsed state and active tab both persist across
+  // sessions via localStorage. A requester whose panel is collapsed, or on a
+  // different tab, would otherwise hit a disabled submit button with no
+  // visible reason why. This drives a warning FormModeToggle renders outside
+  // the panel, next to the mode switch itself — the same place F2's "pick an
+  // approver" warning already lives, per that ruling's own principle that a
+  // blocking requirement must not live only inside the collapsible panel.
+  const freeformRouteReasonMissing = freeformCustomRouteRequiresReason && cleanOverrideReason.length === 0;
   const canSubmitPending =
     (customRoute.routeSource === "custom"
       ? (!freeformCustomRouteRequiresReason || cleanOverrideReason.length > 0)
       : (!routeReview.requiresReason || cleanOverrideReason.length > 0)) &&
     (!selectedNotLowest || cleanVendorReason.length > 0) &&
     rowsMissingNonNegotiableRemark.length === 0 &&
-    customRoute.canSubmitCustom;
+    customRoute.canSubmitCustom &&
+    // Task 10 fix round 2, G2: customRoute.canSubmitCustom is vacuously true
+    // whenever routeSource !== "custom" — but applyBulkData (a loaded template
+    // saved from free-form) can set formMode: "freeform" without touching
+    // routeSource/people, landing on formMode "freeform" + routeSource "book1"
+    // + zero people. That combination must never be submittable regardless of
+    // which branch produced it, so this checks the invariant directly instead
+    // of trusting routeSource to already be "custom" here.
+    (!isFreeform || customRoute.people.length > 0);
   const currentDateLabel = useMemo(
     () => currentDateTime
       ? new Intl.DateTimeFormat("th-TH", { dateStyle: "full", timeStyle: "short" }).format(currentDateTime)
@@ -401,7 +419,19 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     }
     if (data.priceAdjustmentReason) setPriceAdjustmentReason(data.priceAdjustmentReason as string);
     if (data.readRecipients) setReadRecipients(data.readRecipients as string[]);
-    if (data.formMode) bodyBlocks.setFormMode(data.formMode as MemoFormMode);
+    if (data.formMode) {
+      bodyBlocks.setFormMode(data.formMode as MemoFormMode);
+      // Task 10 fix round 2, G2: a template saved from free-form mode carries
+      // formMode: "freeform" (snapshotFormData below) but never carried
+      // routeSource/customRoute people — this hook has never persisted the
+      // approver list into a template. Applying that data without also
+      // forcing routeSource here would land on formMode "freeform" +
+      // routeSource "book1" + zero custom-route people, which is exactly the
+      // 400-then-data-loss combination C2/F2 were written to prevent. This
+      // keeps the same invariant handleFormModeChange (page.tsx) enforces on
+      // a manual toggle click true for this load path too.
+      if (data.formMode === "freeform") customRoute.setRouteSource("custom");
+    }
     if (Array.isArray(data.bodyBlocks)) bodyBlocks.setBlocks(data.bodyBlocks as MemoBodyBlock[]);
   };
 
@@ -485,6 +515,7 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     bodyBlocks,
     isFreeform,
     freeformCustomRouteRequiresReason,
+    freeformRouteReasonMissing,
     customRoute,
     routeSource: customRoute.routeSource,
     customRoutePeople: customRoute.people,

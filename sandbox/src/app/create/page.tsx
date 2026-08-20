@@ -93,6 +93,7 @@ function CreatePageContent() {
     bodyBlocks,
     isFreeform,
     freeformCustomRouteRequiresReason,
+    freeformRouteReasonMissing,
     customRoute,
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
@@ -287,6 +288,8 @@ function CreatePageContent() {
             blockCount={bodyBlocks.blocks.length}
             disabled={isRevisionMode}
             customRoutePeopleCount={customRoute.people.length}
+            needsRouteOverrideReason={freeformRouteReasonMissing}
+            onGoToRoutingTab={() => { setAssistantExpanded(true); setAssistantTab("routing"); }}
             onChange={handleFormModeChange}
           />
 
