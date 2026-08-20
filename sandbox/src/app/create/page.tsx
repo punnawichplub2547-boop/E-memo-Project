@@ -20,6 +20,9 @@ import { MemoDetailsCard } from "./_components/MemoDetailsCard";
 import { RoutingCard } from "./_components/RoutingCard";
 import { CustomRouteCard } from "./_components/CustomRouteCard";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
+import { BlockEditorCard } from "./_components/BlockEditorCard";
+import { FormModeToggle } from "./_components/FormModeToggle";
+import type { MemoFormMode } from "@/lib/memo-body-blocks";
 import { useCreateMemoAssistant } from "./_hooks/useCreateMemoAssistant";
 import { useMemoFormFields } from "./_hooks/useMemoFormFields";
 import { useMemoTemplates } from "./_hooks/useMemoTemplates";
@@ -89,6 +92,7 @@ function CreatePageContent() {
     selectedVendorVat,
     selectedVendorVatAmount,
     canSubmitPending,
+    bodyBlocks,
     customRoute, routeSource,
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
@@ -96,6 +100,16 @@ function CreatePageContent() {
     updateVendorDiscountPercent, markVendorNonNegotiable, rowsMissingNonNegotiableRemark,
     applyBulkData, snapshotFormData,
   } = formFields;
+
+  // V3 free-form memo body (Task 10 — mode switch integration). Choosing
+  // "freeform" forces routeSource to "custom" immediately: the server 400s a
+  // free-form memo without a custom route, so the UI must not let the user
+  // find that out only at submit time (carry-in C2).
+  const isFreeform = bodyBlocks.formMode === "freeform";
+  const handleFormModeChange = (mode: MemoFormMode) => {
+    bodyBlocks.setFormMode(mode);
+    if (mode === "freeform") customRoute.setRouteSource("custom");
+  };
 
   const {
     templates, templatesLoading, saveModalOpen, setSaveModalOpen, isSavingTemplate,
@@ -121,6 +135,46 @@ function CreatePageContent() {
   // ── Assistant panel state — extracted to hook for localStorage persistence ──
   const { assistantExpanded, assistantTab, assistantHydrated, setAssistantExpanded, setAssistantTab } =
     useCreateMemoAssistant();
+
+  // Built once, rendered either directly (standard form) or inside
+  // BlockEditorCard's systemSlots (free-form form) — same element, same
+  // props, never duplicated in the JSX below.
+  const requestItemsCard = (
+    <RequestItemsCard
+      requestItems={requestItems}
+      amount={amount}
+      requestItemsGrandTotal={requestItemsGrandTotal}
+      addRequestItem={addRequestItem}
+      removeRequestItem={removeRequestItem}
+      updateRequestItem={updateRequestItem}
+    />
+  );
+  const priceComparisonCard = (
+    <PriceComparisonCard
+      priceComparisons={priceComparisons}
+      isPdfLoading={isPdfLoading}
+      pdfError={pdfError}
+      selectedVendor={selectedVendor}
+      selectedVendorReason={selectedVendorReason}
+      lowestNetPrice={lowestNetPrice}
+      hasPricedVendor={hasPricedVendor}
+      selectedNotLowest={selectedNotLowest}
+      selectedVendorVat={selectedVendorVat}
+      selectedVendorVatAmount={selectedVendorVatAmount}
+      lowestOfferSummary={lowestOfferSummary}
+      selectedVendorSummary={selectedVendorSummary}
+      addVendorRow={addVendorRow}
+      removeVendorRow={removeVendorRow}
+      updateVendorRow={updateVendorRow}
+      updateVendorDiscountPercent={updateVendorDiscountPercent}
+      markVendorNonNegotiable={markVendorNonNegotiable}
+      rowsMissingNonNegotiableRemark={rowsMissingNonNegotiableRemark}
+      onSelectVendor={handleSelectVendor}
+      onPdfButtonClick={() => pdfInputRef.current?.click()}
+      onClearPdfError={() => setPdfError(null)}
+      onSelectedVendorReasonChange={setSelectedVendorReason}
+    />
+  );
 
   return (
     <div className="em-art">
@@ -218,6 +272,13 @@ function CreatePageContent() {
             <span className="em-create-step-note">แบบฟอร์มเดียว</span>
           </div>
 
+          <FormModeToggle
+            formMode={bodyBlocks.formMode}
+            blockCount={bodyBlocks.blocks.length}
+            disabled={isRevisionMode}
+            onChange={handleFormModeChange}
+          />
+
           <div className={`em-create-top-shell ${assistantExpanded ? "is-expanded" : "is-collapsed"}${assistantHydrated ? " is-ready" : ""}`}>
             <div className="em-create-main-col">
               {!isRevisionMode && (
@@ -272,6 +333,7 @@ function CreatePageContent() {
                 aiError={aiError}
                 isPdfLoading={isPdfLoading}
                 onPdfClick={() => pdfInputRef.current?.click()}
+                isFreeform={isFreeform}
               />
             </div>
 
@@ -380,15 +442,17 @@ function CreatePageContent() {
                 >
                   <div className="em-create-tab-pane" data-pane="routing">
                     <div className="em-tabs em-route-source-tabs" role="tablist" aria-label="วิธีกำหนดผู้อนุมัติ">
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={routeSource === "book1"}
-                        className={`em-tab ${routeSource === "book1" ? "active" : ""}`}
-                        onClick={() => customRoute.setRouteSource("book1")}
-                      >
-                        แนะนำตาม Book1
-                      </button>
+                      {!isFreeform && (
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={routeSource === "book1"}
+                          className={`em-tab ${routeSource === "book1" ? "active" : ""}`}
+                          onClick={() => customRoute.setRouteSource("book1")}
+                        >
+                          แนะนำตาม Book1
+                        </button>
+                      )}
                       <button
                         type="button"
                         role="tab"
@@ -475,15 +539,22 @@ function CreatePageContent() {
           {/* Lower full-width section — moved out of the left column for spacious layout */}
           <div className="em-form-rows" style={{ display: "grid", gap: 14 }}>
 
-            {/* Request Items — full width */}
-            <RequestItemsCard
-              requestItems={requestItems}
-              amount={amount}
-              requestItemsGrandTotal={requestItemsGrandTotal}
-              addRequestItem={addRequestItem}
-              removeRequestItem={removeRequestItem}
-              updateRequestItem={updateRequestItem}
-            />
+            {/* Request Items + Price Comparison — the free-form form swaps both
+                for the block editor, which renders these same two cards as its
+                "system" block slots instead of duplicating their V2 discount/VAT
+                rules (carry-in C4). Built once and reused in both branches so
+                neither card's prop list is duplicated in the JSX. */}
+            {isFreeform ? (
+              <BlockEditorCard
+                body={bodyBlocks}
+                systemSlots={{ requestItems: requestItemsCard, priceComparison: priceComparisonCard }}
+              />
+            ) : (
+              <>
+                {requestItemsCard}
+                {priceComparisonCard}
+              </>
+            )}
 
             {/* Budget + Attachments — paired 2-col */}
             <div className="em-pair-grid">
@@ -531,32 +602,6 @@ function CreatePageContent() {
                 uploadError={notifyNoteError}
               />
             )}
-
-            {/* Price Comparison — premium full-width financial decision card */}
-            <PriceComparisonCard
-              priceComparisons={priceComparisons}
-              isPdfLoading={isPdfLoading}
-              pdfError={pdfError}
-              selectedVendor={selectedVendor}
-              selectedVendorReason={selectedVendorReason}
-              lowestNetPrice={lowestNetPrice}
-              hasPricedVendor={hasPricedVendor}
-              selectedNotLowest={selectedNotLowest}
-              selectedVendorVat={selectedVendorVat}
-              selectedVendorVatAmount={selectedVendorVatAmount}
-              lowestOfferSummary={lowestOfferSummary}
-              selectedVendorSummary={selectedVendorSummary}
-              addVendorRow={addVendorRow}
-              removeVendorRow={removeVendorRow}
-              updateVendorRow={updateVendorRow}
-              updateVendorDiscountPercent={updateVendorDiscountPercent}
-              markVendorNonNegotiable={markVendorNonNegotiable}
-              rowsMissingNonNegotiableRemark={rowsMissingNonNegotiableRemark}
-              onSelectVendor={handleSelectVendor}
-              onPdfButtonClick={() => pdfInputRef.current?.click()}
-              onClearPdfError={() => setPdfError(null)}
-              onSelectedVendorReasonChange={setSelectedVendorReason}
-            />
 
             {/* Form Actions Footer */}
             <div className="em-card em-create-footer-actions">

@@ -50,6 +50,17 @@ export function hasSystemBlock(blocks: MemoBodyBlock[], ref: SystemBlockRef): bo
   return blocks.some((block) => block.type === "system" && block.ref === ref);
 }
 
+/**
+ * `useBodyBlocks().setFormMode("standard")` clears `blocks` unconditionally
+ * (the server rejects a "standard" memo carrying bodyBlocks). Switching
+ * *into* "standard" while blocks exist is the one data-loss case the UI
+ * must confirm before committing — switching into "freeform", or into
+ * "standard" with no blocks, is always safe to do immediately.
+ */
+export function shouldConfirmFormModeSwitch(targetMode: MemoFormMode, blockCount: number): boolean {
+  return targetMode === "standard" && blockCount > 0;
+}
+
 export type TableBlockValue = { headers: string[]; rows: string[][] };
 export type KeyValuePair = { key: string; value: string };
 

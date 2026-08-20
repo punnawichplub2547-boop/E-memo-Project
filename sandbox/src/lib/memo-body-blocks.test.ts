@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   moveBlock, removeBlock, hasSystemBlock, createBlock,
   setTableHeader, setTableCell, addTableColumn, addTableRow, removeTableRow,
-  setKeyValuePair, MAX_TABLE_COLUMNS,
+  setKeyValuePair, MAX_TABLE_COLUMNS, shouldConfirmFormModeSwitch,
   type MemoBodyBlock,
 } from "./memo-body-blocks";
 
@@ -151,6 +151,22 @@ describe("removeTableRow", () => {
     const rows = [["1"], ["2"], ["3"]];
     const out = removeTableRow(headers, rows, 1);
     expect(out.rows).toEqual([["1"], ["3"]]);
+  });
+});
+
+describe("shouldConfirmFormModeSwitch", () => {
+  it("requires confirmation when switching to standard while blocks exist", () => {
+    expect(shouldConfirmFormModeSwitch("standard", 1)).toBe(true);
+    expect(shouldConfirmFormModeSwitch("standard", 3)).toBe(true);
+  });
+
+  it("does not require confirmation switching to standard with no blocks", () => {
+    expect(shouldConfirmFormModeSwitch("standard", 0)).toBe(false);
+  });
+
+  it("never requires confirmation switching to freeform, regardless of block count", () => {
+    expect(shouldConfirmFormModeSwitch("freeform", 0)).toBe(false);
+    expect(shouldConfirmFormModeSwitch("freeform", 5)).toBe(false);
   });
 });
 

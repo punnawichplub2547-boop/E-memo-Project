@@ -7,6 +7,10 @@ interface DescriptionCardProps {
   aiError: string | null;
   isPdfLoading: boolean;
   onPdfClick: () => void;
+  /** Free-form mode: the memo body itself lives in blocks, so this field's
+   *  label switches to explain what it is actually used for (still required —
+   *  see validate-memo-form.ts, unchanged). */
+  isFreeform?: boolean;
 }
 
 export function DescriptionCard({
@@ -15,7 +19,11 @@ export function DescriptionCard({
   aiError,
   isPdfLoading,
   onPdfClick,
+  isFreeform = false,
 }: DescriptionCardProps) {
+  const fieldLabel = isFreeform
+    ? "สรุปย่อ — ใช้แสดงในคิว ผลค้นหา และอีเมลแจ้งเตือน"
+    : "Description / เหตุผลการขอ";
   return (
     <div className="em-card" style={{ overflow: "hidden", position: "relative" }}>
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(60% 80% at 0% 0%, rgba(37,99,235,0.06), transparent 58%)" }} />
@@ -30,7 +38,7 @@ export function DescriptionCard({
       </div>
       <div className="em-card-body" style={{ position: "relative", display: "grid", gap: 12 }}>
         <div className="em-field">
-          <label className="em-label">Description / เหตุผลการขอ <span className="req">*</span></label>
+          <label className="em-label">{fieldLabel} <span className="req">*</span></label>
           <textarea
             className="em-textarea"
             style={{ minHeight: 160, lineHeight: 1.6, padding: "12px 13px" }}

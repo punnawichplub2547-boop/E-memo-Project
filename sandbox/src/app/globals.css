@@ -1528,6 +1528,26 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   align-items: center;
 }
 
+/* ===== /create form-mode switch (FormModeToggle) ===== */
+.em-form-mode-toggle { display: grid; gap: 6px; margin: -2px 0 2px; }
+.em-form-mode-tabs .em-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.em-form-mode-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: rgba(220,38,38,0.06);
+  border: 1px solid rgba(220,38,38,0.25);
+}
+.em-form-mode-confirm-text { font-size: 12.5px; font-weight: 600; color: #B91C1C; }
+.em-form-mode-lock-note { font-size: 11.5px; color: var(--muted); }
+
 .em-hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 .em-hint-warn {
   color: var(--amber);
