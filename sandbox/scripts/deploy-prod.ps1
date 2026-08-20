@@ -87,6 +87,7 @@ $ColumnMigrations = [ordered]@{
     'memos.return_to_step'       = '2026-07-22-add-memo-return-to-step.sql'
     'memos.custom_route_json'    = '2026-08-10-add-memo-custom-route.sql'
     'memos.notify_attach_excel'  = '2026-08-13-add-memo-notify-note.sql'
+    'memos.form_mode'            = '2026-08-17-add-memo-form-mode.sql'
 }
 
 # --- Helpers --------------------------------------------------------------

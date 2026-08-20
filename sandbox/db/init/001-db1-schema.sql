@@ -1,5 +1,7 @@
 -- DB-1 schema for the HR&GA E-Memo prototype.
 -- Scope: schema only. Seed migration, read API, and write persistence come later.
+-- SET NAMES utf8mb4 กันภาษาไทย (เช่น item_subcategories seed rows ด้านล่าง) double-encode ผ่าน mysql CLI
+SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS memos (
   id                              BIGINT        NOT NULL AUTO_INCREMENT,
@@ -39,6 +41,19 @@ CREATE TABLE IF NOT EXISTS memos (
   recommended_route_json          JSON          NULL,
   selected_route_json             JSON          NULL,
   custom_route_json               JSON          NULL,
+
+  -- Unlike closing_remark/requester_user_id/md_review_*/notify_* above (which
+  -- stay deferred to their migrations on purpose), form_mode + body_blocks_json
+  -- ARE baked in here, matching db/migrations/2026-08-17-add-memo-form-mode.sql.
+  -- Reason: every POST /api/memos INSERT names both columns unconditionally, so
+  -- a DB created fresh from this init script (docker compose up on an empty
+  -- volume, or a new dev machine) could not accept ANY memo — not just
+  -- freeform ones — until the 2026-08-17 migration also ran. form_mode is the
+  -- source of truth for which UI mode a memo used; DEFAULT 'standard' makes
+  -- every pre-V3 row correct with no backfill needed.
+  form_mode                       ENUM('standard','freeform') NOT NULL DEFAULT 'standard',
+  body_blocks_json                JSON          NULL,
+
   route_mode                      VARCHAR(80)   NULL,
   route_override_reason           TEXT          NULL,
   notify_md                       BOOLEAN       NOT NULL DEFAULT FALSE,
