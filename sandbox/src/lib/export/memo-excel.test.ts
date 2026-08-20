@@ -4,6 +4,26 @@ import { buildMemoExcelWorkbook, memoToExcelBuffer, type MemoSignature } from ".
 import type { MemoRecord } from "../approval";
 import { buildCustomRoute } from "../custom-route";
 
+// C3 (carry-in): this file used to have 3 near-duplicate `sheetText()`-style helpers (plus
+// several more test bodies that inlined the identical accumulation pattern by hand) — one of
+// them (the "custom per-person signature block" describe block) did NOT skip
+// `ExcelJS.ValueType.Merge` cells. Every `setRange()` call in this file merges a column span,
+// and `row.eachCell()` visits every cell inside a merge, not just the master — so an
+// unfiltered accumulator reports the same printed string once per column the merge spans. That
+// was harmless everywhere it was actually used (all callers only ever called `.toContain()` /
+// `.not.toContain()`, never counted occurrences), but it is exactly the bug this project has
+// already shipped once (a merge-width-inflated occurrence count) — consolidated here to the
+// one implementation every test in the file now shares, so there is only one place left that
+// could regress.
+function sheetText(ws: ExcelJS.Worksheet): string {
+  const parts: string[] = [];
+  ws.eachRow((row) => row.eachCell((cell) => {
+    if (cell.type === ExcelJS.ValueType.Merge) return;
+    parts.push(String(cell.value ?? ""));
+  }));
+  return parts.join("\n");
+}
+
 async function reasonRowHeight(description: string): Promise<number> {
   const wb = await buildMemoExcelWorkbook(makeMemo({ description }));
   const ws = wb.getWorksheet("Memo")!;
@@ -58,13 +78,7 @@ describe("buildMemoExcelWorkbook", () => {
 
   it("renders main category and item subcategory in the memo metadata", async () => {
     const wb = await buildMemoExcelWorkbook(makeMemo({ itemSubcategoryLabel: "office supplies" }));
-    const ws = wb.getWorksheet("Memo")!;
-    let text = "";
-    ws.eachRow((row) => {
-      row.eachCell((cell) => {
-        if (typeof cell.value === "string") text += cell.value + "\n";
-      });
-    });
+    const text = sheetText(wb.getWorksheet("Memo")!);
     expect(text).toContain("Category:");
     expect(text).toContain("Subcategory: office supplies");
   });
@@ -106,26 +120,14 @@ describe("buildMemoExcelWorkbook", () => {
       { stepLabel: "General Manager", actorName: "วิชัย โรจน์ดี", actedAt: "02 Jan 2026 10:00" },
     ];
     const wb = await buildMemoExcelWorkbook(makeMemo(), signatures);
-    const ws = wb.getWorksheet("Memo")!;
-    let text = "";
-    ws.eachRow((row) => {
-      row.eachCell((cell) => {
-        if (typeof cell.value === "string") text += cell.value + "\n";
-      });
-    });
+    const text = sheetText(wb.getWorksheet("Memo")!);
     expect(text).toContain("วิชัย โรจน์ดี");
     expect(text).toContain("(...ชื่อ-สกุล...)"); // Supervisor / Sr.GM placeholder still present
   });
 
   it("renders closingRemark as a หมายเหตุ note in the closing block", async () => {
     const wb = await buildMemoExcelWorkbook(makeMemo({ closingRemark: "ขออนุมัติเบิกเป็นเงินสด" }));
-    const ws = wb.getWorksheet("Memo")!;
-    let text = "";
-    ws.eachRow((row) => {
-      row.eachCell((cell) => {
-        if (typeof cell.value === "string") text += cell.value + "\n";
-      });
-    });
+    const text = sheetText(wb.getWorksheet("Memo")!);
     expect(text).toContain("หมายเหตุ: ขออนุมัติเบิกเป็นเงินสด");
     expect(text).toContain("ขอแสดงความนับถือ");
   });
@@ -229,12 +231,11 @@ describe("Thai layout fit", () => {
 });
 
 describe("buildMemoExcelWorkbook — custom per-person signature block", () => {
-  function sheetText(ws: ExcelJS.Worksheet): string {
-    const parts: string[] = [];
-    ws.eachRow((row) => row.eachCell((cell) => parts.push(String(cell.value ?? ""))));
-    return parts.join("\n");
-  }
-
+  // C3: this block's local sheetText() used to NOT filter ExcelJS.ValueType.Merge cells — see
+  // the top-level sheetText() doc comment. Every test below only ever used .toContain()/
+  // .not.toContain(), never counted occurrences, so switching to the merge-aware shared helper
+  // changes nothing about what these tests verify (confirmed by running them — see
+  // task-12-report.md).
   const manyApprovers = buildCustomRoute(
     Array.from({ length: 8 }, (_, i) => ({
       userId: i + 1,
@@ -307,20 +308,12 @@ describe("buildMemoExcelWorkbook — custom per-person signature block", () => {
 });
 
 describe("buildMemoExcelWorkbook — free-form body blocks (Task 11)", () => {
-  // Every setRange() call here merges a column span, and ExcelJS's row.eachCell() visits
-  // every cell in a merge, not just the master — the non-master cells mirror the master's
-  // .value. Counting occurrences without filtering those out double/quadruple-counts a
-  // single printed value (a 4-wide merge reports the same string 4 times), which would make
-  // the "printed twice" tests below fail even when the sheet only has ONE real table. Skip
-  // ValueType.Merge cells so occurrence counts reflect printed cells, not merge width.
-  function sheetText(ws: ExcelJS.Worksheet): string {
-    const parts: string[] = [];
-    ws.eachRow((row) => row.eachCell((cell) => {
-      if (cell.type === ExcelJS.ValueType.Merge) return;
-      parts.push(String(cell.value ?? ""));
-    }));
-    return parts.join("\n");
-  }
+  // C3: uses the top-level sheetText() (merge-aware — see its doc comment). Every setRange()
+  // call here merges a column span, and ExcelJS's row.eachCell() visits every cell in a merge,
+  // not just the master — the non-master cells mirror the master's .value. Counting occurrences
+  // without filtering those out double/quadruple-counts a single printed value (a 4-wide merge
+  // reports the same string 4 times), which would make the "printed twice" tests below fail
+  // even when the sheet only has ONE real table.
 
   it("prints the blocks in the order the requester arranged them", async () => {
     const wb = await buildMemoExcelWorkbook(makeMemo({
@@ -435,14 +428,7 @@ describe("buildMemoExcelWorkbook — free-form body blocks (Task 11)", () => {
 });
 
 describe("buildMemoExcelWorkbook — fix round 1 (H1/H2)", () => {
-  function sheetText(ws: ExcelJS.Worksheet): string {
-    const parts: string[] = [];
-    ws.eachRow((row) => row.eachCell((cell) => {
-      if (cell.type === ExcelJS.ValueType.Merge) return;
-      parts.push(String(cell.value ?? ""));
-    }));
-    return parts.join("\n");
-  }
+  // C3: uses the top-level sheetText() (merge-aware — see its doc comment).
 
   // H1: spanColumns() clamps at MAX_TABLE_COLUMNS (8). The live write path
   // (memo-body-blocks-server.ts) already rejects >8 headers before persist, but the export
@@ -525,5 +511,48 @@ describe("buildMemoExcelWorkbook — fix round 1 (H1/H2)", () => {
       if (typeof cell.value === "string" && cell.value.length === 5000) found = cell.value;
     }));
     expect(found).toBe(longText);
+  });
+});
+
+describe("buildMemoExcelWorkbook — Task 12: multi-page print setup", () => {
+  it("repeats the ISO header on every printed page", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ formMode: "standard" }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expect(ws.pageSetup.printTitlesRow).toBe("1:3");
+  });
+
+  it("numbers the pages in the footer", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ formMode: "standard" }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expect(ws.headerFooter?.oddFooter).toContain("&P");
+    expect(ws.headerFooter?.oddFooter).toContain("&N");
+  });
+
+  // C2: we cannot know from an unrendered workbook where Excel will actually paginate — only
+  // Excel's own renderer decides that. What we control (and can test) is our OWN decision to
+  // insert a manual break via Row.addPageBreak() before the signature block; ws.model.rowBreaks
+  // reflects exactly the breaks our code asked for, nothing about real pagination. These two
+  // tests assert that decision, not a page count or a page position.
+  it("does not add a manual page break before the signature block on a short memo", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({ formMode: "standard" }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expect(ws.model.rowBreaks).toHaveLength(0);
+  });
+
+  // C1: sized empirically (not guessed) against this file's real fitRowHeight/page-height
+  // constants via a throwaway probe script — see task-12-report.md for the exact numbers and
+  // how they were obtained — rather than assumed from the brief's flat "44 rows/page" model,
+  // which Task 11 already made wrong for exactly this kind of content (see the block comment
+  // above PAGE_PRINTABLE_HEIGHT_POINTS in memo-excel.ts).
+  it("adds a manual page break before the signature block once a long free-form body nearly fills a page", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [
+        { id: "1", type: "paragraph", text: "ก".repeat(5000) },
+        { id: "2", type: "paragraph", text: "ก".repeat(1300) },
+      ],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expect(ws.model.rowBreaks.length).toBeGreaterThanOrEqual(1);
   });
 });

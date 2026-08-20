@@ -120,6 +120,57 @@ function rangeWidth(ws: ExcelJS.Worksheet, startCol: number, endCol: number): nu
 // truncates content, only how tall Excel is told to draw the row.
 const MAX_EXCEL_ROW_HEIGHT = 409;
 
+// ---- Task 12: repeat the ISO header on every printed page, and keep the signature block
+// from being split across a page boundary. ----
+//
+// C1 (carry-in): the task brief's own sample assumed a flat "16pt/row, 44 rows per page"
+// estimate to decide where content sits on the page. That assumption predates Task 11, which
+// made row height content-driven — a single 1200-char paragraph chunk in a free-form memo can
+// already be ~384pt tall (24 wrapped lines), so counting *rows* instead of *points* would be
+// off by more than an order of magnitude on exactly the documents this feature exists to
+// protect. contentHeightBeforeRow() below sums the REAL heights fitRowHeight already assigned
+// (falling back to Excel's own default for any row it never touched), so the "how much of the
+// page is already used" side of the estimate tracks Task 11's variable row heights instead of
+// pretending they are all 16pt.
+//
+// The signature block's OWN height is still a small constant (SIGNATURE_BLOCK_HEIGHT_ESTIMATE_
+// POINTS) rather than measured the same way — unlike body content, its rows never hold
+// requester-typed paragraphs (labels/names/dates are short, single-line values), so headerCell's
+// own fitRowHeight call on the one label row it draws will realistically clamp to its 16pt
+// minimum every time. Using rowCount * DEFAULT_ROW_HEIGHT_POINTS here is a deliberate, bounded
+// approximation, not the same shortcut C1 flags — it is also a safe overestimate for the
+// standard 3-row block (Supervisor/Manager/... header+name+date), since 5 rows covers the
+// custom-route block's worst case (label + subLabel + name + date + hidden-count note).
+//
+// Per C2, none of this predicts where Excel actually paginates — only Excel's renderer does
+// that. What we control and can test is: did OUR estimate decide the block was at risk and
+// insert a manual break (`Row.addPageBreak()`, confirmed present on this ExcelJS version — see
+// task-12-report.md) before it. A false "no risk" only ever costs a possibly-split block (no
+// worse than before Task 12); a false "at risk" only ever costs one early page break — neither
+// failure mode is silent data loss, which is why an estimate is an acceptable trade-off here.
+const PAGE_PRINTABLE_HEIGHT_POINTS = 700; // A4 portrait, default ~0.75in top/bottom margins.
+const DEFAULT_ROW_HEIGHT_POINTS = 15; // ExcelJS's own default for a row fitRowHeight never set.
+const SIGNATURE_BLOCK_HEIGHT_ESTIMATE_POINTS = 5 * DEFAULT_ROW_HEIGHT_POINTS;
+
+// Rows 1-3 (company header + ISO badge) repeat on every physical page via printTitlesRow, so
+// they consume printable height on EVERY page, not just the first. Read from the heights
+// already set at the top of buildMemoExcelWorkbook rather than hardcoded, so a future header
+// change is picked up automatically instead of silently going stale.
+function repeatedHeaderHeightPoints(ws: ExcelJS.Worksheet): number {
+  let h = 0;
+  for (let i = 1; i <= 3; i++) h += ws.getRow(i).height ?? DEFAULT_ROW_HEIGHT_POINTS;
+  return h;
+}
+
+// Sum of the real heights of every row already drawn between the repeated header (rows 1-3)
+// and `beforeRow` (exclusive) — see the block comment above for why this must be actual
+// heights, not a flat per-row constant.
+function contentHeightBeforeRow(ws: ExcelJS.Worksheet, beforeRow: number): number {
+  let h = 0;
+  for (let i = 4; i < beforeRow; i++) h += ws.getRow(i).height ?? DEFAULT_ROW_HEIGHT_POINTS;
+  return h;
+}
+
 // ExcelJS does not auto-fit row height for wrapped text, so long Thai strings spill out of
 // their cell. Estimate the wrapped line count for `text` inside the merged range and grow the
 // row so nothing clips. We under-estimate chars-per-line on purpose (taller is safe, clipped
@@ -399,7 +450,18 @@ export async function buildMemoExcelWorkbook(
   wb.created = new Date();
 
   const ws = wb.addWorksheet("Memo", {
-    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+    pageSetup: {
+      paperSize: 9,
+      orientation: "portrait",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      // Q6 — the ISO company header (rows 1-3) must appear on every printed page, not just
+      // the first, once a long free-form body pushes the memo past one physical page.
+      printTitlesRow: "1:3",
+    },
+    // &P = current page number, &N = total page count (ExcelJS/Excel header-footer codes).
+    headerFooter: { oddFooter: "&Rหน้า &P จาก &N" },
     views: [{ showGridLines: false }],
   });
 
@@ -526,6 +588,20 @@ export async function buildMemoExcelWorkbook(
   // Manager, Managing Director) — Supervisor and Sr.General Manager have no workflow
   // equivalent and are always left blank for a human wet-signature.
   r++;
+
+  // Task 12 Step 4 (C1-adjusted): if too little of the current printed page remains for the
+  // whole signature block, force it onto a fresh page rather than let Excel split it — a
+  // signature row landing alone at the top of the next page, separated from its label row,
+  // reads as broken far worse than an early page break. See the block comment above
+  // PAGE_PRINTABLE_HEIGHT_POINTS for why this measures real accumulated row height instead of
+  // counting rows.
+  const usablePageHeight = PAGE_PRINTABLE_HEIGHT_POINTS - repeatedHeaderHeightPoints(ws);
+  const consumedOnCurrentPage = contentHeightBeforeRow(ws, r) % usablePageHeight;
+  const remainingOnCurrentPage = usablePageHeight - consumedOnCurrentPage;
+  if (remainingOnCurrentPage < SIGNATURE_BLOCK_HEIGHT_ESTIMATE_POINTS) {
+    ws.getRow(r - 1).addPageBreak();
+  }
+
   // Column spans are shared by both modes so the printed layout never moves (Q21).
   const SIG_SPANS: Array<[number, number]> = [[1, 2], [3, 4], [5, 7], [8, 9], [10, 12]];
   const customSlots =
