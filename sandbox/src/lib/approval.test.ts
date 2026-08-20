@@ -10,6 +10,7 @@ import {
   getDashboardMetrics,
   needsNonNegotiableRemark,
   NON_NEGOTIABLE_REMARK,
+  requiresOverrideReasonForCustomRoute,
   seedMemos
 } from "./approval";
 
@@ -275,6 +276,66 @@ describe("analyzeApprovalRoute", () => {
         "Managing Director"
       ])
     ).toMatchObject({ mode: "escalated", requiresReason: false });
+  });
+});
+
+describe("requiresOverrideReasonForCustomRoute", () => {
+  // Task 10 fix round 1, F1: the free-form form's custom route is a list of
+  // people, not a Book1 ladder, so this checks only the FINAL person's
+  // recorded approval_level against the recommendation — not the whole route.
+  it("does not require a reason with no people picked yet (canSubmitCustom blocks submit first)", () => {
+    expect(requiresOverrideReasonForCustomRoute("General Manager", [])).toBe(false);
+  });
+
+  it("does not require a reason when the final approver matches the recommendation", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("General Manager", [
+        { approvalLevel: "Manager / Top Section" },
+        { approvalLevel: "General Manager" },
+      ])
+    ).toBe(false);
+  });
+
+  it("does not require a reason when the final approver outranks the recommendation (escalation)", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("Manager / Top Section", [
+        { approvalLevel: "Managing Director" },
+      ])
+    ).toBe(false);
+  });
+
+  it("requires a reason when the final approver is ranked below the recommendation", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("Managing Director", [
+        { approvalLevel: "General Manager" },
+        { approvalLevel: "Manager / Top Section" },
+      ])
+    ).toBe(true);
+  });
+
+  it("only looks at the LAST person — an earlier low-ranked checker does not trigger the reason", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("General Manager", [
+        { approvalLevel: "Manager / Top Section" },
+        { approvalLevel: "General Manager" },
+      ])
+    ).toBe(false);
+  });
+
+  it("requires a reason when the final approver's level is null (unverifiable — conservative default)", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("Manager / Top Section", [
+        { approvalLevel: null },
+      ])
+    ).toBe(true);
+  });
+
+  it("requires a reason when the final approver's level is unrecognized text", () => {
+    expect(
+      requiresOverrideReasonForCustomRoute("Manager / Top Section", [
+        { approvalLevel: "some unrecognized value" },
+      ])
+    ).toBe(true);
   });
 });
 

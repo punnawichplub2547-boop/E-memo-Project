@@ -317,3 +317,71 @@ describe("useMemoFormFields — custom route tab", () => {
     expect(result.current.customRoutePeople).toEqual([]);
   });
 });
+
+describe("useMemoFormFields — free-form custom route override reason (fix round 1, F1)", () => {
+  const managerPerson = (userId: number, name: string) => ({
+    userId,
+    name,
+    approvalLevel: "Manager / Top Section",
+    department: "IT",
+  });
+  const mdPerson = (userId: number, name: string) => ({
+    userId,
+    name,
+    approvalLevel: "Managing Director",
+    department: "IT",
+  });
+
+  it("blocks free-form submit when the custom route's final approver ranks below the Book1 recommendation, until a reason is given", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => { result.current.applyBulkData({ formMode: "freeform" }); });
+    act(() => { result.current.setCategory("general-purchase"); });
+    act(() => { result.current.setAmount(75000) }); // Book1-recommends "Managing Director" here
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    act(() => { result.current.customRoute.addPerson(managerPerson(42, "สมชาย ใจดี")); }); // final approver ranks below MD
+
+    expect(result.current.freeformCustomRouteRequiresReason).toBe(true);
+    expect(result.current.canSubmitPending).toBe(false);
+
+    act(() => { result.current.setRouteOverrideReason("MD มอบหมายให้ผู้จัดการอนุมัติแทนกรณีนี้"); });
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("does not demand a reason in free-form mode when the custom route's final approver meets or exceeds the recommendation", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => { result.current.applyBulkData({ formMode: "freeform" }); });
+    act(() => { result.current.setCategory("general-purchase"); });
+    act(() => { result.current.setAmount(75000) }); // Book1-recommends "Managing Director" here
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    act(() => { result.current.customRoute.addPerson(mdPerson(9, "อรทัย ศรีสุข")); }); // matches the recommendation
+
+    expect(result.current.freeformCustomRouteRequiresReason).toBe(false);
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+
+  it("does NOT apply the free-form reason gate on the standard form's custom tab (V2 behavior unchanged)", async () => {
+    const { result } = renderHook(() =>
+      useMemoFormFields({ memos: [], reviseId: null, user: makeUser() })
+    );
+    await act(async () => { await Promise.resolve(); });
+
+    // Same scenario as the first test above (big amount, low-ranked sole
+    // approver) but formMode is left at its "standard" default.
+    act(() => { result.current.setCategory("general-purchase"); });
+    act(() => { result.current.setAmount(75000) });
+    act(() => { result.current.customRoute.setRouteSource("custom"); });
+    act(() => { result.current.customRoute.addPerson(managerPerson(42, "สมชาย ใจดี")); });
+
+    expect(result.current.isFreeform).toBe(false);
+    expect(result.current.freeformCustomRouteRequiresReason).toBe(false);
+    expect(result.current.canSubmitPending).toBe(true);
+  });
+});

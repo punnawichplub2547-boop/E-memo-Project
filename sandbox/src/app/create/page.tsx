@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
@@ -17,8 +17,7 @@ import { BudgetCard } from "./_components/BudgetCard";
 import { DraftPreviewPanel } from "./_components/DraftPreviewPanel";
 import { DescriptionCard } from "./_components/DescriptionCard";
 import { MemoDetailsCard } from "./_components/MemoDetailsCard";
-import { RoutingCard } from "./_components/RoutingCard";
-import { CustomRouteCard } from "./_components/CustomRouteCard";
+import { RoutingTabPane } from "./_components/RoutingTabPane";
 import { PriceComparisonCard } from "./_components/PriceComparisonCard";
 import { BlockEditorCard } from "./_components/BlockEditorCard";
 import { FormModeToggle } from "./_components/FormModeToggle";
@@ -29,7 +28,6 @@ import { useMemoTemplates } from "./_hooks/useMemoTemplates";
 import { useMemoAiAssist } from "./_hooks/useMemoAiAssist";
 import { useMemoSubmit } from "./_hooks/useMemoSubmit";
 import { usePrototypeUser } from "@/lib/prototype-user-context";
-import { ReadRecipientPicker } from "./_components/ReadRecipientPicker";
 import { SaveTemplateModal } from "./_components/SaveTemplateModal";
 import { TemplateSelectorCard } from "./_components/TemplateSelectorCard";
 
@@ -93,7 +91,9 @@ function CreatePageContent() {
     selectedVendorVatAmount,
     canSubmitPending,
     bodyBlocks,
-    customRoute, routeSource,
+    isFreeform,
+    freeformCustomRouteRequiresReason,
+    customRoute,
     requestItemsGrandTotal,
     addRequestItem, removeRequestItem, updateRequestItem,
     addVendorRow, removeVendorRow, updateVendorRow, handleSelectVendor,
@@ -104,11 +104,21 @@ function CreatePageContent() {
   // V3 free-form memo body (Task 10 — mode switch integration). Choosing
   // "freeform" forces routeSource to "custom" immediately: the server 400s a
   // free-form memo without a custom route, so the UI must not let the user
-  // find that out only at submit time (carry-in C2).
-  const isFreeform = bodyBlocks.formMode === "freeform";
+  // find that out only at submit time (carry-in C2). Fix round 1 / F4: restore
+  // whatever routeSource the user had before entering free-form on the way
+  // back out, rather than leaving it stuck on "custom" (e.g. a requester who
+  // had already picked "Customize route เอง" in standard mode before trying
+  // free-form gets that choice back, not silently reset to the Book1 tab).
+  const previousRouteSourceRef = useRef<typeof customRoute.routeSource | null>(null);
   const handleFormModeChange = (mode: MemoFormMode) => {
+    if (mode === "freeform" && bodyBlocks.formMode !== "freeform") {
+      previousRouteSourceRef.current = customRoute.routeSource;
+      customRoute.setRouteSource("custom");
+    } else if (mode === "standard" && bodyBlocks.formMode === "freeform") {
+      customRoute.setRouteSource(previousRouteSourceRef.current ?? "book1");
+      previousRouteSourceRef.current = null;
+    }
     bodyBlocks.setFormMode(mode);
-    if (mode === "freeform") customRoute.setRouteSource("custom");
   };
 
   const {
@@ -276,6 +286,7 @@ function CreatePageContent() {
             formMode={bodyBlocks.formMode}
             blockCount={bodyBlocks.blocks.length}
             disabled={isRevisionMode}
+            customRoutePeopleCount={customRoute.people.length}
             onChange={handleFormModeChange}
           />
 
@@ -441,68 +452,26 @@ function CreatePageContent() {
                   data-tab={assistantTab}
                 >
                   <div className="em-create-tab-pane" data-pane="routing">
-                    <div className="em-tabs em-route-source-tabs" role="tablist" aria-label="วิธีกำหนดผู้อนุมัติ">
-                      {!isFreeform && (
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={routeSource === "book1"}
-                          className={`em-tab ${routeSource === "book1" ? "active" : ""}`}
-                          onClick={() => customRoute.setRouteSource("book1")}
-                        >
-                          แนะนำตาม Book1
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={routeSource === "custom"}
-                        className={`em-tab ${routeSource === "custom" ? "active" : ""}`}
-                        onClick={() => customRoute.setRouteSource("custom")}
-                      >
-                        Customize route เอง
-                      </button>
-                    </div>
-                    {routeSource === "custom" ? (
-                      <CustomRouteCard
-                        route={customRoute}
-                        notifyMD={recommendation.notifyMD}
-                        notifyMDReason={recommendation.notifyMDReason}
-                      />
-                    ) : (
-                    <RoutingCard
+                    <RoutingTabPane
+                      isFreeform={isFreeform}
+                      customRoute={customRoute}
+                      recommendation={recommendation}
+                      freeformCustomRouteRequiresReason={freeformCustomRouteRequiresReason}
+                      routeOverrideReason={routeOverrideReason}
+                      onRouteOverrideReasonChange={setRouteOverrideReason}
                       effectiveApprover={effectiveApprover}
                       tierClass={tierClass}
                       isOverridden={isOverridden}
                       effectiveIsDeadStock={effectiveIsDeadStock}
                       skipGmStep={skipGmStep}
-                      routeOverrideReason={routeOverrideReason}
                       routeReview={routeReview}
-                      recommendation={recommendation}
-                      flow={selectedRoute}
+                      selectedRoute={selectedRoute}
                       onApproverChange={(v) => { setChosenApprover(v); setSkipGmStep(false); }}
-                      onReset={() => { setChosenApprover(null); setSkipGmStep(false); setRouteOverrideReason(""); }}
+                      onRoutingReset={() => { setChosenApprover(null); setSkipGmStep(false); setRouteOverrideReason(""); }}
                       onSkipGmChange={setSkipGmStep}
-                      onRouteOverrideReasonChange={setRouteOverrideReason}
+                      readRecipients={readRecipients}
+                      onReadRecipientsChange={setReadRecipients}
                     />
-                    )}
-                    <div style={{
-                      marginTop: 12,
-                      background: "var(--surface)",
-                      border: "1px solid var(--line)",
-                      borderRadius: "var(--r-md)",
-                      padding: "12px 14px",
-                    }}>
-                      <div className="em-eyebrow" style={{ fontSize: 11, marginBottom: 8 }}>
-                        ผู้รับทราบ / Read Recipients
-                      </div>
-                      <div className="em-field">
-                        <ReadRecipientPicker
-                          value={readRecipients}
-                          onChange={setReadRecipients}
-                        />
-                      </div>
-                    </div>
                   </div>
                   <div className="em-create-tab-pane" data-pane="draft">
                     <DraftPreviewPanel
@@ -621,7 +590,16 @@ function CreatePageContent() {
                 <button
                   type="button"
                   className="em-btn"
-                  disabled={isSubmitting}
+                  // Fix round 1 / F2: free-form always submits as a custom route
+                  // (see handleFormModeChange above), and the server 400s a
+                  // custom route with no people — without this gate, Save Draft
+                  // dispatches ADD_MEMO optimistically and navigates away before
+                  // that 400 comes back, so the blocks the user just wrote are
+                  // gone on the next reload. canSubmitPending does not cover
+                  // drafts (it also requires the vendor/item rows this button
+                  // deliberately skips), so this checks the same underlying
+                  // "at least one custom approver" state directly.
+                  disabled={isSubmitting || (isFreeform && customRoute.people.length === 0)}
                   onClick={() => handleSubmit("draft")}
                 >
                   <IconFileText size={15} /> Save Draft

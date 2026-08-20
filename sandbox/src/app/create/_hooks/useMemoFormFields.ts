@@ -14,6 +14,7 @@ import {
   needsNonNegotiableRemark,
   NON_NEGOTIABLE_REMARK,
   PriceComparison,
+  requiresOverrideReasonForCustomRoute,
   RequestItem,
 } from "@/lib/approval";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
@@ -157,6 +158,7 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
       ? { formMode: reviseMemo!.formMode ?? "standard", blocks: reviseMemo!.bodyBlocks ?? [] }
       : undefined
   );
+  const isFreeform = bodyBlocks.formMode === "freeform";
 
   const [chosenApprover, setChosenApprover] = useState<ApprovalLevel | null>(null);
   const [skipGmStep, setSkipGmStep] = useState(false);
@@ -267,11 +269,21 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
   const rowsMissingNonNegotiableRemark = priceComparisons.filter(
     row => needsNonNegotiableRemark(row) && (row.remark ?? "").trim().length === 0
   );
+  // Task 10 fix round 1, F1: standard-mode custom routing (V2) still waives the
+  // Book1 override reason entirely — routeReview there compares the Book1 ladder,
+  // which is not the route being used at all, and the server writes its own audit
+  // reason when it rebuilds the per-person route. That V2 decision is unchanged.
+  // Free-form is different: the spec requires the reason whenever the custom
+  // route's actual final approver ranks below the Book1 recommendation, precisely
+  // so free-form cannot become a way around the amount rules (Ruling 14).
+  const freeformCustomRouteRequiresReason =
+    isFreeform && customRoute.routeSource === "custom"
+      ? requiresOverrideReasonForCustomRoute(recommendation.recommendedFinalApprover, customRoute.people)
+      : false;
   const canSubmitPending =
-    // The Book1 override reason only makes sense against the Book1 ladder. On the
-    // custom tab the recommended route is not the route being used at all, and the
-    // server writes its own audit reason when it rebuilds the per-person route.
-    (customRoute.routeSource === "custom" || !routeReview.requiresReason || cleanOverrideReason.length > 0) &&
+    (customRoute.routeSource === "custom"
+      ? (!freeformCustomRouteRequiresReason || cleanOverrideReason.length > 0)
+      : (!routeReview.requiresReason || cleanOverrideReason.length > 0)) &&
     (!selectedNotLowest || cleanVendorReason.length > 0) &&
     rowsMissingNonNegotiableRemark.length === 0 &&
     customRoute.canSubmitCustom;
@@ -471,6 +483,8 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
     cleanVendorReason,
     canSubmitPending,
     bodyBlocks,
+    isFreeform,
+    freeformCustomRouteRequiresReason,
     customRoute,
     routeSource: customRoute.routeSource,
     customRoutePeople: customRoute.people,

@@ -469,6 +469,33 @@ export function analyzeApprovalRoute(
   };
 }
 
+/**
+ * Whether a free-form memo's per-person ("custom") route requires an
+ * override reason because its final approver ranks below what Book1 would
+ * recommend. This deliberately does NOT reuse analyzeApprovalRoute(): that
+ * function compares two Book1 *routes* built by buildApprovalFlow(), which
+ * has nothing to do with the people actually picked on the custom-route tab
+ * — plugging a custom route's steps into it would check the wrong thing
+ * (Ruling 14 / Task 10 fix round 1, F1). Only the FINAL position approves in
+ * a custom route (see custom-route.ts's Q4 role rule), so comparing just
+ * that person's recorded approval_level against the recommendation is what
+ * the spec's "สายที่เลือกต่ำกว่าที่แนะนำ" rule means once the route is a list of
+ * people rather than a ladder. An empty list requires no reason yet — there
+ * is nothing to justify until canSubmitCustom's "pick at least one person"
+ * gate is satisfied. A missing or unrecognized approval_level ranks below
+ * everything (getApprovalLevelRank returns -1 for both), so it conservatively
+ * requires a reason rather than silently letting an unverifiable level pass.
+ */
+export function requiresOverrideReasonForCustomRoute(
+  recommendedFinalApprover: ApprovalLevel,
+  people: { approvalLevel: string | null }[]
+): boolean {
+  if (people.length === 0) return false;
+  const rawLevel = people[people.length - 1].approvalLevel;
+  const finalRank = rawLevel ? getApprovalLevelRank(rawLevel as ApprovalLevel) : -1;
+  return finalRank < getApprovalLevelRank(recommendedFinalApprover);
+}
+
 export const seedMemos: MemoRecord[] = [
   {
     // Pending at Manager — just submitted today; good for "new request" demo

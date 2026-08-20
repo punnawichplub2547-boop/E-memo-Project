@@ -10,6 +10,11 @@ type Props = {
   blockCount: number;
   /** True in edit-and-resubmit mode: the mode is locked from the first submit (Q5). */
   disabled: boolean;
+  /** Count of people picked on the custom-route tab. Free-form forces custom
+   *  routing, so 0 here means the server will 400 (fix round 1, F2) — the
+   *  warning must live here, next to the toggle, not inside the collapsible
+   *  assistant panel where CustomRouteCard's own empty-state note lives. */
+  customRoutePeopleCount: number;
   onChange: (mode: MemoFormMode) => void;
 };
 
@@ -19,7 +24,7 @@ type Props = {
  * because it owns real state of its own (the two-step inline confirm before
  * a mode switch that clears the free-form blocks — carry-in C3).
  */
-export function FormModeToggle({ formMode, blockCount, disabled, onChange }: Props) {
+export function FormModeToggle({ formMode, blockCount, disabled, customRoutePeopleCount, onChange }: Props) {
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   const handlePick = (mode: MemoFormMode) => {
@@ -86,6 +91,11 @@ export function FormModeToggle({ formMode, blockCount, disabled, onChange }: Pro
       )}
       {disabled && (
         <div className="em-form-mode-lock-note">รูปแบบฟอร์มถูกล็อกไว้ตั้งแต่ส่งครั้งแรก</div>
+      )}
+      {formMode === "freeform" && customRoutePeopleCount === 0 && (
+        <div className="em-form-mode-lock-note">
+          ฟอร์มอิสระต้องเลือกผู้อนุมัติเองอย่างน้อย 1 คน — บันทึกร่างหรือส่งขออนุมัติไม่ได้จนกว่าจะเลือก
+        </div>
       )}
     </div>
   );

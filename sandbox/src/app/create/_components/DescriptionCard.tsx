@@ -24,6 +24,13 @@ export function DescriptionCard({
   const fieldLabel = isFreeform
     ? "สรุปย่อ — ใช้แสดงในคิว ผลค้นหา และอีเมลแจ้งเตือน"
     : "Description / เหตุผลการขอ";
+  // Fix round 1 / F3: this caption used to always say "write the full
+  // reasoning here", which contradicted the free-form label above it telling
+  // the user it is only a short summary — the full content goes in the block
+  // editor further down the page.
+  const cardCaption = isFreeform
+    ? "สรุปสั้น ๆ พอใช้แสดงผลได้ — เนื้อหาฉบับเต็มพิมพ์ในบล็อกเนื้อหาด้านล่าง"
+    : "สรุปเหตุผล ความจำเป็น และรายละเอียดประกอบ Memo";
   return (
     <div className="em-card" style={{ overflow: "hidden", position: "relative" }}>
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(60% 80% at 0% 0%, rgba(37,99,235,0.06), transparent 58%)" }} />
@@ -33,7 +40,7 @@ export function DescriptionCard({
             <IconFileText size={15} style={{ color: "var(--primary)" }} />
             Description / เหตุผลการขอ
           </h3>
-          <div className="em-sub">สรุปเหตุผล ความจำเป็น และรายละเอียดประกอบ Memo</div>
+          <div className="em-sub">{cardCaption}</div>
         </div>
       </div>
       <div className="em-card-body" style={{ position: "relative", display: "grid", gap: 12 }}>
