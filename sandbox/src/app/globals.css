@@ -1519,6 +1519,11 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 }
 .em-block-table .em-table { min-width: 480px; width: 100%; }
 .em-block-table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Header cell = the column name input plus its own delete control, same
+   affordance as the per-row 🗑 in the trailing column. */
+.em-block-table-th { display: flex; align-items: center; gap: 4px; }
+.em-block-table-th .em-table-input { flex: 1; min-width: 0; }
+.em-block-table-th .em-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
 
 .em-block-kv { display: flex; flex-direction: column; gap: 8px; }
 .em-block-kv-row {

@@ -8,6 +8,7 @@ import {
   addTableColumn,
   addTableRow,
   removeTableRow,
+  removeTableColumn,
 } from "@/lib/memo-body-blocks";
 
 type Props = {
@@ -30,6 +31,11 @@ export function TableBlock({ headers, rows, onChange }: Props) {
 
   const removeRow = (r: number) => onChange(removeTableRow(headers, rows, r));
 
+  // All of the "which cells go away" logic lives in removeTableColumn (pure, unit
+  // tested) — including its refusal to remove the last column, which this button
+  // mirrors as a disabled state so the rule is visible before it is clicked.
+  const removeColumn = (c: number) => onChange(removeTableColumn(headers, rows, c));
+
   return (
     <div className="em-block-table">
       <div className="em-block-table-scroll">
@@ -38,12 +44,24 @@ export function TableBlock({ headers, rows, onChange }: Props) {
             <tr>
               {headers.map((header, i) => (
                 <th key={i}>
-                  <input
-                    className="em-table-input"
-                    value={header}
-                    placeholder={`คอลัมน์ ${i + 1}`}
-                    onChange={(e) => setHeader(i, e.target.value)}
-                  />
+                  <div className="em-block-table-th">
+                    <input
+                      className="em-table-input"
+                      value={header}
+                      placeholder={`คอลัมน์ ${i + 1}`}
+                      onChange={(e) => setHeader(i, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="em-btn sm icon-only danger"
+                      onClick={() => removeColumn(i)}
+                      disabled={headers.length <= 1}
+                      title={headers.length <= 1 ? "ตารางต้องมีอย่างน้อย 1 คอลัมน์" : undefined}
+                      aria-label={`ลบคอลัมน์ ${i + 1}`}
+                    >
+                      🗑
+                    </button>
+                  </div>
                 </th>
               ))}
               <th aria-label="ลบแถว" />

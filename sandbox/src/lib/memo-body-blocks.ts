@@ -111,6 +111,31 @@ export function removeTableRow(headers: string[], rows: string[][], rowIndex: nu
   return { headers, rows: rows.filter((_, ri) => ri !== rowIndex) };
 }
 
+/**
+ * Removes one column: the header at `index` plus the same index from every row.
+ * Pure — never mutates `headers`/`rows`.
+ *
+ * Two no-ops, both returning the SAME references (mirroring `addTableColumn`'s
+ * behavior at the cap, so a caller comparing identity can tell nothing happened):
+ * an out-of-range index, and the last remaining column — a zero-column table has
+ * no cell left to type into and prints as an empty block on the ISO form, so
+ * "delete the whole block" is the action for that, not this.
+ *
+ * Rows shorter than `headers` are left alone past their end rather than padded:
+ * `filter` on a ragged row simply keeps what is there.
+ */
+export function removeTableColumn(
+  headers: string[],
+  rows: string[][],
+  index: number
+): TableBlockValue {
+  if (index < 0 || index >= headers.length || headers.length <= 1) return { headers, rows };
+  return {
+    headers: headers.filter((_, ci) => ci !== index),
+    rows: rows.map((row) => row.filter((_, ci) => ci !== index)),
+  };
+}
+
 /** Patches one key/value pair by index. Pure — never mutates `pairs`. */
 export function setKeyValuePair(
   pairs: KeyValuePair[],

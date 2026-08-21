@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   moveBlock, removeBlock, hasSystemBlock, createBlock,
-  setTableHeader, setTableCell, addTableColumn, addTableRow, removeTableRow,
+  setTableHeader, setTableCell, addTableColumn, addTableRow, removeTableRow, removeTableColumn,
   setKeyValuePair, MAX_TABLE_COLUMNS, shouldConfirmFormModeSwitch,
   type MemoBodyBlock,
 } from "./memo-body-blocks";
@@ -151,6 +151,61 @@ describe("removeTableRow", () => {
     const rows = [["1"], ["2"], ["3"]];
     const out = removeTableRow(headers, rows, 1);
     expect(out.rows).toEqual([["1"], ["3"]]);
+  });
+});
+
+describe("removeTableColumn", () => {
+  it("drops the header and the same index from every row", () => {
+    const out = removeTableColumn(
+      ["ชื่อ", "จำนวน", "ราคา"],
+      [["ก", "1", "10"], ["ข", "2", "20"]],
+      1,
+    );
+    expect(out.headers).toEqual(["ชื่อ", "ราคา"]);
+    expect(out.rows).toEqual([["ก", "10"], ["ข", "20"]]);
+  });
+
+  it("leaves the other columns' values untouched when removing the first column", () => {
+    const out = removeTableColumn(["a", "b", "c"], [["1", "2", "3"]], 0);
+    expect(out.headers).toEqual(["b", "c"]);
+    expect(out.rows).toEqual([["2", "3"]]);
+  });
+
+  it("is a no-op for an out-of-range index, returning the same references", () => {
+    const headers = ["a", "b"];
+    const rows = [["1", "2"]];
+    for (const index of [-1, 2, 99]) {
+      const out = removeTableColumn(headers, rows, index);
+      expect(out.headers).toBe(headers);
+      expect(out.rows).toBe(rows);
+    }
+  });
+
+  // A table with zero columns has no cell left to type into and would render as an
+  // empty block on the ISO form — "delete the block" is the action for that, not
+  // "delete the last column".
+  it("refuses to delete the last remaining column", () => {
+    const headers = ["a"];
+    const rows = [["1"], ["2"]];
+    const out = removeTableColumn(headers, rows, 0);
+    expect(out.headers).toBe(headers);
+    expect(out.rows).toBe(rows);
+  });
+
+  it("does not mutate the original headers array or its row arrays", () => {
+    const headers = ["a", "b"];
+    const rows = [["1", "2"]];
+    removeTableColumn(headers, rows, 0);
+    expect(headers).toEqual(["a", "b"]);
+    expect(rows).toEqual([["1", "2"]]);
+  });
+
+  // Rows can be shorter/longer than headers (legacy data, a future validator change):
+  // splicing a ragged row must not invent cells or throw.
+  it("tolerates a row that is shorter than the header list", () => {
+    const out = removeTableColumn(["a", "b", "c"], [["1", "2", "3"], ["1"]], 2);
+    expect(out.headers).toEqual(["a", "b"]);
+    expect(out.rows).toEqual([["1", "2"], ["1"]]);
   });
 });
 
