@@ -17,6 +17,7 @@ import {
   requiresOverrideReasonForCustomRoute,
   RequestItem,
 } from "@/lib/approval";
+import { approvalTierClass } from "@/lib/approval-tier-class";
 import { coerceNonNegativeNumber, coercePositiveInteger } from "@/lib/number-input";
 import { newClientRowId } from "@/lib/client-row-id";
 import { canResubmitMemo, prototypeUserAuthId, PrototypeUser } from "@/lib/prototype-users";
@@ -233,7 +234,7 @@ export function useMemoFormFields({ memos, reviseId, user }: UseMemoFormFieldsIn
       ),
     [recommendation.recommendedFinalApprover, selectedRoute]
   );
-  const tierClass = effectiveApprover === "Managing Director" ? "md" : effectiveApprover === "General Manager" ? "gm" : "mgr";
+  const tierClass = approvalTierClass(effectiveApprover);
   const isOverridden = routeReview.mode !== "recommended";
   const budgetRemaining = budgetPlan - budgetUsed - amount;
   const cleanOverrideReason = routeOverrideReason.trim();

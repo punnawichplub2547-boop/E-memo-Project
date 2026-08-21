@@ -1,5 +1,6 @@
 import { IconShield } from "@/components/icons";
 import type { ApprovalLevel } from "@/lib/approval";
+import { approvalTierClass } from "@/lib/approval-tier-class";
 
 type Props = {
   recommendedFinalApprover: ApprovalLevel;
@@ -32,7 +33,12 @@ export function CustomRouteReasonNote({
           <h3>เทียบกับข้อเสนอแนะ Book1</h3>
           <div className="em-sub">ใช้เป็นข้อมูลอ้างอิง — ไม่ผูกกับสายที่เลือกเอง (Customize route เอง) ด้านล่าง</div>
         </div>
-        <span className="em-tier mgr">{recommendedFinalApprover}</span>
+        {/* Derived, not hardcoded: this badge names the Book1 recommendation, and this
+            card exists to make the gap between that tier and the picked route visible —
+            printing "Managing Director" in the Manager colour hid exactly that. */}
+        <span className={`em-tier ${approvalTierClass(recommendedFinalApprover)}`}>
+          {recommendedFinalApprover}
+        </span>
       </div>
       <div className="em-card-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--line)", display: "flex", gap: 10, alignItems: "flex-start" }}>

@@ -300,9 +300,15 @@ export async function POST(
   }
 }
 
-// All 44 mutable columns in the same field order as memoRowParams in api/memos/route.ts,
-// minus the immutable identity fields: memo_no, requester_name, requester_user_id, created_at.
-// Append memoDbId last for the WHERE id = ? clause.
+// All 47 parameterised mutable columns, in the same field order as memoRowParams in
+// api/memos/route.ts, minus the immutable identity fields: memo_no, requester_name,
+// requester_user_id, created_at. Append memoDbId last for the WHERE id = ? clause,
+// giving 48 placeholders in total.
+//
+// The UPDATE above assigns 48 columns: these 47 plus `return_to_step = NULL`, which is
+// a literal and takes no parameter. Counted twice by hand and once by script — the
+// comment used to say 44, and a wrong number in exactly this spot has broken prod in
+// this project before, because it is what the next editor checks alignment against.
 function memoUpdateParams(row: MemoSeedRow, memoDbId: number) {
   return [
     row.title,
