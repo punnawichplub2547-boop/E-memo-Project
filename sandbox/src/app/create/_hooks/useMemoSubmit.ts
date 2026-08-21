@@ -30,7 +30,7 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
     effectiveIsPriceAdjustment, priceAdjustmentReason, effectiveFollowsProductionPlan,
     effectiveIsDeadStock, showDeptMonthly, deptMonthlyOverBudgetTotal, orderedReadRecipients,
     recommendation, routeReview, selectedRoute, cleanOverrideReason, canSubmitPending,
-    routeSource, customRoutePeople,
+    routeSource, customRoutePeople, freeformCustomRouteRequiresReason,
     notifyNoteImageFiles,
     bodyBlocks,
   } = fields;
@@ -221,7 +221,16 @@ export function useMemoSubmit(fields: MemoFormFieldsResult, { user, dispatch, ro
         selectedRoute: customRouteResult ? customRouteResult.route : selectedRoute,
         customRoute: customRouteResult ? customRouteResult.approvers : undefined,
         routeMode: routeReview.mode,
-        routeOverrideReason: routeReview.requiresReason ? cleanOverrideReason : undefined,
+        // C1: in free-form mode RoutingCard is never rendered, so chosenApprover stays
+        // null and routeReview.mode is always "recommended" — requiresReason can never
+        // be true. The gate that actually blocks a free-form submission is
+        // freeformCustomRouteRequiresReason (Ruling 14), so it has to be honored here
+        // too or the reason the requester was forced to type is silently discarded.
+        // Purely additive: the standard-mode condition is unchanged.
+        routeOverrideReason:
+          routeReview.requiresReason || freeformCustomRouteRequiresReason
+            ? cleanOverrideReason
+            : undefined,
         notifyMD: recommendation.notifyMD,
         requiresMdReview: recommendation.requiresMdReview,
         // V3 free-form body: sent every time, same as customRoute above — a

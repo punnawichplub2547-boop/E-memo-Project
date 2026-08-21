@@ -69,6 +69,12 @@ export type MemoDraftFields = {
   };
   selectedRoute: ApprovalLevel[];
   cleanOverrideReason: string;
+  /** V3/Ruling 14: true when the free-form custom route's real final approver ranks
+   *  BELOW the Book1 recommendation. `useMemoFormFields` computes it (and blocks
+   *  submission until a reason is typed), so the reason it demands must be recorded
+   *  — passed in as a field rather than recomputed here, because the ranking needs
+   *  the picked people's approval levels, which this function does not otherwise read. */
+  freeformCustomRouteRequiresReason?: boolean;
   firstCheckingStep: ApprovalLevel;
   /** Which tab of the routing card is active. Absent means the classic Book1 route. */
   routeSource?: "book1" | "custom";
@@ -144,10 +150,17 @@ export function buildMemoDraftRecord(
     // A hand-picked route never matches the Book1 recommendation by construction.
     routeMode: custom ? "exception" : fields.routeReview.mode,
     customRoute: custom ? custom.approvers : undefined,
-    // The Book1 override reason does not apply to a custom route — the server
-    // records its own reason when it rebuilds the route.
+    // Standard mode (V2, unchanged): the Book1 override reason does not apply to a
+    // custom route — routeReview compares the Book1 ladder, which is not the route in
+    // use, and the server records its own reason when it rebuilds the route.
+    // Free-form mode (V3/Ruling 14) is the exception: there the reason IS about the
+    // custom route — it explains why its final approver ranks below what Book1 asks
+    // for — and the form refuses to submit without it. Dropping it here would leave
+    // the anti-evasion gate producing no evidence at all (C1).
     routeOverrideReason:
-      !custom && fields.routeReview.requiresReason ? fields.cleanOverrideReason : undefined,
+      (!custom && fields.routeReview.requiresReason) || fields.freeformCustomRouteRequiresReason
+        ? fields.cleanOverrideReason
+        : undefined,
     readRecipients: fields.orderedReadRecipients,
     readActions,
     description: fields.description.trim() || undefined,

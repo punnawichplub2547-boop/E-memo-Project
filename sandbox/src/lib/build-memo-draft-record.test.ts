@@ -242,7 +242,12 @@ describe("custom route preview", () => {
     expect(record.selectedRoute).toEqual(["Manager / Top Section", "General Manager"]);
   });
 
-  it("keeps the override reason out of a custom route (the server writes its own)", () => {
+  // STANDARD mode + custom route. V2 deliberately waives the Book1 override reason
+  // here: routeReview compares the Book1 ladder, which is not the route in use, and
+  // the server writes its own audit reason when it rebuilds the per-person route.
+  // `makeFields()` never sets `bodyBlocks`, so `formMode` is undefined = standard —
+  // this case is untouched by the free-form fix below.
+  it("keeps the override reason out of a STANDARD-mode custom route (the server writes its own)", () => {
     const record = buildMemoDraftRecord(
       makeFields({
         routeSource: "custom",
@@ -253,5 +258,58 @@ describe("custom route preview", () => {
       { ...opts, id: "", status: "draft" },
     );
     expect(record.routeOverrideReason).toBeUndefined();
+  });
+});
+
+// C1: free-form mode demands this reason before it will let the memo be submitted
+// (useMemoFormFields.freeformRouteReasonMissing gates canSubmitPending), so it has to
+// survive the trip to the DB — otherwise the anti-evasion control produces no evidence
+// at all and the server's generic "กำหนดผู้อนุมัติเองเป็นรายบุคคล (custom route)" string
+// is written over the requester's own words.
+describe("free-form below-recommendation reason", () => {
+  const people = [
+    { userId: 42, name: "สมชาย ใจดี", approvalLevel: "Manager / Top Section", department: "IT" },
+  ];
+
+  function freeformFields(overrides: Partial<MemoDraftFields> = {}) {
+    return makeFields({
+      routeSource: "custom",
+      customRoutePeople: people,
+      bodyBlocks: {
+        formMode: "freeform",
+        blocks: [{ id: "b1", type: "paragraph", text: "เนื้อหาอิสระ" }],
+      },
+      ...overrides,
+    });
+  }
+
+  it("carries the reason the requester typed when the custom route ranks below Book1", () => {
+    const record = buildMemoDraftRecord(
+      freeformFields({
+        freeformCustomRouteRequiresReason: true,
+        cleanOverrideReason: "คุยกับ MD แล้ว อนุมัติทางวาจา",
+      }),
+      { ...opts, id: "", status: "pending" },
+    );
+    expect(record.routeOverrideReason).toBe("คุยกับ MD แล้ว อนุมัติทางวาจา");
+  });
+
+  it("stays undefined when the free-form custom route does not rank below Book1", () => {
+    const record = buildMemoDraftRecord(
+      freeformFields({
+        freeformCustomRouteRequiresReason: false,
+        cleanOverrideReason: "พิมพ์ไว้แล้วเปลี่ยนใจเลือกผู้อนุมัติที่สูงพอ",
+      }),
+      { ...opts, id: "", status: "pending" },
+    );
+    expect(record.routeOverrideReason).toBeUndefined();
+  });
+
+  // Coverage gap the reviewer flagged: nothing proved a brand-new free-form memo
+  // actually hands its blocks to the ADD_MEMO payload.
+  it("carries formMode and the block list onto a brand-new memo", () => {
+    const record = buildMemoDraftRecord(freeformFields(), { ...opts, id: "EM-1", status: "pending" });
+    expect(record.formMode).toBe("freeform");
+    expect(record.bodyBlocks).toEqual([{ id: "b1", type: "paragraph", text: "เนื้อหาอิสระ" }]);
   });
 });

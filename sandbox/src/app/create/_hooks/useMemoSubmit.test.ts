@@ -364,4 +364,44 @@ describe("useMemoSubmit — custom per-person route on revision", () => {
       })
     );
   });
+
+  // C1, revision half. RoutingCard is never rendered in free-form mode, so
+  // chosenApprover stays null and routeReview.mode is always "recommended" —
+  // routeReview.requiresReason can therefore never be true here, and the reason the
+  // requester was forced to type was dropped on every free-form revision.
+  it("carries the free-form below-recommendation reason into SUBMIT_REVISION", async () => {
+    const { dispatch, result } = renderWithRoute({
+      routeSource: "custom",
+      customRoutePeople: customPeople,
+      bodyBlocks: { formMode: "freeform", blocks: [{ id: "b1", type: "paragraph", text: "เนื้อหา" }] },
+      freeformCustomRouteRequiresReason: true,
+      cleanOverrideReason: "คุยกับ MD แล้ว อนุมัติทางวาจา",
+      routeReview: { mode: "recommended", requiresReason: false, recommendedRoute: ["Manager / Top Section"] },
+    } as never);
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SUBMIT_REVISION",
+        routeOverrideReason: "คุยกับ MD แล้ว อนุมัติทางวาจา",
+      })
+    );
+  });
+
+  it("leaves routeOverrideReason undefined on a free-form revision that needs no reason", async () => {
+    const { dispatch, result } = renderWithRoute({
+      routeSource: "custom",
+      customRoutePeople: customPeople,
+      bodyBlocks: { formMode: "freeform", blocks: [{ id: "b1", type: "paragraph", text: "เนื้อหา" }] },
+      freeformCustomRouteRequiresReason: false,
+      cleanOverrideReason: "พิมพ์ค้างไว้",
+      routeReview: { mode: "recommended", requiresReason: false, recommendedRoute: ["Manager / Top Section"] },
+    } as never);
+    await act(async () => { await result.current.handleSubmit("pending"); });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SUBMIT_REVISION",
+        routeOverrideReason: undefined,
+      })
+    );
+  });
 });
