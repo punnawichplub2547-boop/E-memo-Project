@@ -106,6 +106,14 @@ export async function POST(
       memoUpdate.selected_route_json = JSON.stringify(custom.route);
       memoUpdate.recommended_route_json = JSON.stringify(custom.route);
       memoUpdate.custom_route_json = JSON.stringify(custom.approvers);
+      // Same audit contract as POST /api/memos: a per-person route never matches the
+      // Book1 ladder, so it is recorded as an exception with a reason. Without this the
+      // client's routeMode won — and in free-form mode the client always sends
+      // "recommended" (RoutingCard is never rendered, so routeReview.mode never moves),
+      // which made the drawer's "Exception: <reason>" line disappear on every revision.
+      memoUpdate.route_mode = "exception";
+      memoUpdate.route_override_reason =
+        memoUpdate.route_override_reason?.trim() || "กำหนดผู้อนุมัติเองเป็นรายบุคคล (custom route)";
     } else {
       // No server-built route, so any person token here is client-authored. Same reasoning
       // as POST /api/memos: the token IS the approver's identity to canActOnStep, so a

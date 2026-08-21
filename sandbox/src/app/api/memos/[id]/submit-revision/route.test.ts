@@ -229,3 +229,65 @@ describe("POST /api/memos/[id]/submit-revision free-form body blocks", () => {
     expect(updateParams[index]).toBeNull();
   });
 });
+
+// IA (whole-branch review, fix round): POST /api/memos forces route_mode = "exception" and
+// backfills a generic reason whenever the resolver rebuilds a per-person route. This route
+// did not, so it wrote whatever routeMode the client sent. In free-form mode the client
+// always sends "recommended" (RoutingCard is never rendered, so routeReview.mode never
+// changes), which made drawer-panel hide the "Exception: <reason>" line on /queue from the
+// second revision onwards — silently undoing the reason W1 had just started recording.
+describe("POST /api/memos/[id]/submit-revision route_mode on a rebuilt custom route", () => {
+  function updateColumn(column: string): unknown {
+    const update = execute.mock.calls.find(([sql]) => String(sql).includes("UPDATE memos SET"));
+    expect(update).toBeDefined();
+    const sql = String(update![0]);
+    const index = sql
+      .slice(0, sql.indexOf("WHERE"))
+      .split(",")
+      .findIndex((c) => c.includes(column));
+    expect(index).toBeGreaterThanOrEqual(0);
+    return (update![1] as unknown[])[index];
+  }
+
+  beforeEach(() => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue({
+      status: "ok",
+      route: ["person:1#42"],
+      approvers: [{ stepKey: "person:1#42", userId: 42, name: "สมชาย ใจดี", approvalLevel: null, department: "IT" }],
+    } as never);
+  });
+
+  it("records a per-person route as an exception even when the client says recommended", async () => {
+    const memo = makeMemo({
+      selectedRoute: ["person:1#42"],
+      routeMode: "recommended",
+      routeOverrideReason: "ของด่วนหน้างาน หัวหน้าแผนกอนุมัติแทนได้",
+    });
+
+    const res = await POST(postRevision(memo, [{ userId: 42 }]), { params });
+
+    expect(res.status).toBe(200);
+    expect(updateColumn("route_mode")).toBe("exception");
+    expect(updateColumn("route_override_reason")).toBe("ของด่วนหน้างาน หัวหน้าแผนกอนุมัติแทนได้");
+  });
+
+  it("backfills the generic audit reason when the requester supplied none", async () => {
+    const memo = makeMemo({ selectedRoute: ["person:1#42"], routeMode: "recommended" });
+
+    const res = await POST(postRevision(memo, [{ userId: 42 }]), { params });
+
+    expect(res.status).toBe(200);
+    expect(updateColumn("route_mode")).toBe("exception");
+    expect(updateColumn("route_override_reason")).toBe("กำหนดผู้อนุมัติเองเป็นรายบุคคล (custom route)");
+  });
+
+  it("leaves route_mode alone when no per-person route was rebuilt", async () => {
+    vi.mocked(resolveCustomRouteFromRequest).mockResolvedValue({ status: "none" } as never);
+    const memo = makeMemo({ routeMode: "recommended", selectedRoute: ["General Manager"] });
+
+    const res = await POST(postRevision(memo), { params });
+
+    expect(res.status).toBe(200);
+    expect(updateColumn("route_mode")).toBe("recommended");
+  });
+});

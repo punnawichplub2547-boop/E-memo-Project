@@ -1523,7 +1523,10 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
    affordance as the per-row 🗑 in the trailing column. */
 .em-block-table-th { display: flex; align-items: center; gap: 4px; }
 .em-block-table-th .em-table-input { flex: 1; min-width: 0; }
-.em-block-table-th .em-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+/* No pointer-events:none here: it would suppress the button's own title tooltip
+   ("ตารางต้องมีอย่างน้อย 1 คอลัมน์"), which is the only thing telling the requester
+   WHY the control is greyed out — and it would make cursor:not-allowed dead too. */
+.em-block-table-th .em-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .em-block-kv { display: flex; flex-direction: column; gap: 8px; }
 .em-block-kv-row {
