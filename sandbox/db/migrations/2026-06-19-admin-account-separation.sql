@@ -22,7 +22,19 @@ SET NAMES utf8mb4;
 
 -- 1) Dedicated admin account.
 --    name "ผู้ดูแลระบบ E-Memo" (first/last split so CONCAT = the full label).
---    password: Admincar_1996  (bcrypt cost 12; change after first login)
+--    🔴 SECURITY: never write the plaintext password in this file. It used to be
+--    here in clear text, and this repository is PUBLIC — anyone could read the
+--    admin credentials for a system that is reachable from the internet. The
+--    plaintext lives in the owner's password manager and nowhere else.
+--
+--    The bcrypt hash below is a LOCAL-DEVELOPMENT seed and is public knowledge by
+--    definition (it is committed here, and the password it was built from was
+--    published). Treat it as compromised: on ANY database that is not a throwaway
+--    local one, rotate the password immediately after running this file —
+--      node -e "require('bcryptjs').hash('<new password>',12).then(console.log)"
+--      UPDATE users SET password_hash='<hash>' WHERE employee_card_id='ADMIN001';
+--    Re-running this migration RESETS the password back to the public seed, which
+--    is why it is deliberately excluded from scripts/deploy-prod.ps1.
 --    Idempotent: re-running refreshes the admin's core fields instead of erroring
 --    on the unique card_id/email.
 INSERT INTO users

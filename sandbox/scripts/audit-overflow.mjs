@@ -6,10 +6,20 @@
 import { chromium } from "playwright";
 
 const baseUrl = process.env.SANDBOX_URL ?? "http://localhost:3000";
-const creds = [
-  { email: "admin@car-1996.com", password: "Admincar_1996" },
-  { email: "punnawich@car-1996.com", password: "Admin@1234" },
-];
+// 🔴 SECURITY: these credentials used to be hardcoded here in clear text, and this
+// repository is PUBLIC. Supply them from the environment instead — they never
+// belong in a committed file:
+//   AUDIT_EMAIL=... AUDIT_PASSWORD=... npm run audit:overflow
+// Use a throwaway local account. Never point this script at production.
+const auditEmail = process.env.AUDIT_EMAIL;
+const auditPassword = process.env.AUDIT_PASSWORD;
+if (!auditEmail || !auditPassword) {
+  console.error(
+    "Set AUDIT_EMAIL and AUDIT_PASSWORD (a local, throwaway account) before running this audit.",
+  );
+  process.exit(1);
+}
+const creds = [{ email: auditEmail, password: auditPassword }];
 const pages = ["/", "/create", "/queue", "/history", "/search", "/report", "/admin", "/profile"];
 
 async function login(page) {

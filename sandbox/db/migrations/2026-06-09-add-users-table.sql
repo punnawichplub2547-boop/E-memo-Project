@@ -31,7 +31,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Seed admin: ปุณณวิช ภูประเสริฐ (IT Support Trainee)
--- Default password: Admin@1234  (change after first login)
+-- 🔴 SECURITY: the plaintext default password used to be written here, and this
+-- repository is PUBLIC. It has been removed. The hash below is a local-development
+-- seed and must be treated as compromised — rotate it on any database that is not
+-- a throwaway local one:
+--   node -e "require('bcryptjs').hash('<new password>',12).then(console.log)"
+--   UPDATE users SET password_hash='<hash>' WHERE employee_card_id='6905003S';
 INSERT INTO users
   (employee_card_id, email, first_name, last_name, password_hash, department, roles_json, approval_level, status)
 VALUES (

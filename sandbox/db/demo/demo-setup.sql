@@ -12,8 +12,11 @@ SET first_name = 'ปุณณวิช', last_name = 'ภูประเสร�
 WHERE employee_card_id = '6905003S';
 
 -- 2. Add MD demo account
---    Password: Admin@1234 (same hash as admin account)
 --    Login: md@car-1996.com
+--    🔴 SECURITY: the plaintext password used to be written here, and this
+--    repository is PUBLIC. It has been removed. This is DEMO data for a local
+--    database only — never run this file against production, and rotate the
+--    password if it ever reached a reachable environment.
 INSERT INTO users
   (employee_card_id, email, first_name, last_name, password_hash, department, roles_json, approval_level, status)
 VALUES (
