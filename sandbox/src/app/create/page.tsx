@@ -120,6 +120,16 @@ function CreatePageContent() {
       previousRouteSourceRef.current = null;
     }
     bodyBlocks.setFormMode(mode);
+    // H3 (UX review): the block editor — the whole point of free-form — sits
+    // below the fold on /create, so switching mode used to look like nothing
+    // happened. Bring it into view on the next paint, once it has rendered.
+    if (mode === "freeform") {
+      requestAnimationFrame(() => {
+        document
+          .querySelector(".em-block-editor")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
   };
 
   const {
@@ -280,7 +290,7 @@ function CreatePageContent() {
             <StepDot n="2" label="เส้นทางอนุมัติ" active />
             <div className="em-create-step-connector is-second" aria-hidden="true" />
             <StepDot n="3" label="ตรวจทานและส่ง" active />
-            <span className="em-create-step-note">แบบฟอร์มเดียว</span>
+            <span className="em-create-step-note">กรอกจบในหน้าเดียว</span>
           </div>
 
           <FormModeToggle

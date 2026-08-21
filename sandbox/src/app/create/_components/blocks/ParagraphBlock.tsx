@@ -7,6 +7,7 @@ export function ParagraphBlock({ text, onChange }: Props) {
     <textarea
       className="em-textarea"
       rows={4}
+      aria-label="เนื้อความของย่อหน้า"
       value={text}
       placeholder="พิมพ์เนื้อความ เช่น เนื่องจากเครื่องจักรสายการผลิตขัดข้อง..."
       onChange={(e) => onChange(e.target.value)}

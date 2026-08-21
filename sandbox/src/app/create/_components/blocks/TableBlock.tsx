@@ -10,7 +10,7 @@ import {
   removeTableRow,
   removeTableColumn,
 } from "@/lib/memo-body-blocks";
-import { IconTrash } from "@/components/icons";
+import { IconTrash, IconX } from "@/components/icons";
 
 type Props = {
   headers: string[];
@@ -47,31 +47,47 @@ export function TableBlock({ headers, rows, onChange }: Props) {
           className="em-table"
           style={{ minWidth: Math.max(240, headers.length * 150) }}
         >
+          {/* H4 (UX review): the column-delete button used to live inside the same
+              <th> as the header input, which made every header input exactly one
+              button narrower than the <td> inputs below it — headers and cells
+              never lined up, and the misalignment compounded across 8 columns. It
+              also meant two identical red trash icons on screen with different
+              blast radii (whole column vs one row). Now: a thin control row above
+              the headers, and a grey ✕ for "remove column" so the trash icon means
+              exactly one thing — remove row. */}
           <thead>
+            <tr className="em-block-table-colbar">
+              {headers.map((header, i) => (
+                <th key={i}>
+                  <button
+                    type="button"
+                    className="em-btn sm icon-only ghost em-block-table-colremove"
+                    onClick={() => removeColumn(i)}
+                    disabled={headers.length <= 1}
+                    title={headers.length <= 1 ? "ตารางต้องมีอย่างน้อย 1 คอลัมน์" : "ลบคอลัมน์นี้ทุกแถว"}
+                    aria-label={`ลบคอลัมน์ ${header.trim() || i + 1} ทุกแถว`}
+                  >
+                    <IconX size={12} />
+                  </button>
+                </th>
+              ))}
+              <th />
+            </tr>
             <tr>
               {headers.map((header, i) => (
                 <th key={i}>
-                  <div className="em-block-table-th">
-                    <input
-                      className="em-table-input"
-                      value={header}
-                      placeholder={`คอลัมน์ ${i + 1}`}
-                      onChange={(e) => setHeader(i, e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="em-btn sm icon-only danger"
-                      onClick={() => removeColumn(i)}
-                      disabled={headers.length <= 1}
-                      title={headers.length <= 1 ? "ตารางต้องมีอย่างน้อย 1 คอลัมน์" : undefined}
-                      aria-label={`ลบคอลัมน์ ${i + 1}`}
-                    >
-                      <IconTrash size={13} />
-                    </button>
-                  </div>
+                  <input
+                    className="em-table-input"
+                    value={header}
+                    placeholder={`คอลัมน์ ${i + 1}`}
+                    aria-label={`ชื่อคอลัมน์ที่ ${i + 1}`}
+                    onChange={(e) => setHeader(i, e.target.value)}
+                  />
                 </th>
               ))}
-              <th aria-label="ลบแถว" />
+              {/* M8: a header cell whose only job is to sit above the row-delete
+                  column. Named for screen readers, blank for the eye. */}
+              <th><span className="em-sr-only">ลบแถว</span></th>
             </tr>
           </thead>
           <tbody>
@@ -82,6 +98,7 @@ export function TableBlock({ headers, rows, onChange }: Props) {
                     <input
                       className="em-table-input"
                       value={cell}
+                      aria-label={`${headers[c]?.trim() || `คอลัมน์ ${c + 1}`} — แถวที่ ${r + 1}`}
                       onChange={(e) => setCell(r, c, e.target.value)}
                     />
                   </td>
@@ -91,7 +108,8 @@ export function TableBlock({ headers, rows, onChange }: Props) {
                     type="button"
                     className="em-btn sm icon-only danger"
                     onClick={() => removeRow(r)}
-                    aria-label="ลบแถวนี้"
+                    aria-label={`ลบแถวที่ ${r + 1}`}
+                    title="ลบแถวนี้"
                   >
                     <IconTrash size={13} />
                   </button>

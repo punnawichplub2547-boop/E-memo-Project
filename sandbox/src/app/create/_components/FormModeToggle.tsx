@@ -61,7 +61,43 @@ export function FormModeToggle({
 
   return (
     <div className="em-form-mode-toggle">
-      {confirmingClear ? (
+      {/* M9 (UX review): the labels used to describe only the side effect
+          ("ระบบแนะนำสายอนุมัติ" / "เลือกผู้อนุมัติเอง"), so the control read as "how do I
+          pick approvers" rather than "which form am I filling in". Two lines: the
+          mode on top, the consequence underneath — which also fixes H2, because
+          the single-line labels were ~560px wide inside a ~358px phone and the
+          first one was cut off mid-word with no hint that it scrolled. */}
+      <div className="em-eyebrow" style={{ marginBottom: 6 }}>รูปแบบฟอร์ม / Form mode</div>
+      <div className="em-tabs em-form-mode-tabs" role="tablist" aria-label="รูปแบบฟอร์ม">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={formMode === "standard"}
+          className={`em-tab em-form-mode-tab ${formMode === "standard" ? "active" : ""}`}
+          disabled={disabled}
+          title={disabled ? "รูปแบบฟอร์มถูกล็อกไว้ตั้งแต่ส่งครั้งแรก" : undefined}
+          onClick={() => handlePick("standard")}
+        >
+          <span className="em-form-mode-tab-name">ฟอร์มซื้อ/จ้าง</span>
+          <span className="em-form-mode-tab-sub">ฟอร์มมาตรฐาน · ระบบแนะนำสายอนุมัติ</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={formMode === "freeform"}
+          className={`em-tab em-form-mode-tab ${formMode === "freeform" ? "active" : ""}`}
+          disabled={disabled}
+          title={disabled ? "รูปแบบฟอร์มถูกล็อกไว้ตั้งแต่ส่งครั้งแรก" : undefined}
+          onClick={() => handlePick("freeform")}
+        >
+          <span className="em-form-mode-tab-name">ฟอร์มอิสระ</span>
+          <span className="em-form-mode-tab-sub">เขียนเนื้อหาเอง · เลือกผู้อนุมัติเอง</span>
+        </button>
+      </div>
+      {/* L1 (UX review): the confirmation used to REPLACE the tablist, so while it
+          was open the requester could not see which mode they were in. It sits
+          under the tabs now instead. */}
+      {confirmingClear && (
         <div className="em-form-mode-confirm" role="alert">
           <span className="em-form-mode-confirm-text">
             สลับกลับฟอร์มซื้อ/จ้างจะล้างเนื้อหาที่พิมพ์ไว้ในฟอร์มอิสระทั้งหมด ยืนยันหรือไม่?
@@ -81,29 +117,6 @@ export function FormModeToggle({
             onClick={() => setConfirmingClear(false)}
           >
             <IconX size={12} /> ยกเลิก
-          </button>
-        </div>
-      ) : (
-        <div className="em-tabs em-form-mode-tabs" role="tablist" aria-label="รูปแบบฟอร์ม">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={formMode === "standard"}
-            className={`em-tab ${formMode === "standard" ? "active" : ""}`}
-            disabled={disabled}
-            onClick={() => handlePick("standard")}
-          >
-            ฟอร์มซื้อ/จ้าง — ระบบแนะนำสายอนุมัติ
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={formMode === "freeform"}
-            className={`em-tab ${formMode === "freeform" ? "active" : ""}`}
-            disabled={disabled}
-            onClick={() => handlePick("freeform")}
-          >
-            ฟอร์มอิสระ — เลือกผู้อนุมัติเอง
           </button>
         </div>
       )}

@@ -734,10 +734,6 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   flex: 1;
   min-width: 0;
 }
-.em-create-assistant-tabs .em-tab {
-  border: 0;
-  background: transparent;
-}
 /* Collapse button: hidden on mobile, shown on desktop via @media below */
 .em-create-assistant-collapse {
   display: none;
@@ -1268,11 +1264,19 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
 /* ===== Tabs ===== */
 .em-tabs { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+/* H1 (UX review): the border/background reset used to live only on
+   .em-create-assistant-tabs .em-tab, so every OTHER <button class="em-tab">
+   rendered with the UA stylesheet’s outset border and buttonface grey — which
+   also swallowed .em-tab.active’s white pill. The /queue, /history and /search
+   tabs escaped only because they are <div>s. Resetting here fixes the mode
+   toggle and the V2 route-source tabs at once, and is a no-op for the divs. */
 .em-tab {
   padding: 7px 12px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
+  border: 0;
+  background: transparent;
   border-radius: 7px;
   cursor: pointer;
   display: flex; align-items: center; gap: 6px;
@@ -1496,14 +1500,40 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-block-tools { display: flex; align-items: center; gap: 4px; }
 /* No pointer-events:none: it suppresses the button’s own title tooltip, which is
    the only thing explaining why a control is greyed out, and it makes
-   cursor:not-allowed dead too. Same reasoning as .em-block-table-th below. */
+   cursor:not-allowed dead too. Same reasoning as .em-block-table-colbar below. */
 .em-block-tools .em-btn:disabled,
+.em-block-tools .em-btn[aria-disabled="true"],
 .em-block-table-actions .em-btn:disabled,
 .em-block-add .em-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
+/* H3 (UX review): switching into free-form used to change almost nothing on
+   screen — the editor was a ~110px strip holding one grey sentence. A real
+   working area with one primary action. Not a hero: no artwork, no oversized
+   type, it is the drop zone the card exists for. */
+.em-block-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 20px 16px;
+  text-align: center;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.em-block-empty-title { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.em-block-empty-sub { font-size: 11.5px; color: var(--muted); line-height: 1.5; max-width: 420px; }
+.em-block-add-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 2px;
+  background: var(--line-2);
+}
 .em-block-add {
   display: flex;
   flex-wrap: wrap;
@@ -1523,14 +1553,33 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
    here overflowed a 390px screen even for a 1-column table (UX review C2). */
 .em-block-table .em-table { width: 100%; }
 .em-block-table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-/* Header cell = the column name input plus its own delete control, same
-   affordance as the per-row delete button in the trailing column. */
-.em-block-table-th { display: flex; align-items: center; gap: 4px; }
-.em-block-table-th .em-table-input { flex: 1; min-width: 0; }
+/* H4 (UX review): the column-remove control moved out of the header cell into its
+   own thin row above it, so header inputs and body inputs finally share a width. */
+/* Specificity has to beat `.em-table thead th` (0,1,2), which paints the header
+   band and a bottom border — this control row is neither. text-align:right puts
+   each ✕ over the right edge of the column it removes. */
+.em-block-table tr.em-block-table-colbar th {
+  padding: 2px 4px 0;
+  border-bottom: 0;
+  background: transparent;
+  text-align: right;
+}
+.em-block-table-colremove { display: inline-flex; }
 /* No pointer-events:none here: it would suppress the button's own title tooltip
    ("ตารางต้องมีอย่างน้อย 1 คอลัมน์"), which is the only thing telling the requester
    WHY the control is greyed out — and it would make cursor:not-allowed dead too. */
-.em-block-table-th .em-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.em-block-table tr.em-block-table-colbar .em-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+/* Screen-reader-only label: header cells that must be named for assistive tech but
+   stay blank on screen. */
+.em-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .em-block-kv { display: flex; flex-direction: column; gap: 8px; }
 .em-block-kv-row {
@@ -1542,6 +1591,32 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 
 /* ===== /create form-mode switch (FormModeToggle) ===== */
 .em-form-mode-toggle { display: grid; gap: 6px; margin: -2px 0 2px; }
+/* M9/H2 (UX review): two-line labels — the mode on top, what it means underneath.
+   flex-basis 0 + flex:1 makes the two tabs share the row evenly instead of
+   sizing to their text, which is what overflowed a phone before. */
+.em-form-mode-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  text-align: left;
+  padding: 8px 12px;
+  white-space: normal;
+}
+.em-form-mode-tab-name { font-size: 12.5px; font-weight: 700; }
+.em-form-mode-tab-sub {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.em-form-mode-tab.active .em-form-mode-tab-sub { color: var(--ink-2); }
+@media (max-width: 480px) {
+  /* Below this the two-up row gets too cramped for the sub-label to breathe. */
+  .em-form-mode-tabs { flex-wrap: wrap; }
+  .em-form-mode-tab { flex: 1 1 100%; }
+}
 .em-form-mode-tabs .em-tab:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1570,6 +1645,29 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   border: 1px solid rgba(220,38,38,0.25);
 }
 .em-block-confirm-text { font-size: 12px; font-weight: 600; color: #B91C1C; }
+/* M10 (UX review): Request Items / Price Comparison carry their own top-level
+   eyebrow. Rendered INSIDE the memo body they read as a sibling of it, so they
+   get indented and their eyebrow de-emphasised. */
+.em-memo-body-system {
+  padding-left: 12px;
+  border-left: 2px solid var(--line-2);
+}
+.em-memo-body-system .em-eyebrow {
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+/* M7 (UX review): a body table wider than the drawer scrolls, but nothing said so —
+   an approver on a phone could miss the last column entirely, and the column cap is
+   8. background-attachment:local means the shadows only appear on the side that
+   still has content to scroll to. Scoped to memo-body tables so the rest of the
+   app’s .em-table-scroll users are untouched. */
+.em-memo-body-table .em-table-scroll {
+  background:
+    linear-gradient(to right, var(--surface) 30%, rgba(255,255,255,0)) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, rgba(255,255,255,0)) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(15,23,42,0.16), rgba(15,23,42,0)) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(15,23,42,0.16), rgba(15,23,42,0)) right center / 14px 100% no-repeat scroll;
+}
 .em-form-mode-lock-note {
   font-size: 11.5px;
   color: var(--muted);

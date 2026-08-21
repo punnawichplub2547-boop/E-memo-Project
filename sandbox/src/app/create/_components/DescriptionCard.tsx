@@ -86,10 +86,14 @@ export function DescriptionCard({
                 เริ่มจากใบเสนอราคา / Start with quotation
               </div>
               <div style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.55 }}>
-                อ่าน PDF เพื่อเติมข้อมูลผู้ขาย ราคา ส่วนลด และ VAT ต่อแถวลงใน Price Comparison ด้านล่าง
+                {isFreeform
+                  ? "อ่าน PDF เพื่อเติมข้อมูลผู้ขาย ราคา ส่วนลด และ VAT — จะแสดงในเมโมเมื่อเพิ่มบล็อก \"ตารางเปรียบเทียบราคา\" ในเนื้อหาเมโม"
+                  : "อ่าน PDF เพื่อเติมข้อมูลผู้ขาย ราคา ส่วนลด และ VAT ต่อแถวลงใน Price Comparison ด้านล่าง"}
               </div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 5 }}>
-                หากไม่มีไฟล์ PDF สามารถกรอกข้อมูลผู้ขายเองด้านล่างได้
+                {isFreeform
+                  ? "หากไม่มีไฟล์ PDF สามารถเพิ่มบล็อกแล้วกรอกข้อมูลผู้ขายเองได้"
+                  : "หากไม่มีไฟล์ PDF สามารถกรอกข้อมูลผู้ขายเองด้านล่างได้"}
               </div>
             </div>
           </div>

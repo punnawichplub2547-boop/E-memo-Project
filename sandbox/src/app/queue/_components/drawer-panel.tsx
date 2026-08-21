@@ -217,11 +217,19 @@ export function DrawerPanel({
           </div>
         </section>
 
-        {/* 3. Description / เหตุผลการขอ */}
+        {/* 3. Description / เหตุผลการขอ
+            H5 + L7 (UX review): in free-form mode this field is the short summary
+            (/create labels it "สรุปย่อ") and the memo body below is the document.
+            It used to be titled and styled identically to the body's first
+            paragraph, so an approver had to read both to work out which one was
+            the actual memo. In standard mode the description IS the content, so
+            nothing there changes. */}
         <section>
-          <div className="em-eyebrow" style={{ marginBottom: 6 }}>เหตุผลการขอ / Description</div>
+          <div className="em-eyebrow" style={{ marginBottom: 6 }}>
+            {memo.formMode === "freeform" ? "สรุปย่อ / Summary" : "เหตุผลการขอ / Description"}
+          </div>
           {memo.description ? (
-            <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ink-2)", margin: 0, padding: "12px 14px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--line)", whiteSpace: "pre-wrap" }}>
+            <p style={{ fontSize: memo.formMode === "freeform" ? 12.5 : 13, lineHeight: 1.7, color: "var(--ink-2)", margin: 0, padding: "12px 14px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)", whiteSpace: "pre-wrap" }}>
               {memo.description}
             </p>
           ) : (

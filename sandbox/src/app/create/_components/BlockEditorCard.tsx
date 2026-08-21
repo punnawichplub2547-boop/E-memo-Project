@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { UseBodyBlocksResult } from "../_hooks/useBodyBlocks";
 import { blockHasContent } from "@/lib/memo-body-blocks";
-import { IconArrowUp, IconArrowDown, IconTrash, IconCheck, IconX } from "@/components/icons";
+import { IconArrowUp, IconArrowDown, IconTrash, IconCheck, IconX, IconFileText } from "@/components/icons";
 import { ParagraphBlock } from "./blocks/ParagraphBlock";
 import { TableBlock } from "./blocks/TableBlock";
 import { KeyValueBlock } from "./blocks/KeyValueBlock";
@@ -14,6 +14,17 @@ const BLOCK_TITLE = {
   keyValue: "หัวข้อ–ค่า",
   system: "บล็อกระบบ",
 } as const;
+
+// M3 (UX review): both system blocks used to show the same "บล็อกระบบ" label,
+// so Request Items and Price Comparison were indistinguishable in the list.
+const SYSTEM_TITLE = {
+  requestItems: "รายการที่ขอ",
+  priceComparison: "ตารางเปรียบเทียบราคา",
+} as const;
+
+function blockLabel(block: { type: keyof typeof BLOCK_TITLE; ref?: keyof typeof SYSTEM_TITLE }) {
+  return block.type === "system" && block.ref ? SYSTEM_TITLE[block.ref] : BLOCK_TITLE[block.type];
+}
 
 type Props = {
   body: UseBodyBlocksResult;
@@ -47,18 +58,38 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
 
   return (
     <div className="em-card em-block-editor">
+      {/* M4 (UX review): match the card-head pattern every other card on /create
+          uses — icon chip + Thai/English + .em-sub. */}
       <div className="em-card-head">
-        <h3>เนื้อหาเมโม</h3>
+        <div>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 26, height: 26, borderRadius: 7, background: "var(--primary-soft)", color: "var(--primary)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+              <IconFileText size={14} />
+            </span>
+            เนื้อหาเมโม / Memo Body
+          </h3>
+          <div className="em-sub" style={{ marginTop: 2 }}>
+            เรียงบล็อกได้ตามต้องการ — ย่อหน้า ตาราง หัวข้อ–ค่า และการ์ดจากฟอร์มเดิม
+          </div>
+        </div>
       </div>
       <div className="em-card-body">
         {blocks.length === 0 ? (
-          <p className="em-hint">ยังไม่มีเนื้อหา — กด &quot;เพิ่มบล็อก&quot; ด้านล่างเพื่อเริ่ม</p>
+          <div className="em-block-empty">
+            <div className="em-block-empty-title">เริ่มเขียนเนื้อหาเมโม</div>
+            <div className="em-block-empty-sub">
+              เริ่มจากย่อหน้าหนึ่ง แล้วค่อยเพิ่มตาราง หัวข้อ–ค่า หรือการ์ดจากฟอร์มเดิม ตามลำดับที่ต้องการ
+            </div>
+            <button type="button" className="em-btn sm" onClick={() => addBlock("paragraph")}>
+              + ย่อหน้า
+            </button>
+          </div>
         ) : null}
 
         {blocks.map((block, index) => (
           <div key={block.id} className="em-block">
             <header className="em-block-head">
-              <span className="em-block-kind">{BLOCK_TITLE[block.type]}</span>
+              <span className="em-block-kind">{blockLabel(block)}</span>
               {confirmingId === block.id ? (
                 <span className="em-block-confirm" role="alert">
                   <span className="em-block-confirm-text">
@@ -69,7 +100,7 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
                   <button
                     type="button"
                     className="em-btn sm"
-                    aria-label={`ยืนยันลบบล็อก${BLOCK_TITLE[block.type]}`}
+                    aria-label={`ยืนยันลบบล็อก${blockLabel(block)}`}
                     onClick={() => confirmRemove(block.id)}
                   >
                     <IconCheck size={12} /> ยืนยัน
@@ -89,7 +120,7 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
                     type="button"
                     className="em-btn sm icon-only ghost"
                     aria-label="เลื่อนขึ้น"
-                    disabled={index === 0}
+                    {...(index === 0 ? { "aria-disabled": true } : {})}
                     onClick={() => moveBlockBy(block.id, -1)}
                   >
                     <IconArrowUp size={13} />
@@ -98,7 +129,7 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
                     type="button"
                     className="em-btn sm icon-only ghost"
                     aria-label="เลื่อนลง"
-                    disabled={index === blocks.length - 1}
+                    {...(index === blocks.length - 1 ? { "aria-disabled": true } : {})}
                     onClick={() => moveBlockBy(block.id, 1)}
                   >
                     <IconArrowDown size={13} />
@@ -139,7 +170,7 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
         ))}
 
         <div className="em-block-add">
-          <button type="button" className="em-btn sm ghost" onClick={() => addBlock("paragraph")}>
+          <button type="button" className="em-btn sm" onClick={() => addBlock("paragraph")}>
             + ย่อหน้า
           </button>
           <button type="button" className="em-btn sm ghost" onClick={() => addBlock("table")}>
@@ -148,10 +179,14 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
           <button type="button" className="em-btn sm ghost" onClick={() => addBlock("keyValue")}>
             + หัวข้อ–ค่า
           </button>
+          {/* M3: these two do not create content — they place a card the requester
+              fills in elsewhere — so they are separated from the three above. */}
+          <span className="em-block-add-divider" aria-hidden="true" />
           <button
             type="button"
             className="em-btn sm ghost"
             disabled={isSystemBlockUsed("priceComparison")}
+            title={isSystemBlockUsed("priceComparison") ? "เพิ่มไว้ในเนื้อหาแล้ว" : undefined}
             onClick={() => addBlock("system", "priceComparison")}
           >
             + ตารางเปรียบเทียบราคา
@@ -160,6 +195,7 @@ export function BlockEditorCard({ body, systemSlots }: Props) {
             type="button"
             className="em-btn sm ghost"
             disabled={isSystemBlockUsed("requestItems")}
+            title={isSystemBlockUsed("requestItems") ? "เพิ่มไว้ในเนื้อหาแล้ว" : undefined}
             onClick={() => addBlock("system", "requestItems")}
           >
             + รายการที่ขอ

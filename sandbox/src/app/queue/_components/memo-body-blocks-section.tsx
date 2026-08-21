@@ -26,15 +26,15 @@ const EMPTY_STYLE: CSSProperties = {
   fontStyle: "italic",
 };
 
+// H5 (UX review): a paragraph is prose, not a widget. Boxing every one of them
+// made the memo body read as three form widgets instead of continuous text.
+// The border now means "structured data" (table / key-value) and nothing else.
 const PARAGRAPH_STYLE: CSSProperties = {
-  fontSize: 13,
-  lineHeight: 1.7,
-  color: "var(--ink-2)",
+  fontSize: 13.5,
+  lineHeight: 1.75,
+  color: "var(--ink)",
   margin: 0,
-  padding: "12px 14px",
-  borderRadius: 10,
-  background: "var(--surface)",
-  border: "1px solid var(--line)",
+  padding: "2px 2px 6px",
   whiteSpace: "pre-wrap",
 };
 
@@ -49,9 +49,9 @@ const KV_CARD_STYLE: CSSProperties = {
 };
 
 const KV_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
+  display: "grid",
+  gridTemplateColumns: "minmax(120px, 200px) 1fr",
+  alignItems: "baseline",
   gap: 12,
   margin: 0,
 };
@@ -95,7 +95,7 @@ export function MemoBodyBlocksSection({ memo, systemSlots }: Props) {
                   {block.pairs.map((pair, i) => (
                     <div key={i} style={KV_ROW_STYLE}>
                       <dt style={{ color: "var(--muted)" }}>{pair.key || "—"}</dt>
-                      <dd style={{ margin: 0, color: "var(--ink)", fontWeight: 500, textAlign: "right" }}>
+                      <dd style={{ margin: 0, color: "var(--ink)", fontWeight: 500 }}>
                         {pair.value || "—"}
                       </dd>
                     </div>
@@ -106,7 +106,7 @@ export function MemoBodyBlocksSection({ memo, systemSlots }: Props) {
 
             if (block.type === "table") {
               return (
-                <div key={block.id} style={TABLE_WRAP_STYLE}>
+                <div key={block.id} className="em-memo-body-table" style={TABLE_WRAP_STYLE}>
                   {/* .em-table-scroll: the project's existing mobile-overflow-safety
                       wrapper (globals.css) — transparent on desktop, becomes a real
                       overflow-x scroller under the 768px breakpoint. Reused here
@@ -137,7 +137,14 @@ export function MemoBodyBlocksSection({ memo, systemSlots }: Props) {
 
             // block.type === "system": render the real Request Items / Price
             // Comparison JSX passed in via systemSlots — never a copy.
-            return <div key={block.id}>{systemSlots[block.ref]}</div>;
+            // M10 (UX review): these carry their own top-level-looking eyebrow.
+            // Indented and de-emphasised so they read as part of the body rather
+            // than as a sibling section of it.
+            return (
+              <div key={block.id} className="em-memo-body-system">
+                {systemSlots[block.ref]}
+              </div>
+            );
           })}
         </div>
       )}
