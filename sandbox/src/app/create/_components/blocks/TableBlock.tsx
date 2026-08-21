@@ -10,6 +10,7 @@ import {
   removeTableRow,
   removeTableColumn,
 } from "@/lib/memo-body-blocks";
+import { IconTrash } from "@/components/icons";
 
 type Props = {
   headers: string[];
@@ -39,7 +40,13 @@ export function TableBlock({ headers, rows, onChange }: Props) {
   return (
     <div className="em-block-table">
       <div className="em-block-table-scroll">
-        <table className="em-table">
+        {/* C2 (UX review): min-width now grows with the column count instead of a
+            flat 480px, which pushed the row/column delete buttons off a 390px
+            screen even for a 1-column table. Wide tables still scroll. */}
+        <table
+          className="em-table"
+          style={{ minWidth: Math.max(240, headers.length * 150) }}
+        >
           <thead>
             <tr>
               {headers.map((header, i) => (
@@ -59,7 +66,7 @@ export function TableBlock({ headers, rows, onChange }: Props) {
                       title={headers.length <= 1 ? "ตารางต้องมีอย่างน้อย 1 คอลัมน์" : undefined}
                       aria-label={`ลบคอลัมน์ ${i + 1}`}
                     >
-                      🗑
+                      <IconTrash size={13} />
                     </button>
                   </div>
                 </th>
@@ -86,7 +93,7 @@ export function TableBlock({ headers, rows, onChange }: Props) {
                     onClick={() => removeRow(r)}
                     aria-label="ลบแถวนี้"
                   >
-                    🗑
+                    <IconTrash size={13} />
                   </button>
                 </td>
               </tr>

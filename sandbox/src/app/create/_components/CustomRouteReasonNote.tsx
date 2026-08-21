@@ -31,7 +31,14 @@ export function CustomRouteReasonNote({
       <div className="em-card-head">
         <div>
           <h3>เทียบกับข้อเสนอแนะ Book1</h3>
-          <div className="em-sub">ใช้เป็นข้อมูลอ้างอิง — ไม่ผูกกับสายที่เลือกเอง (Customize route เอง) ด้านล่าง</div>
+          {/* C1 (UX review): when a reason is required this card is the one
+              mandatory gate of the whole feature — it must not describe itself
+              as reference-only while holding a required field. */}
+          <div className="em-sub">
+            {requiresReason
+              ? "ต้องกรอกเหตุผลข้างล่างก่อนจึงส่งขออนุมัติได้ — สายที่เลือกเองต่ำกว่าที่ Book1 แนะนำ"
+              : "ใช้เป็นข้อมูลอ้างอิง — ไม่ผูกกับสายที่เลือกเอง (Customize route เอง) ด้านล่าง"}
+          </div>
         </div>
         {/* Derived, not hardcoded: this badge names the Book1 recommendation, and this
             card exists to make the gap between that tier and the picked route visible —
@@ -58,7 +65,13 @@ export function CustomRouteReasonNote({
             </label>
             <textarea
               className="em-textarea"
-              style={{ minHeight: 72 }}
+              aria-invalid={routeOverrideReason.trim() === "" ? true : undefined}
+              style={{
+                minHeight: 72,
+                ...(routeOverrideReason.trim() === ""
+                  ? { borderColor: "var(--rose)" }
+                  : null),
+              }}
               placeholder="ระบุเหตุผล เช่น คุยกับผู้อนุมัติแล้ว / เรื่องเร่งด่วน"
               value={routeOverrideReason}
               onChange={(e) => onRouteOverrideReasonChange(e.target.value)}

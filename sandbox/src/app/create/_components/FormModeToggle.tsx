@@ -110,17 +110,22 @@ export function FormModeToggle({
       {disabled && (
         <div className="em-form-mode-lock-note">รูปแบบฟอร์มถูกล็อกไว้ตั้งแต่ส่งครั้งแรก</div>
       )}
+      {/* C1 (UX review): these two conditions BLOCK submission, so they get the
+          warning voice (.em-hint-warn) and role="alert". Only the "mode is locked"
+          line above stays .em-form-mode-lock-note — that one is genuinely info.
+          Before this, a message that stopped the requester from finishing their
+          work was rendered in the smallest, faintest text on the page. */}
       {formMode === "freeform" && customRoutePeopleCount === 0 && (
-        <div className="em-form-mode-lock-note">
+        <div className="em-hint-warn em-form-mode-block-note" role="alert">
           ฟอร์มอิสระต้องเลือกผู้อนุมัติเองอย่างน้อย 1 คน — บันทึกร่างหรือส่งขออนุมัติไม่ได้จนกว่าจะเลือก
         </div>
       )}
       {formMode === "freeform" && needsRouteOverrideReason && (
-        <div className="em-form-mode-lock-note">
+        <div className="em-hint-warn em-form-mode-block-note" role="alert">
           <span>
             ผู้อนุมัติที่เลือกต่ำกว่าที่ Book1 แนะนำ — ต้องกรอกเหตุผลก่อนจึงจะส่งขออนุมัติได้
           </span>
-          <button type="button" className="em-btn sm ghost" onClick={onGoToRoutingTab}>
+          <button type="button" className="em-btn sm" onClick={onGoToRoutingTab}>
             ไปกรอกเหตุผลที่แท็บ &quot;เส้นทางอนุมัติ&quot;
           </button>
         </div>

@@ -61,6 +61,35 @@ export function shouldConfirmFormModeSwitch(targetMode: MemoFormMode, blockCount
   return targetMode === "standard" && blockCount > 0;
 }
 
+/**
+ * Does this block hold anything the requester would be upset to lose?
+ *
+ * Deleting a block is instant and there is no undo anywhere in the app, while
+ * the far lighter "switch back to standard" already asks for confirmation
+ * (shouldConfirmFormModeSwitch above). The editor uses this to protect the
+ * blocks that matter without nagging about an empty one just added by mistake.
+ *
+ * A "system" block is always protected even though it carries no text of its
+ * own: removing it makes the server null out the request-items or
+ * price-comparison column it points at (resolveBodyBlocksFromRequest's clear*
+ * flags), which is real data loss.
+ */
+export function blockHasContent(block: MemoBodyBlock): boolean {
+  switch (block.type) {
+    case "paragraph":
+      return block.text.trim() !== "";
+    case "table":
+      return (
+        block.headers.some((h) => h.trim() !== "") ||
+        block.rows.some((row) => row.some((cell) => cell.trim() !== ""))
+      );
+    case "keyValue":
+      return block.pairs.some((p) => p.key.trim() !== "" || p.value.trim() !== "");
+    case "system":
+      return true;
+  }
+}
+
 export type TableBlockValue = { headers: string[]; rows: string[][] };
 export type KeyValuePair = { key: string; value: string };
 

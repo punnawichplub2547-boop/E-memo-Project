@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   moveBlock, removeBlock, hasSystemBlock, createBlock,
   setTableHeader, setTableCell, addTableColumn, addTableRow, removeTableRow, removeTableColumn,
-  setKeyValuePair, MAX_TABLE_COLUMNS, shouldConfirmFormModeSwitch,
+  setKeyValuePair, MAX_TABLE_COLUMNS, shouldConfirmFormModeSwitch, blockHasContent,
   type MemoBodyBlock,
 } from "./memo-body-blocks";
 
@@ -243,5 +243,38 @@ describe("setKeyValuePair", () => {
     const pairs = [{ key: "a", value: "1" }];
     setKeyValuePair(pairs, 0, { key: "changed" });
     expect(pairs).toEqual([{ key: "a", value: "1" }]);
+  });
+});
+
+// C3 (UX review): deleting a block is instant and irreversible, while the far
+// lighter "switch back to standard" action already asks for confirmation. The
+// editor needs to know whether a block is worth protecting — an empty block a
+// requester just added by mistake should still delete in one click.
+describe("blockHasContent", () => {
+  it("treats an untouched paragraph as empty but a typed one as content", () => {
+    expect(blockHasContent({ id: "a", type: "paragraph", text: "" })).toBe(false);
+    expect(blockHasContent({ id: "a", type: "paragraph", text: "   \n  " })).toBe(false);
+    expect(blockHasContent({ id: "a", type: "paragraph", text: "เนื้อหา" })).toBe(true);
+  });
+
+  it("counts a typed table header as content, not just body cells", () => {
+    expect(blockHasContent({ id: "t", type: "table", headers: [""], rows: [[""]] })).toBe(false);
+    expect(blockHasContent({ id: "t", type: "table", headers: ["ลำดับ"], rows: [[""]] })).toBe(true);
+    expect(blockHasContent({ id: "t", type: "table", headers: [""], rows: [["1"]] })).toBe(true);
+  });
+
+  it("counts either half of a key-value pair as content", () => {
+    expect(blockHasContent({ id: "k", type: "keyValue", pairs: [{ key: "", value: "" }] })).toBe(false);
+    expect(blockHasContent({ id: "k", type: "keyValue", pairs: [{ key: "ผู้ติดต่อ", value: "" }] })).toBe(true);
+    expect(blockHasContent({ id: "k", type: "keyValue", pairs: [{ key: "", value: "ฝ่าย IT" }] })).toBe(true);
+  });
+
+  // A system block carries no text of its own, but removing it makes the server
+  // null out the request-items / price-comparison column it points at
+  // (resolveBodyBlocksFromRequest's clear* flags). That is real data loss, so it
+  // is never a one-click delete.
+  it("always protects a system block, because deleting it clears the data it points at", () => {
+    expect(blockHasContent({ id: "s", type: "system", ref: "requestItems" })).toBe(true);
+    expect(blockHasContent({ id: "s", type: "system", ref: "priceComparison" })).toBe(true);
   });
 });

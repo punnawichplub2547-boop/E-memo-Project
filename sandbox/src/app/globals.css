@@ -1494,12 +1494,14 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   border: 1px solid var(--primary-soft);
 }
 .em-block-tools { display: flex; align-items: center; gap: 4px; }
+/* No pointer-events:none: it suppresses the button’s own title tooltip, which is
+   the only thing explaining why a control is greyed out, and it makes
+   cursor:not-allowed dead too. Same reasoning as .em-block-table-th below. */
 .em-block-tools .em-btn:disabled,
 .em-block-table-actions .em-btn:disabled,
 .em-block-add .em-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
 .em-block-add {
@@ -1517,10 +1519,12 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   border: 1px solid var(--line);
   background: var(--surface);
 }
-.em-block-table .em-table { min-width: 480px; width: 100%; }
+/* min-width is set inline by TableBlock, sized to the column count. A flat value
+   here overflowed a 390px screen even for a 1-column table (UX review C2). */
+.em-block-table .em-table { width: 100%; }
 .em-block-table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Header cell = the column name input plus its own delete control, same
-   affordance as the per-row 🗑 in the trailing column. */
+   affordance as the per-row delete button in the trailing column. */
 .em-block-table-th { display: flex; align-items: center; gap: 4px; }
 .em-block-table-th .em-table-input { flex: 1; min-width: 0; }
 /* No pointer-events:none here: it would suppress the button's own title tooltip
@@ -1541,7 +1545,6 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
 .em-form-mode-tabs .em-tab:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  pointer-events: none;
 }
 .em-form-mode-confirm {
   display: flex;
@@ -1554,6 +1557,19 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   border: 1px solid rgba(220,38,38,0.25);
 }
 .em-form-mode-confirm-text { font-size: 12.5px; font-weight: 600; color: #B91C1C; }
+/* Inline two-step confirm on a block header (UX review C3). Same visual language
+   as .em-form-mode-confirm so a destructive step always looks the same. */
+.em-block-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  background: rgba(220,38,38,0.06);
+  border: 1px solid rgba(220,38,38,0.25);
+}
+.em-block-confirm-text { font-size: 12px; font-weight: 600; color: #B91C1C; }
 .em-form-mode-lock-note {
   font-size: 11.5px;
   color: var(--muted);
@@ -1561,6 +1577,20 @@ button, input, select, textarea { font: inherit; cursor: pointer; }
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+/* A blocking condition rendered in the warning voice (UX review C1). Inherits the
+   amber panel from .em-hint-warn and adds the row layout the old
+   .em-form-mode-lock-note provided, so the text and its escape-hatch button
+   still sit on one line. Font size is deliberately NOT 11.5px: this message
+   stops the requester from submitting, so it must not be the faintest text
+   on the page. */
+.em-form-mode-block-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .em-hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }

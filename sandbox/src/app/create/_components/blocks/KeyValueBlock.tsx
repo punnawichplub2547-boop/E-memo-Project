@@ -1,6 +1,7 @@
 "use client";
 
 import { setKeyValuePair, type KeyValuePair } from "@/lib/memo-body-blocks";
+import { IconTrash } from "@/components/icons";
 
 type Props = { pairs: KeyValuePair[]; onChange: (pairs: KeyValuePair[]) => void };
 
@@ -29,7 +30,7 @@ export function KeyValueBlock({ pairs, onChange }: Props) {
             aria-label="ลบรายการนี้"
             onClick={() => onChange(pairs.filter((_, idx) => idx !== i))}
           >
-            🗑
+            <IconTrash size={13} />
           </button>
         </div>
       ))}
