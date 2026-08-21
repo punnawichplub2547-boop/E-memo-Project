@@ -7,7 +7,6 @@ import type { ApprovalLevel, ApprovalStepKey, MemoRecord } from "../approval";
 import { approvalLabels, computePriceRowTotals } from "../approval";
 import { describeCustomStep } from "../custom-route";
 import { buildCustomSignatureSlots, type SignatureSlot } from "./memo-signature-slots";
-import { safeSpreadsheetText } from "./excel-safe-text";
 import { spanColumns, FORM_COL_WIDTHS } from "./span-columns";
 
 export type MemoSignature = {
@@ -378,16 +377,28 @@ function collapseToSpanCount(cells: string[], spanCount: number): string[] {
 // spec §6.2). `system` blocks are pointers, not a copy of the data (§4.4) — they call the
 // same renderItemsTable/renderPriceTable used by standard mode, so the underlying
 // price/request-item data (and its VAT math, selected-vendor flag, etc.) never needs a
-// second implementation. Every free-typed string goes through safeSpreadsheetText() —
-// unlike the fixed standard-mode tables, this surface lets the requester type into
-// arbitrarily many cells, so formula injection (§7.1) is a real risk here.
+// second implementation.
+//
+// Free-typed strings are written verbatim — deliberately NOT through
+// safeSpreadsheetText(). The .xlsx format encodes cell type explicitly, and ExcelJS
+// decides it in exceljs/lib/doc/cell.js::getType(): a plain string is always
+// Cell.Types.String, and Cell.Types.Formula requires an object value carrying a
+// `formula`/`sharedFormula` key. There is no `startsWith('=')` anywhere in
+// exceljs/lib, so no text this function writes can become a formula in the file.
+// The apostrophe prefix therefore protected nothing here while corrupting real
+// content: "-" is a formula-trigger character and Thai memo bullets beginning with
+// "- " are completely ordinary, so the ISO F-DC-006 printout showed a literal
+// apostrophe on the requester's own words. §7.1 formula injection is a CSV problem —
+// Excel re-parses text on CSV import — and memo-csv.ts still uses safeSpreadsheetText
+// for exactly that reason. Do not "restore" it here; if defense-in-depth is ever
+// wanted, set cell.style.quotePrefix instead of mutating the value.
 function renderBodyBlocks(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: number): number {
   let r = startRow;
   for (const block of memo.bodyBlocks ?? []) {
     switch (block.type) {
       case "paragraph": {
         for (const chunk of chunkText(block.text, MAX_PARAGRAPH_CHARS)) {
-          const text = safeSpreadsheetText(chunk);
+          const text = chunk;
           setRange(ws, 1, TOTAL_COLS, r, text, { wrap: true });
           fitRowHeight(ws, r, text, 1, TOTAL_COLS, { minHeight: 16 });
           r++;
@@ -409,13 +420,13 @@ function renderBodyBlocks(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: num
         const spans = spanColumns(block.headers.length);
         const headers = collapseToSpanCount(block.headers, spans.length);
         headers.forEach((header, i) =>
-          headerCell(ws, spans[i][0], spans[i][1], r, safeSpreadsheetText(header))
+          headerCell(ws, spans[i][0], spans[i][1], r, header)
         );
         r++;
         for (const row of block.rows) {
           const cells = collapseToSpanCount(row, spans.length);
           cells.forEach((cell, i) => {
-            const text = safeSpreadsheetText(cell);
+            const text = cell;
             setRange(ws, spans[i][0], spans[i][1], r, text, { wrap: true });
             fitRowHeight(ws, r, text, spans[i][0], spans[i][1], { minHeight: 16 });
           });
@@ -425,8 +436,8 @@ function renderBodyBlocks(ws: ExcelJS.Worksheet, memo: MemoRecord, startRow: num
       }
       case "keyValue": {
         for (const pair of block.pairs) {
-          const value = safeSpreadsheetText(pair.value);
-          setRange(ws, 1, 3, r, safeSpreadsheetText(pair.key), { bold: true });
+          const value = pair.value;
+          setRange(ws, 1, 3, r, pair.key, { bold: true });
           setRange(ws, 4, TOTAL_COLS, r, value, { wrap: true });
           fitRowHeight(ws, r, value, 4, TOTAL_COLS, { minHeight: 16 });
           r++;

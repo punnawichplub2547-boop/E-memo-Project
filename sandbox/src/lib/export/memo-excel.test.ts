@@ -390,23 +390,81 @@ describe("buildMemoExcelWorkbook — free-form body blocks (Task 11)", () => {
     expect(chunks.map((c) => c.length)).toEqual([1200, 1200, 1200, 1200, 200]);
   });
 
-  it("neutralises a formula typed into a table cell", async () => {
+  // I2: the .xlsx format encodes cell type explicitly — ExcelJS decides it in
+  // doc/cell.js::getType(), where a plain string is always Cell.Types.String and
+  // Cell.Types.Formula requires an object value with a `formula`/`sharedFormula` key
+  // (there is no `startsWith('=')` anywhere in exceljs/lib). So nothing the requester
+  // types can become a formula in a file this generator writes, and the apostrophe
+  // prefix that used to be added here bought zero protection while corrupting real
+  // Thai text — a body line starting with "- " is completely ordinary and was being
+  // printed as "'- ..." on the ISO form.
+  //
+  // These tests therefore assert BOTH halves: the text survives verbatim AND the cell
+  // is still a plain string. Checking only the text would keep passing if someone
+  // later wrote the value as a real formula object.
+  function findCellByValue(ws: ExcelJS.Worksheet, value: string): ExcelJS.Cell | undefined {
+    const matches: ExcelJS.Cell[] = [];
+    ws.eachRow((row) => row.eachCell((cell) => {
+      if (cell.type === ExcelJS.ValueType.Merge) return;
+      if (cell.value === value) matches.push(cell);
+    }));
+    return matches[0];
+  }
+
+  function expectPlainString(ws: ExcelJS.Worksheet, value: string) {
+    const cell = findCellByValue(ws, value);
+    expect(cell, `no cell holds ${JSON.stringify(value)} verbatim`).toBeDefined();
+    expect(cell!.type).toBe(ExcelJS.ValueType.String);
+    expect(cell!.formula).toBeUndefined();
+  }
+
+  it("writes formula-looking text in a table cell verbatim, as a string not a formula", async () => {
     const wb = await buildMemoExcelWorkbook(makeMemo({
       formMode: "freeform",
       bodyBlocks: [{ id: "t", type: "table", headers: ["ช่อง"], rows: [['=HYPERLINK("http://evil")']] }],
     }), []);
-    const text = sheetText(wb.getWorksheet("Memo")!);
-    expect(text).toContain(`'=HYPERLINK`);
+    const ws = wb.getWorksheet("Memo")!;
+    expectPlainString(ws, '=HYPERLINK("http://evil")');
+    expect(sheetText(ws)).not.toContain(`'=HYPERLINK`);
   });
 
-  it("neutralises a formula typed into a key-value pair", async () => {
+  it("writes formula-looking text in a key-value pair verbatim, as a string not a formula", async () => {
     const wb = await buildMemoExcelWorkbook(makeMemo({
       formMode: "freeform",
       bodyBlocks: [{ id: "kv", type: "keyValue", pairs: [{ key: "=cmd", value: "+2+3" }] }],
     }), []);
-    const text = sheetText(wb.getWorksheet("Memo")!);
-    expect(text).toContain(`'=cmd`);
-    expect(text).toContain(`'+2+3`);
+    const ws = wb.getWorksheet("Memo")!;
+    expectPlainString(ws, "=cmd");
+    expectPlainString(ws, "+2+3");
+  });
+
+  // Coverage minor #3: the old suite only covered a body cell and a key-value pair.
+  it("writes formula-looking text in a table HEADER verbatim, as a string not a formula", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "t", type: "table", headers: ["@SUM(A1:A9)"], rows: [["ค่า"]] }],
+    }), []);
+    expectPlainString(wb.getWorksheet("Memo")!, "@SUM(A1:A9)");
+  });
+
+  it("writes a paragraph that starts with a hyphen verbatim, as a string not a formula", async () => {
+    // The real-world regression: "-" is a FORMULA_TRIGGERS character, and a Thai memo
+    // bullet line beginning with "- " is completely ordinary.
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "p", type: "paragraph", text: "- ค่าขนส่ง 2,000 บาท" }],
+    }), []);
+    const ws = wb.getWorksheet("Memo")!;
+    expectPlainString(ws, "- ค่าขนส่ง 2,000 บาท");
+    expect(sheetText(ws)).not.toContain("'- ค่าขนส่ง");
+  });
+
+  it("writes a paragraph that starts with = verbatim, as a string not a formula", async () => {
+    const wb = await buildMemoExcelWorkbook(makeMemo({
+      formMode: "freeform",
+      bodyBlocks: [{ id: "p", type: "paragraph", text: "=cmd|'/c calc'!A1" }],
+    }), []);
+    expectPlainString(wb.getWorksheet("Memo")!, "=cmd|'/c calc'!A1");
   });
 
   it("still renders the budget table on a free-form memo (fixed position, not a block)", async () => {
